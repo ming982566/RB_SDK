@@ -76,6 +76,7 @@ public:
     explicit RaceBearBackend(QObject* parent = nullptr);
     ~RaceBearBackend() override;
 
+    // frequencyHz 单位为 Hz，不是毫秒；默认 100 表示目标周期约 10 ms。
     // 整个应用只调用一次 initialize/shutdown，页面之间共享该后端对象。
     bool initialize(const QString& appDataName, int frequencyHz = 100);
     void shutdown();
@@ -157,6 +158,7 @@ bool RaceBearBackend::initialize(
 
     initialized_ = true;
 
+    // frequencyHz 是每秒计算次数；100 Hz 对应约 10 ms 周期。
     // SDK 内部循环负责后端计算；Qt 定时器只读取结果，不能重复驱动计算。
     if (RB_Runtime_StartLoop(frequencyHz) != RB_OK) {
         shutdown();
@@ -300,7 +302,7 @@ connect(backend_, &RaceBearBackend::stateChanged, this, [this]() {
 connect(backend_, &RaceBearBackend::sdkLogReceived,
     this, &MainWindow::appendSdkLog);
 
-backend_->initialize(QStringLiteral("MyQtMotionApp"), 100);
+backend_->initialize(QStringLiteral("MyQtMotionApp"), 100); // 100 Hz，约 10 ms 周期。
 ```
 
 连接输出：

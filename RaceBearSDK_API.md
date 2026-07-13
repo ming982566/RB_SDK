@@ -82,7 +82,7 @@ int main()
         return 2;
     }
 
-    // SDK 在内部使用 MultimediaTimer 驱动后端计算。
+    // 参数单位是 Hz。100 表示每秒计算 100 次，目标周期约 10 ms。
     if (RB_Runtime_StartLoop(100) != RB_OK) {
         std::puts("RaceBear SDK runtime loop failed to start.");
         RB_Runtime_Shutdown();
@@ -118,6 +118,20 @@ RB_Runtime_StartLoop()        常规前端必须
 停止宿主自己的定时器和工作线程
 RB_Runtime_Shutdown()         退出前必须
 ```
+
+### 计算循环频率
+
+`RB_Runtime_StartLoop(int frequencyHz)` 的参数是**每秒计算次数，单位 Hz**，不是定时器周期毫秒数。
+
+| 传入值 | 实际含义 | 目标周期 |
+| ------ | -------- | -------- |
+| `50` | 50 Hz，每秒约 50 次 | 约 20 ms |
+| `100` | 100 Hz，每秒约 100 次，常规动感平台推荐值 | 约 10 ms |
+| `200` | 200 Hz，每秒约 200 次 | 约 5 ms |
+
+有效输入范围为 1-1000 Hz。实际执行频率仍受 Windows 调度、计算负载和设备链路影响。UI 刷新频率与后端计算频率是两回事：后端可以运行在 100 Hz，而 UI 只需以 30-60 Hz 调用 `RB_State_Read()`。
+
+`RB_Runtime_SetLoopFrequency()` 使用同样的 Hz 单位，`RB_Runtime_GetLoopFrequency()` 返回的也是当前目标频率 Hz。
 
 宿主程序不需要为 SDK 调用 `CoInitializeEx()` 或 `CoUninitialize()`。SDK 在自己的线程中管理 COM 生命周期。
 

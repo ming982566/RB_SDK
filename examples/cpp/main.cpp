@@ -15,7 +15,7 @@ namespace
 	class RuntimeSession
 	{
 	public:
-		// appDataName 决定配置和授权目录；frequencyHz 是 SDK 内部计算频率。
+		// frequencyHz 单位为 Hz，不是毫秒；100 表示每秒 100 次，目标周期约 10 ms。
 		bool Start(const char* appDataName, int frequencyHz)
 		{
 			// 应用目录名只能在初始化前设置，不能传入完整路径。
@@ -120,7 +120,7 @@ int main()
 
 	// 示例使用独立目录，避免覆盖正式 SimRacebear 或第三方产品配置。
 	RuntimeSession session;
-	if (!session.Start("RaceBearCppExample", 100)) {
+	if (!session.Start("RaceBearCppExample", 100)) { // 100 Hz，目标周期约 10 ms。
 		std::puts("Failed to initialize RaceBear SDK.");
 		return 1;
 	}

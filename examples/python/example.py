@@ -13,7 +13,7 @@ def main() -> None:
 
         # 使用示例专属目录，避免读写正式产品的配置和本地授权文件。
         # 100 Hz 是后端计算频率，不是下面 Python 循环的刷新频率。
-        sdk.initialize("RaceBearPythonExample", frequency_hz=100)
+        sdk.initialize("RaceBearPythonExample", frequency_hz=100)  # 100 Hz，约 10 ms 周期。
 
         # 串口枚举不需要第三方库，返回值已经转换为 Python 字典列表。
         print("Serial ports:")

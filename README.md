@@ -23,7 +23,7 @@ minimum lifecycle is:
 ```cpp
 RB_Runtime_SetAppDataName("YourCompanyName");
 RB_Runtime_Initialize();
-RB_Runtime_StartLoop(100);
+RB_Runtime_StartLoop(100); // 100 Hz = about 10 ms per calculation; not 100 ms
 
 // Read state and operate the SDK.
 

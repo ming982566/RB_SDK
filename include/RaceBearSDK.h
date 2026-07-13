@@ -937,6 +937,7 @@ RB_API void RB_Runtime_Shutdown();
  * @brief 启动由 SDK MultimediaTimer 驱动的后端计算循环；已启动时会按新频率重建循环。
  * @param frequencyHz 请求频率，单位 Hz；必须大于 0，实际值会限制在 1-1000 Hz。
  * @return RB_OK 表示启动成功；RB_INVALID_ARGUMENT 表示频率不合法；RB_ERROR 表示未初始化或定时器启动失败。
+ * @note 传入 100 表示 100 Hz，即每秒计算 100 次、目标周期约 10 ms；参数不是毫秒数。
  */
 RB_API int RB_Runtime_StartLoop(int frequencyHz);
 
@@ -962,6 +963,7 @@ RB_API int RB_Runtime_StopLoop();
  * @brief 修改内部计算循环频率；循环未启动时只保存频率，已启动时立即重建定时器。
  * @param frequencyHz 请求频率，单位 Hz；必须大于 0，实际值会限制在 1-1000 Hz。
  * @return RB_OK 表示设置成功；RB_INVALID_ARGUMENT 表示频率不合法；RB_ERROR 表示重建定时器失败。
+ * @note 传入 50 表示 50 Hz、目标周期约 20 ms；参数不是定时器周期毫秒数。
  */
 RB_API int RB_Runtime_SetLoopFrequency(int frequencyHz);
 
