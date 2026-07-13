@@ -76,9 +76,9 @@ public:
     explicit RaceBearBackend(QObject* parent = nullptr);
     ~RaceBearBackend() override;
 
-    // frequencyHz 单位为 Hz，不是毫秒；默认 100 表示目标周期约 10 ms。
+    // intervalMs 单位为毫秒；默认值2表示目标周期约2ms。
     // 整个应用只调用一次 initialize/shutdown，页面之间共享该后端对象。
-    bool initialize(const QString& appDataName, int frequencyHz = 100);
+    bool initialize(const QString& appDataName, int intervalMs = 2);
     void shutdown();
 
     // state() 返回最近一次定时器读取的副本，UI 不直接高频调用 DLL。
@@ -139,7 +139,7 @@ RaceBearBackend::~RaceBearBackend()
 
 bool RaceBearBackend::initialize(
     const QString& appDataName,
-    int frequencyHz)
+    int intervalMs)
 {
     if (initialized_) {
         return true;
@@ -158,9 +158,9 @@ bool RaceBearBackend::initialize(
 
     initialized_ = true;
 
-    // frequencyHz 是每秒计算次数；100 Hz 对应约 10 ms 周期。
+    // intervalMs 是计算周期间隔，单位毫秒。
     // SDK 内部循环负责后端计算；Qt 定时器只读取结果，不能重复驱动计算。
-    if (RB_Runtime_StartLoop(frequencyHz) != RB_OK) {
+    if (RB_Runtime_StartLoop(intervalMs) != RB_OK) {
         shutdown();
         emit sdkError(QStringLiteral("RaceBear SDK 计算循环启动失败"));
         return false;
@@ -302,7 +302,7 @@ connect(backend_, &RaceBearBackend::stateChanged, this, [this]() {
 connect(backend_, &RaceBearBackend::sdkLogReceived,
     this, &MainWindow::appendSdkLog);
 
-backend_->initialize(QStringLiteral("MyQtMotionApp"), 100); // 100 Hz，约 10 ms 周期。
+backend_->initialize(QStringLiteral("MyQtMotionApp"), 2); // 计算周期间隔2ms。
 ```
 
 连接输出：

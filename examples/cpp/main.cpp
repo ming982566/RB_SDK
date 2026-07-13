@@ -15,8 +15,8 @@ namespace
 	class RuntimeSession
 	{
 	public:
-		// frequencyHz 单位为 Hz，不是毫秒；100 表示每秒 100 次，目标周期约 10 ms。
-		bool Start(const char* appDataName, int frequencyHz)
+		// intervalMs 单位为毫秒；当前示例使用2ms。
+		bool Start(const char* appDataName, int intervalMs)
 		{
 			// 应用目录名只能在初始化前设置，不能传入完整路径。
 			if (RB_Runtime_SetAppDataName(appDataName) != RB_OK) {
@@ -30,7 +30,7 @@ namespace
 			initialized_ = true;
 
 			// 后端计算由 SDK 的 MultimediaTimer 驱动，前端不再自行调用计算函数。
-			if (RB_Runtime_StartLoop(frequencyHz) != RB_OK) {
+			if (RB_Runtime_StartLoop(intervalMs) != RB_OK) {
 				Stop();
 				return false;
 			}
@@ -120,7 +120,7 @@ int main()
 
 	// 示例使用独立目录，避免覆盖正式 SimRacebear 或第三方产品配置。
 	RuntimeSession session;
-	if (!session.Start("RaceBearCppExample", 100)) { // 100 Hz，目标周期约 10 ms。
+	if (!session.Start("RaceBearCppExample", 2)) { // 计算周期间隔2ms。
 		std::puts("Failed to initialize RaceBear SDK.");
 		return 1;
 	}

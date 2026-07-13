@@ -482,12 +482,12 @@ class RaceBearSDK:
         value = self._dll.RB_Runtime_GetVersion()
         return value.decode("utf-8", errors="replace") if value else ""
 
-    def initialize(self, app_data_name: str, frequency_hz: int = 100) -> None:
+    def initialize(self, app_data_name: str, interval_ms: int = 2) -> None:
         """设置独立应用目录、初始化 SDK 并启动内部计算循环。
 
         app_data_name 必须是目录名而不是完整路径。任一步失败都会抛出
         RaceBearError；计算循环启动失败时会先自动关闭已初始化的 SDK。
-        frequency_hz 单位为 Hz，不是毫秒；默认 100 表示目标周期约 10 ms。
+        interval_ms 单位为毫秒；默认值2表示目标周期约2ms。
         """
         if self._initialized:
             raise RuntimeError("RaceBear SDK is already initialized.")
@@ -502,8 +502,8 @@ class RaceBearSDK:
             raise RaceBearError("RB_Runtime_Initialize", rc)
 
         self._initialized = True
-        # frequency_hz 是每秒计算次数；100 Hz 对应约 10 ms 周期。
-        rc = self._dll.RB_Runtime_StartLoop(frequency_hz)
+        # 后端计算由SDK的MultimediaTimer驱动，Python只负责读取状态。
+        rc = self._dll.RB_Runtime_StartLoop(interval_ms)
         if rc != RB_OK:
             self.close()
             raise RaceBearError("RB_Runtime_StartLoop", rc)

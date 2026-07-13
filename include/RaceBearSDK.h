@@ -934,12 +934,12 @@ RB_API int RB_Runtime_Initialize();
 RB_API void RB_Runtime_Shutdown();
 
 /**
- * @brief 启动由 SDK MultimediaTimer 驱动的后端计算循环；已启动时会按新频率重建循环。
- * @param frequencyHz 请求频率，单位 Hz；必须大于 0，实际值会限制在 1-1000 Hz。
- * @return RB_OK 表示启动成功；RB_INVALID_ARGUMENT 表示频率不合法；RB_ERROR 表示未初始化或定时器启动失败。
- * @note 传入 100 表示 100 Hz，即每秒计算 100 次、目标周期约 10 ms；参数不是毫秒数。
+ * @brief 启动由 SDK MultimediaTimer 驱动的后端计算循环；已启动时会按新周期间隔重建循环。
+ * @param intervalMs 计算周期间隔，单位毫秒；有效范围 1-1000 ms，推荐初始值为 2 ms。
+ * @return RB_OK 表示启动成功；RB_INVALID_ARGUMENT 表示间隔不合法；RB_ERROR 表示未初始化或定时器启动失败。
+ * @note 传入 2 表示约每 2 ms 计算一次；传入 1 表示约每 1 ms 计算一次。
  */
-RB_API int RB_Runtime_StartLoop(int frequencyHz);
+RB_API int RB_Runtime_StartLoop(int intervalMs);
 
 /**
  * @brief 暂停已启动的内部计算循环，但保留定时器和当前频率。
@@ -960,18 +960,17 @@ RB_API int RB_Runtime_ResumeLoop();
 RB_API int RB_Runtime_StopLoop();
 
 /**
- * @brief 修改内部计算循环频率；循环未启动时只保存频率，已启动时立即重建定时器。
- * @param frequencyHz 请求频率，单位 Hz；必须大于 0，实际值会限制在 1-1000 Hz。
- * @return RB_OK 表示设置成功；RB_INVALID_ARGUMENT 表示频率不合法；RB_ERROR 表示重建定时器失败。
- * @note 传入 50 表示 50 Hz、目标周期约 20 ms；参数不是定时器周期毫秒数。
+ * @brief 修改内部计算循环周期；循环未启动时只保存间隔，已启动时立即重建定时器。
+ * @param intervalMs 计算周期间隔，单位毫秒；有效范围 1-1000 ms。
+ * @return RB_OK 表示设置成功；RB_INVALID_ARGUMENT 表示间隔不合法；RB_ERROR 表示重建定时器失败。
  */
-RB_API int RB_Runtime_SetLoopFrequency(int frequencyHz);
+RB_API int RB_Runtime_SetLoopIntervalMs(int intervalMs);
 
 /**
- * @brief 获取当前保存的内部计算循环频率。
- * @return 成功时返回 1-1000 范围内的频率，单位 Hz；内部失败时返回 RB_ERROR。
+ * @brief 获取当前保存的内部计算循环周期间隔。
+ * @return 成功时返回 1-1000 范围内的间隔，单位毫秒；内部失败时返回 RB_ERROR。
  */
-RB_API int RB_Runtime_GetLoopFrequency();
+RB_API int RB_Runtime_GetLoopIntervalMs();
 
 /**
  * @brief 查询内部计算定时器是否已经启动。

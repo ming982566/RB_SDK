@@ -82,8 +82,8 @@ int main()
         return 2;
     }
 
-    // 参数单位是 Hz。100 表示每秒计算 100 次，目标周期约 10 ms。
-    if (RB_Runtime_StartLoop(100) != RB_OK) {
+    // 参数单位是 ms。2 表示约每 2 ms 计算一次。
+    if (RB_Runtime_StartLoop(2) != RB_OK) {
         std::puts("RaceBear SDK runtime loop failed to start.");
         RB_Runtime_Shutdown();
         return 3;
@@ -119,19 +119,21 @@ RB_Runtime_StartLoop()        常规前端必须
 RB_Runtime_Shutdown()         退出前必须
 ```
 
-### 计算循环频率
+### 计算循环周期
 
-`RB_Runtime_StartLoop(int frequencyHz)` 的参数是**每秒计算次数，单位 Hz**，不是定时器周期毫秒数。
+`RB_Runtime_StartLoop(int intervalMs)` 的参数是计算周期间隔，单位毫秒。
 
-| 传入值 | 实际含义 | 目标周期 |
-| ------ | -------- | -------- |
-| `50` | 50 Hz，每秒约 50 次 | 约 20 ms |
-| `100` | 100 Hz，每秒约 100 次，常规动感平台推荐值 | 约 10 ms |
-| `200` | 200 Hz，每秒约 200 次 | 约 5 ms |
+| 传入值 | 实际含义 |
+| ------ | -------- |
+| `1` | 目标周期约 1 ms |
+| `2` | 目标周期约 2 ms，当前推荐初始值 |
+| `10` | 目标周期约 10 ms |
 
-有效输入范围为 1-1000 Hz。实际执行频率仍受 Windows 调度、计算负载和设备链路影响。UI 刷新频率与后端计算频率是两回事：后端可以运行在 100 Hz，而 UI 只需以 30-60 Hz 调用 `RB_State_Read()`。
+有效输入范围为 1-1000 ms。实际执行周期仍受 Windows 调度、计算负载和设备链路影响。UI 刷新周期与后端计算周期是两回事：后端可以按 2 ms 运行，而 UI 只需按约 16-33 ms 调用 `RB_State_Read()`。
 
-`RB_Runtime_SetLoopFrequency()` 使用同样的 Hz 单位，`RB_Runtime_GetLoopFrequency()` 返回的也是当前目标频率 Hz。
+`RB_Runtime_SetLoopIntervalMs()` 使用相同的毫秒单位，`RB_Runtime_GetLoopIntervalMs()` 返回当前目标周期间隔毫秒数。
+
+SDK 0.4.2 将本参数从 Hz 改为 ms。旧代码中的 `RB_Runtime_StartLoop(100)` 必须按实际需求改为毫秒值，不能直接沿用。
 
 宿主程序不需要为 SDK 调用 `CoInitializeEx()` 或 `CoUninitialize()`。SDK 在自己的线程中管理 COM 生命周期。
 
@@ -1092,7 +1094,7 @@ void DrainSdkLogs()
 
 | 工作                | 建议线程                                                    |
 | ------------------- | ----------------------------------------------------------- |
-| SDK 后端计算        | 由 `RB_Runtime_StartLoop()` 创建的内部 MultimediaTimer 负责 |
+| SDK 后端计算        | 由 `RB_Runtime_StartLoop(intervalMs)` 创建的内部 MultimediaTimer 负责 |
 | UI 状态刷新         | UI 定时器，通常 30-60 Hz；需要更顺滑预览时可到 100 Hz       |
 | JSON 目录和配置读取 | 页面加载或用户刷新时调用，不要高频轮询                      |
 | 串口和设备回调      | SDK 工作线程触发，转发到 UI 线程                            |
