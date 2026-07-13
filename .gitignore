@@ -2,7 +2,7 @@
 *.zip
 *.sha256
 build.log
-release/
+/release/
 tmp/
 
 # Visual Studio and CMake output
