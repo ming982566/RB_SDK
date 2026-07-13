@@ -1,24 +1,93 @@
-This is free and unencumbered software released into the public domain.
+RaceBear SDK Proprietary License Agreement
+Version 1.0, July 2026
 
-Anyone is free to copy, modify, publish, use, compile, sell, or
-distribute this software, either in source code form or as a compiled
-binary, for any purpose, commercial or non-commercial, and by any
-means.
+Copyright (c) 2026 RaceBear. All rights reserved.
 
-In jurisdictions that recognize copyright laws, the author or authors
-of this software dedicate any and all copyright interest in the
-software to the public domain. We make this dedication for the benefit
-of the public at large and to the detriment of our heirs and
-successors. We intend this dedication to be an overt act of
-relinquishment in perpetuity of all present and future rights to this
-software under copyright law.
+1. License Grant
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
+Subject to a valid RaceBear SDK license and compliance with this
+Agreement, RaceBear grants you a limited, non-exclusive,
+non-transferable, and revocable license to:
 
-For more information, please refer to <https://unlicense.org>
+* use the RaceBear SDK to develop applications that integrate with
+  RaceBear-supported software and hardware;
+* make reasonable backup copies for internal development; and
+* redistribute the unmodified RaceBearSDK.dll runtime only as an
+  inseparable part of an application developed by you with this SDK.
+
+2. Restrictions
+
+You may not:
+
+* sell, sublicense, publish, mirror, or redistribute the SDK, its
+  libraries, headers, documentation, or examples as a standalone SDK;
+* modify, translate, reverse engineer, decompile, disassemble, or
+  attempt to derive source code from the SDK, except where such a
+  restriction is prohibited by applicable law;
+* remove or alter copyright, licensing, authentication, telemetry, or
+  attribution notices;
+* bypass, disable, interfere with, or help another party bypass any
+  license, authorization, output-locking, or security mechanism;
+* use RaceBear names, trademarks, or branding to imply endorsement or
+  that a third-party application is an official RaceBear product; or
+* use the SDK in a way that violates applicable law or third-party
+  rights.
+
+3. Runtime Redistribution
+
+Redistribution of RaceBearSDK.dll is permitted only when all of the
+following conditions are met:
+
+* the runtime remains unmodified;
+* it is distributed as a required component of your licensed
+  application, not as a standalone download or SDK;
+* your application does not expose the SDK for reuse by unrelated
+  applications; and
+* recipients remain subject to RaceBear authorization and output
+  restrictions enforced by the runtime.
+
+Debug libraries, import libraries, headers, documentation, symbols,
+and examples may not be redistributed to end users unless RaceBear
+has provided separate written permission.
+
+4. Ownership
+
+The SDK is licensed, not sold. RaceBear retains all title, ownership,
+and intellectual-property rights in the SDK. No rights are granted
+except those expressly stated in this Agreement.
+
+5. Updates and Compatibility
+
+RaceBear may change, replace, or discontinue SDK functions, protocols,
+authorization services, and supported products. You are responsible
+for testing your application against the exact SDK version you ship.
+
+6. Termination
+
+This license terminates automatically if you violate this Agreement
+or if the associated RaceBear authorization is revoked. Upon
+termination, you must stop using and distributing the SDK and remove
+all copies under your control, except copies already lawfully
+distributed as part of an application before termination.
+
+7. Disclaimer
+
+THE SDK IS PROVIDED "AS IS" WITHOUT WARRANTIES OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE, NON-INFRINGEMENT, RELIABILITY, OR AVAILABILITY.
+
+8. Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, RACEBEAR SHALL NOT BE LIABLE
+FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE
+DAMAGES, OR FOR LOSS OF DATA, REVENUE, PROFITS, BUSINESS, OR DEVICE
+AVAILABILITY ARISING FROM USE OF THE SDK.
+
+9. Separate Agreement
+
+A separately signed commercial agreement with RaceBear takes
+precedence over conflicting terms in this Agreement.
+
+For commercial licensing or redistribution permission, contact the
+RaceBear project owner through:
+https://github.com/ming982566/RB_SDK

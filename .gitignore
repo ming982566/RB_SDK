@@ -1,0 +1,18 @@
+# Local release staging and generated files
+*.zip
+*.sha256
+build.log
+release/
+tmp/
+
+# Visual Studio and CMake output
+.vs/
+.vscode/
+obj/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.user
+*.pdb
+*.exp
+*.ilk
