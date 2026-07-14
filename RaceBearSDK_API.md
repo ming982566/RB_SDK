@@ -203,7 +203,7 @@ if (rc == RB_OK) {
 | `state.Rig`        | 当前平台、轴数量和 6DOF 分层输出                     |
 | `state.Function`   | 风感、安全带、震动等功能摘要                         |
 | `state.Output`     | 输出数量、连接状态和发送间隔                         |
-| `state.Can`        | CAN 控制器、电机状态和固件更新状态                   |
+| `state.Can`        | CAN 状态摘要；完整设备管理当前不作为第三方公共能力   |
 | `state.Wind`       | 风感当前输入和各通道输出                             |
 | `state.Seatbelt`   | 安全带张紧输入、左右输出和测试状态                   |
 | `state.LastAction` | 最近一次后端动作说明                                 |
@@ -276,7 +276,7 @@ bool ReadSdkJson(const char* key, std::string& result)
 | `output.catalog`       | 输出实例和可输出 Key   | 输出页面和命令编辑器 |
 | `motionEffect.catalog` | 运动增强效果目录       | 运动增强页面         |
 | `haptic.catalog`       | 震动效果目录           | 震动页面             |
-| `can.state`            | CAN 状态 JSON          | CAN 页面或诊断工具   |
+| `can.state`            | CAN 状态摘要 JSON      | 只读状态或诊断显示   |
 | `plugin.catalog`       | 功能插件目录           | 插件页面             |
 
 调用示例：
@@ -1207,7 +1207,7 @@ if (rc == RB_OK) {
 { "ok": false, "message": "unknown command" }
 ```
 
-命令返回 `RB_OK` 只表示本次命令被成功执行。对于连接、回零、固件更新等持续过程，前端还应继续读取 `RB_RuntimeState` 中的状态，直到流程完成或出现错误。
+命令返回 `RB_OK` 只表示本次命令被成功执行。对于输出连接等持续过程，前端还应继续读取 `RB_RuntimeState` 中的状态，直到流程完成或出现错误。
 
 ## 10. 授权接入
 
@@ -1383,7 +1383,7 @@ void DrainSdkLogs()
 | 安全带 | `RB_Seatbelt_ReadConfig()`、`state.Seatbelt` | 编辑、测试、保存和应用 |
 | 震动 | `RB_Haptic_ReadProfile()`、运行摘要 | 编辑效果、输出通道、保存和应用 |
 | 输出 | `RB_Output_GetCatalog()`、`RB_OutputConfig` | 增删实例、编辑参数、Key 模板、连接和断开 |
-| 设备/CAN | `state.Can` 和对应状态包 | 初始化、恢复、固件更新和急停状态展示 |
+| 设备/CAN | `state.Can` 状态摘要 | 可选只读显示；完整设备管理当前不要求第三方实现 |
 | 日志 | `RB_Log_Read()` | 显示、持久化和清理日志 |
 | 自定义游戏 | 自定义游戏状态 | 注册 MMF/UDP 游戏、提交协议和注销 |
 
