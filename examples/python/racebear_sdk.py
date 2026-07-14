@@ -11,7 +11,7 @@ import json
 import os
 import struct
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 # 通用 RB_Result。普通 SDK 接口返回这些值；串口读写接口成功时返回字节数。
@@ -34,6 +34,7 @@ RB_HAPTIC_EFFECT_COUNT = 7
 RB_MAX_OUTPUT_INSTANCES = 32
 RB_MAX_OUTPUT_KEYS = 128
 RB_MAX_EFFECTS = 32
+RB_MAX_PLUGINS = 64
 RB_MAX_CAN_MOTORS = 16
 RB_MAX_TELEMETRY_VALUES = 512
 RB_CUSTOM_TRANSPORT_MMF = 1
@@ -310,6 +311,85 @@ class RB_EffectCatalog(ctypes.Structure):
         ("Version", ctypes.c_int),
         ("Count", ctypes.c_int),
         ("Items", RB_EffectCatalogItem * RB_MAX_EFFECTS),
+    ]
+
+
+class RB_PluginInfo(ctypes.Structure):
+    _fields_ = [
+        ("Index", ctypes.c_int),
+        ("Name", ctypes.c_char * RB_TEXT_MEDIUM),
+        ("Version", ctypes.c_char * RB_TEXT_SMALL),
+        ("StatusText", ctypes.c_char * RB_TEXT_MEDIUM),
+        ("IconPath", ctypes.c_char * RB_TEXT_LARGE),
+        ("Launchable", ctypes.c_int),
+    ]
+
+
+class RB_PluginCatalog(ctypes.Structure):
+    _fields_ = [
+        ("Size", ctypes.c_int),
+        ("Version", ctypes.c_int),
+        ("Count", ctypes.c_int),
+        ("Items", RB_PluginInfo * RB_MAX_PLUGINS),
+    ]
+
+
+class RB_GameInstallInfo(ctypes.Structure):
+    _fields_ = [
+        ("GameKey", ctypes.c_char * RB_TEXT_SMALL),
+        ("SteamAppID", ctypes.c_int),
+        ("GameName", ctypes.c_char * RB_TEXT_MEDIUM),
+        ("ProcessName", ctypes.c_char * RB_TEXT_MEDIUM),
+        ("ProcessId", ctypes.c_int),
+        ("InstallPath", ctypes.c_char * RB_TEXT_LARGE),
+        ("ExePath", ctypes.c_char * RB_TEXT_LARGE),
+        ("Source", ctypes.c_char * RB_TEXT_MEDIUM),
+        ("Found", ctypes.c_int),
+        ("Running", ctypes.c_int),
+        ("Ambiguous", ctypes.c_int),
+    ]
+
+
+class RB_GameConfig(ctypes.Structure):
+    _fields_ = [
+        ("Size", ctypes.c_int),
+        ("Version", ctypes.c_int),
+        ("SourcePort", ctypes.c_int),
+        ("SourceIP", ctypes.c_char * RB_TEXT_MEDIUM),
+        ("RemotehostIP", ctypes.c_char * RB_TEXT_MEDIUM),
+        ("ForwardingPort", ctypes.c_int),
+        ("ForwardingIP", ctypes.c_char * RB_TEXT_MEDIUM),
+        ("Forwarding", ctypes.c_int),
+        ("DirectlyConnected", ctypes.c_int),
+        ("SerialPort", ctypes.c_char * RB_TEXT_MEDIUM),
+        ("SerialBaudRate", ctypes.c_int),
+        ("Configuration", ctypes.c_char * RB_TEXT_MEDIUM),
+        ("GamePath", ctypes.c_char * RB_TEXT_LARGE),
+    ]
+
+
+class RB_PlatformConfig(ctypes.Structure):
+    _fields_ = [
+        ("Size", ctypes.c_int),
+        ("Version", ctypes.c_int),
+        ("Type", ctypes.c_int),
+        ("Index", ctypes.c_int),
+        ("ConfigName", ctypes.c_char * RB_TEXT_MEDIUM),
+        ("Name", ctypes.c_char * RB_TEXT_MEDIUM),
+        ("L1", ctypes.c_int), ("L2", ctypes.c_int), ("L3", ctypes.c_int),
+        ("L4", ctypes.c_int), ("L5", ctypes.c_int), ("L6", ctypes.c_int),
+        ("L7", ctypes.c_int), ("L8", ctypes.c_int), ("L9", ctypes.c_int),
+        ("L10", ctypes.c_int),
+        ("OutBit", ctypes.c_int),
+        ("DefaultPos", ctypes.c_int),
+        ("OutGain", ctypes.c_int),
+        ("OutSmoothing", ctypes.c_int),
+        ("Lateral", ctypes.c_int),
+        ("Longitudinal", ctypes.c_int),
+        ("Vertical", ctypes.c_int),
+        ("DecelerationSpeed", ctypes.c_int),
+        ("Percent", ctypes.c_int),
+        ("OutKey", ctypes.c_char * RB_TEXT_MEDIUM),
     ]
 
 
@@ -726,6 +806,53 @@ class RaceBearSDK:
         self._dll.RB_Seatbelt_SetTestOutput.argtypes = [ctypes.c_int, ctypes.c_double, ctypes.c_double]
         self._dll.RB_Seatbelt_SetTestOutput.restype = ctypes.c_int
 
+        # 游戏安装、遥测源配置和功能插件目录。
+        self._dll.RB_Game_RefreshInstallations.argtypes = []
+        self._dll.RB_Game_RefreshInstallations.restype = ctypes.c_int
+        self._dll.RB_Game_GetInstallCount.argtypes = []
+        self._dll.RB_Game_GetInstallCount.restype = ctypes.c_int
+        self._dll.RB_Game_GetInstallInfo.argtypes = [ctypes.c_int, ctypes.POINTER(RB_GameInstallInfo)]
+        self._dll.RB_Game_GetInstallInfo.restype = ctypes.c_int
+        self._dll.RB_Game_ReadConfig.argtypes = [ctypes.c_char_p, ctypes.POINTER(RB_GameConfig)]
+        self._dll.RB_Game_ReadConfig.restype = ctypes.c_int
+        self._dll.RB_Game_SaveConfig.argtypes = [ctypes.c_char_p, ctypes.POINTER(RB_GameConfig)]
+        self._dll.RB_Game_SaveConfig.restype = ctypes.c_int
+        self._dll.RB_Game_AutoConnect.argtypes = [ctypes.c_int, ctypes.POINTER(RB_GameConfig)]
+        self._dll.RB_Game_AutoConnect.restype = ctypes.c_int
+        self._dll.RB_Game_AutoConfigureCurrent.argtypes = []
+        self._dll.RB_Game_AutoConfigureCurrent.restype = ctypes.c_int
+        self._dll.RB_Game_InstallCurrentPlugin.argtypes = [ctypes.c_char_p]
+        self._dll.RB_Game_InstallCurrentPlugin.restype = ctypes.c_int
+        self._dll.RB_Game_CheckCurrentSideConfig.argtypes = [ctypes.POINTER(RB_GameConfig)]
+        self._dll.RB_Game_CheckCurrentSideConfig.restype = ctypes.c_int
+
+        self._dll.RB_Plugin_Refresh.argtypes = []
+        self._dll.RB_Plugin_Refresh.restype = ctypes.c_int
+        self._dll.RB_Plugin_GetCatalog.argtypes = [ctypes.POINTER(RB_PluginCatalog)]
+        self._dll.RB_Plugin_GetCatalog.restype = ctypes.c_int
+        self._dll.RB_Plugin_Launch.argtypes = [ctypes.c_int]
+        self._dll.RB_Plugin_Launch.restype = ctypes.c_int
+        self._dll.RB_Plugin_StartRuntimes.argtypes = []
+        self._dll.RB_Plugin_StartRuntimes.restype = ctypes.c_int
+
+        # 平台选择、数值诊断和手动测试，不包含任何UI绘制依赖。
+        self._dll.RB_Platform_ReadSelectedIndex.argtypes = []
+        self._dll.RB_Platform_ReadSelectedIndex.restype = ctypes.c_int
+        self._dll.RB_Platform_SaveSelectedIndex.argtypes = [ctypes.c_int]
+        self._dll.RB_Platform_SaveSelectedIndex.restype = ctypes.c_int
+        self._dll.RB_Platform_ReadConfigByIndex.argtypes = [ctypes.c_int, ctypes.POINTER(RB_PlatformConfig)]
+        self._dll.RB_Platform_ReadConfigByIndex.restype = ctypes.c_int
+        self._dll.RB_Platform_GetPreviewPoseLimit.argtypes = [ctypes.c_int, ctypes.POINTER(RB_PlatformConfig), ctypes.c_int]
+        self._dll.RB_Platform_GetPreviewPoseLimit.restype = ctypes.c_double
+        self._dll.RB_Platform_IsPreviewPosePossible.argtypes = [ctypes.c_int, ctypes.POINTER(RB_PlatformConfig), ctypes.c_int]
+        self._dll.RB_Platform_IsPreviewPosePossible.restype = ctypes.c_int
+        self._dll.RB_ManualPose_SetTestEnabled.argtypes = [ctypes.c_int]
+        self._dll.RB_ManualPose_SetTestEnabled.restype = ctypes.c_int
+        self._dll.RB_ManualPose_SetDrive.argtypes = [ctypes.c_int, ctypes.c_double]
+        self._dll.RB_ManualPose_SetDrive.restype = ctypes.c_int
+        self._dll.RB_ManualPose_ResetDrive.argtypes = []
+        self._dll.RB_ManualPose_ResetDrive.restype = ctypes.c_int
+
         # 外部游戏源使用稳定key解析索引，再按固定结构体提交完整遥测帧。
         self._dll.RB_Telemetry_FindIndexByKey.argtypes = [ctypes.c_char_p]
         self._dll.RB_Telemetry_FindIndexByKey.restype = ctypes.c_int
@@ -851,6 +978,99 @@ class RaceBearSDK:
                 raise RaceBearError("RB_Output_GetKind", rc)
             result.append(buffer.value.decode("utf-8", errors="replace"))
         return result
+
+    def game_installations(self, refresh: bool = True) -> List[RB_GameInstallInfo]:
+        """读取游戏安装和运行状态；refresh=True 时先执行一次低频扫描。"""
+        if refresh:
+            count = self._dll.RB_Game_RefreshInstallations()
+        else:
+            count = self._dll.RB_Game_GetInstallCount()
+        if count < 0:
+            raise RaceBearError("RB_Game_RefreshInstallations", count)
+        result: List[RB_GameInstallInfo] = []
+        for index in range(count):
+            info = RB_GameInstallInfo()
+            rc = self._dll.RB_Game_GetInstallInfo(index, ctypes.byref(info))
+            if rc != RB_OK:
+                raise RaceBearError("RB_Game_GetInstallInfo", rc)
+            result.append(info)
+        return result
+
+    def read_game_config(self, game_key: str) -> RB_GameConfig:
+        """按稳定gameKey读取完整遥测配置。"""
+        config = RB_GameConfig()
+        rc = self._dll.RB_Game_ReadConfig(game_key.encode("utf-8"), ctypes.byref(config))
+        if rc != RB_OK:
+            raise RaceBearError("RB_Game_ReadConfig", rc)
+        return config
+
+    def save_game_config(self, game_key: str, config: RB_GameConfig) -> None:
+        """保存完整遥测配置；SDK会拒绝非法端口、布尔值或未终止字符串。"""
+        rc = self._dll.RB_Game_SaveConfig(game_key.encode("utf-8"), ctypes.byref(config))
+        if rc != RB_OK:
+            raise RaceBearError("RB_Game_SaveConfig", rc)
+
+    def connect_game_source(self, catalog_index: int, config: RB_GameConfig) -> None:
+        """使用已读取并修改的配置创建或重新连接游戏遥测Source。"""
+        rc = self._dll.RB_Game_AutoConnect(catalog_index, ctypes.byref(config))
+        if rc != RB_OK:
+            raise RaceBearError("RB_Game_AutoConnect", rc)
+
+    def auto_configure_current_game(self) -> None:
+        """执行当前游戏内置的一键遥测配置；不支持时抛出RaceBearError。"""
+        rc = self._dll.RB_Game_AutoConfigureCurrent()
+        if rc != RB_OK:
+            raise RaceBearError("RB_Game_AutoConfigureCurrent", rc)
+
+    def install_current_game_plugin(self, game_path: str) -> None:
+        """把当前游戏所需遥测插件安装到扫描得到的游戏目录。"""
+        rc = self._dll.RB_Game_InstallCurrentPlugin(game_path.encode("utf-8"))
+        if rc != RB_OK:
+            raise RaceBearError("RB_Game_InstallCurrentPlugin", rc)
+
+    def plugin_catalog(self, refresh: bool = True) -> RB_PluginCatalog:
+        """读取功能插件目录；刷新后旧索引不再使用。"""
+        refresh_rc = self._dll.RB_Plugin_Refresh() if refresh else 0
+        if refresh_rc < 0:
+            raise RaceBearError("RB_Plugin_Refresh", refresh_rc)
+        catalog = RB_PluginCatalog()
+        rc = self._dll.RB_Plugin_GetCatalog(ctypes.byref(catalog))
+        if rc != RB_OK:
+            raise RaceBearError("RB_Plugin_GetCatalog", rc)
+        return catalog
+
+    def launch_plugin(self, plugin_index: int) -> None:
+        """启动目录中标记为Launchable的插件前端。"""
+        rc = self._dll.RB_Plugin_Launch(plugin_index)
+        if rc != RB_OK:
+            raise RaceBearError("RB_Plugin_Launch", rc)
+
+    def read_selected_platform(self) -> Tuple[int, RB_PlatformConfig]:
+        """读取当前平台索引和完整平台配置。"""
+        index = self._dll.RB_Platform_ReadSelectedIndex()
+        if index < 0:
+            raise RaceBearError("RB_Platform_ReadSelectedIndex", index)
+        config = RB_PlatformConfig()
+        rc = self._dll.RB_Platform_ReadConfigByIndex(index, ctypes.byref(config))
+        if rc != RB_OK:
+            raise RaceBearError("RB_Platform_ReadConfigByIndex", rc)
+        return index, config
+
+    def set_manual_pose(self, dof_index: int, value: float) -> None:
+        """设置手动姿态值；线性DOF单位mm，旋转DOF单位度。"""
+        rc = self._dll.RB_ManualPose_SetDrive(dof_index, value)
+        if rc != RB_OK:
+            raise RaceBearError("RB_ManualPose_SetDrive", rc)
+
+    def enable_manual_pose(self, enabled: bool) -> None:
+        """启用或关闭手动测试；关闭前会复位全部手动输入。"""
+        if not enabled:
+            rc = self._dll.RB_ManualPose_ResetDrive()
+            if rc != RB_OK:
+                raise RaceBearError("RB_ManualPose_ResetDrive", rc)
+        rc = self._dll.RB_ManualPose_SetTestEnabled(int(enabled))
+        if rc != RB_OK:
+            raise RaceBearError("RB_ManualPose_SetTestEnabled", rc)
 
     def save_output(self, instance_index: int, config: RB_OutputConfig, apply: bool = True) -> None:
         """保存输出配置；连接参数应在该实例断开后修改。"""

@@ -129,3 +129,52 @@ int ConfigureAdditionalEffectsExample(int profileIndex)
 	return RB_Wind_SaveConfig(&wind);
 }
 
+int ConfigureGameTelemetryExample(const char* gameKey, int catalogIndex, int sourcePort)
+{
+	if (gameKey == nullptr || sourcePort < 0 || sourcePort > 65535) {
+		return RB_INVALID_ARGUMENT;
+	}
+
+	// Read the existing game-specific config so fields not shown by this page survive.
+	RB_GameConfig config{};
+	int rc = RB_Game_ReadConfig(gameKey, &config);
+	if (rc != RB_OK) {
+		return rc;
+	}
+	config.SourcePort = sourcePort;
+	strcpy_s(config.SourceIP, sizeof(config.SourceIP), "127.0.0.1");
+
+	rc = RB_Game_SaveConfig(gameKey, &config);
+	if (rc != RB_OK) {
+		return rc;
+	}
+	return RB_Game_AutoConnect(catalogIndex, &config);
+}
+
+int InspectPluginsAndManualPoseExample()
+{
+	// Plugin indexes are snapshot-local. Refresh first, then use one catalog copy.
+	if (RB_Plugin_Refresh() < 0) {
+		return RB_ERROR;
+	}
+	RB_PluginCatalog plugins{};
+	int rc = RB_Plugin_GetCatalog(&plugins);
+	if (rc != RB_OK) {
+		return rc;
+	}
+
+	const int platformIndex = RB_Platform_ReadSelectedIndex();
+	RB_PlatformConfig platform{};
+	if (platformIndex < 0 || RB_Platform_ReadConfigByIndex(platformIndex, &platform) != RB_OK) {
+		return RB_ERROR;
+	}
+
+	// A value of zero verifies the manual-test path without commanding movement.
+	rc = RB_ManualPose_SetTestEnabled(1);
+	if (rc == RB_OK) {
+		rc = RB_ManualPose_SetDrive(0, 0.0);
+	}
+	RB_ManualPose_ResetDrive();
+	RB_ManualPose_SetTestEnabled(0);
+	return rc;
+}

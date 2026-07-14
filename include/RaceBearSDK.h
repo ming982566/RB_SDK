@@ -75,6 +75,7 @@ enum RB_Limits
 	RB_MAX_OUTPUT_KEYS = 128,        // 输出 key 最大返回数量。
 	RB_MAX_CAN_MOTORS = 16,          // CAN 电机最大返回数量。
 	RB_MAX_EFFECTS = 32,             // 运动/震动效果最大返回数量。
+	RB_MAX_PLUGINS = 64,             // 功能插件目录最大返回数量。
 	RB_CUSTOM_PACKET_MAX_SIZE = 8192,// 自定义游戏MMF/UDP单帧最大字节数。
 	RB_DYNAMIC_DOF_COUNT = 8,        // 动态配置 DOF 槽位数。
 	RB_DYNAMIC_MAX_INPUTS = 8,       // 每个 DOF 最大输入数。
@@ -527,6 +528,25 @@ struct RB_EffectCatalog
 	int Version;                                 // 结构体版本，当前为 1。
 	int Count;                                   // Items 中有效项数量。
 	RB_EffectCatalogItem Items[RB_MAX_EFFECTS];  // 效果项数组。
+};
+
+// 功能插件目录项。索引只在最近一次刷新后的当前目录中有效。
+struct RB_PluginInfo
+{
+	int Index;                                      // 插件零基目录索引。
+	char Name[RB_TEXT_MEDIUM];                      // UTF-8 插件显示名称。
+	char Version[RB_TEXT_SMALL];                    // UTF-8 插件版本。
+	char StatusText[RB_TEXT_MEDIUM];                // UTF-8 当前状态摘要。
+	char IconPath[RB_TEXT_LARGE];                   // UTF-8 图标文件路径，可为空。
+	int Launchable;                                 // 1=插件提供可启动的前端程序，0=仅后台运行。
+};
+
+struct RB_PluginCatalog
+{
+	int Size;                                       // 结构体字节数，由 SDK 写入。
+	int Version;                                    // 结构体版本，当前为 1。
+	int Count;                                      // Items 中有效项数量。
+	RB_PluginInfo Items[RB_MAX_PLUGINS];            // 插件目录项。
 };
 
 // 串口信息。用于前端枚举系统当前可用串口，不负责打开和读写串口。
@@ -1130,6 +1150,88 @@ RB_API int RB_Game_ReadConfig(const char* gameName, RB_GameConfig* config);
 RB_API int RB_Game_SaveConfig(const char* gameName, const RB_GameConfig* config);
 
 /**
+ * @brief 重新扫描受支持游戏的安装目录和运行进程。
+ * @return 大于等于 0 的安装信息数量；失败返回负数。
+ * @note 扫描属于低频操作，只在启动、页面刷新或用户明确要求时调用。
+ */
+RB_API int RB_Game_RefreshInstallations();
+
+/** @brief 返回最近一次安装扫描的条目数量；失败返回负数。 */
+RB_API int RB_Game_GetInstallCount();
+
+/**
+ * @brief 按扫描结果索引读取安装和运行状态。
+ * @param index 零基扫描结果索引。
+ * @param info 接收完整安装信息的结构体指针。
+ * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示索引或指针无效。
+ */
+RB_API int RB_Game_GetInstallInfo(int index, RB_GameInstallInfo* info);
+
+/**
+ * @brief 按稳定 gameKey 查找安装和运行状态。
+ * @param gameKey 来自 RB_GameCatalogItem::GameKey。
+ * @param info 接收安装信息的结构体指针。
+ * @return RB_OK 表示找到安装目录或运行进程；RB_ERROR 表示未找到。
+ */
+RB_API int RB_Game_FindInstallByKey(const char* gameKey, RB_GameInstallInfo* info);
+
+/**
+ * @brief 按稳定 gameKey 读取游戏安装路径。
+ * @return RB_OK、RB_BUFFER_TOO_SMALL、RB_INVALID_ARGUMENT 或 RB_ERROR。
+ */
+RB_API int RB_Game_FindInstallPathByKey(const char* gameKey, char* buffer, int bufferSize);
+
+/**
+ * @brief 按游戏目录索引和完整遥测配置创建或重新连接当前 Source。
+ * @param catalogIndex RB_GameCatalogItem::CatalogIndex。
+ * @param config 先由 RB_Game_ReadConfig() 读取并修改的完整配置。
+ * @return RB_OK 表示 Source 已成功创建或连接；其他值表示配置或连接失败。
+ */
+RB_API int RB_Game_AutoConnect(int catalogIndex, const RB_GameConfig* config);
+
+/**
+ * @brief 对当前游戏执行 SDK 内置的一键遥测配置。
+ * @return RB_OK 表示游戏侧配置成功；RB_ERROR 表示当前游戏不支持或配置失败。
+ */
+RB_API int RB_Game_AutoConfigureCurrent();
+
+/**
+ * @brief 为当前游戏安装 SDK 内置的游戏侧遥测插件。
+ * @param gamePath UTF-8 游戏安装目录；应来自 RB_GameInstallInfo::InstallPath。
+ * @return RB_OK 表示安装成功；其他值表示路径无效、不支持或安装失败。
+ */
+RB_API int RB_Game_InstallCurrentPlugin(const char* gamePath);
+
+/**
+ * @brief 检查当前游戏侧配置是否与给定遥测配置匹配。
+ * @return RB_OK 表示配置可用；RB_ERROR 表示缺失、不匹配或当前游戏不支持检查。
+ */
+RB_API int RB_Game_CheckCurrentSideConfig(const RB_GameConfig* config);
+
+/**
+ * @brief 一次读取功能插件目录；目录刷新后旧索引失效。
+ * @param catalog 接收插件目录的结构体指针；调用前零初始化。
+ * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示 catalog 为空。
+ */
+RB_API int RB_Plugin_GetCatalog(RB_PluginCatalog* catalog);
+
+/** @brief 重新扫描功能插件并返回插件数量；失败返回负数。 */
+RB_API int RB_Plugin_Refresh();
+
+/**
+ * @brief 启动指定插件提供的前端程序。
+ * @param pluginIndex 最近一次插件目录中的零基索引。
+ * @return RB_OK 表示已启动；RB_ERROR 表示插件不可启动或启动失败。
+ */
+RB_API int RB_Plugin_Launch(int pluginIndex);
+
+/**
+ * @brief 启动全部功能插件后台运行态。
+ * @return 大于等于 0 的已启动/已存在运行态数量；失败返回负数。
+ */
+RB_API int RB_Plugin_StartRuntimes();
+
+/**
  * @brief 读取系统配置；配置不存在时返回 SDK 默认值。
  */
 RB_API int RB_System_ReadConfigOrDefault(RB_SystemConfig* config);
@@ -1207,6 +1309,42 @@ RB_API int RB_Platform_GetGeometryParameterName(int platformIndex, int geometryI
  * @return RB_OK 表示调用成功；RB_INVALID_ARGUMENT 表示参数无效。
  */
 RB_API int RB_Platform_GetStrokeParameterName(int platformIndex, int strokeIndex, char* buffer, int bufferSize);
+
+/** @brief 读取当前持久化选择的平台零基索引；失败返回负数。 */
+RB_API int RB_Platform_ReadSelectedIndex();
+
+/** @brief 保存当前平台零基索引；返回 RB_OK 或错误码。 */
+RB_API int RB_Platform_SaveSelectedIndex(int platformIndex);
+
+/**
+ * @brief 计算指定平台配置下某个 DOF 的正负预览范围。
+ * @return 线性 DOF 返回毫米，旋转 DOF 返回度；不可达或参数无效时返回 0。
+ */
+RB_API double RB_Platform_GetPreviewPoseLimit(int platformIndex, const RB_PlatformConfig* config, int dofIndex);
+
+/** @brief 判断指定平台配置是否可以预览该 DOF；1=可以，0=不可达或参数无效。 */
+RB_API int RB_Platform_IsPreviewPosePossible(int platformIndex, const RB_PlatformConfig* config, int dofIndex);
+
+/**
+ * @brief 启用或关闭真实运行平台的手动姿态测试输入。
+ * @param enabled 1=启用，0=关闭并恢复正常遥测输入。
+ * @return RB_OK 表示状态已更新；RB_ERROR 表示运行平台尚未创建。
+ */
+RB_API int RB_ManualPose_SetTestEnabled(int enabled);
+
+/**
+ * @brief 设置单个 DOF 的手动测试值。
+ * @param dofIndex 0-5 依次为 Sway/Surge/Heave/Yaw/Roll/Pitch。
+ * @param value 线性 DOF 单位 mm，旋转 DOF 单位度；应限制在 RB_Platform_GetPreviewPoseLimit() 返回范围内。
+ * @return RB_OK 表示已设置；RB_INVALID_ARGUMENT 或 RB_ERROR 表示输入无效或平台不可用。
+ */
+RB_API int RB_ManualPose_SetDrive(int dofIndex, double value);
+
+/** @brief 将全部手动姿态输入复位为 0；返回 RB_OK 或 RB_ERROR。 */
+RB_API int RB_ManualPose_ResetDrive();
+
+/** @brief 读取单个 DOF 当前手动测试值；参数无效或平台不可用时返回 0。 */
+RB_API double RB_ManualPose_GetDrive(int dofIndex);
 
 /**
  * @brief 按输出实例索引读取输出配置。

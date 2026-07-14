@@ -348,6 +348,22 @@ RB_Wind_SetTestOutput(0, 0.0);
 
 动态滤波、输出、运动增强、震动和安全带使用同样的“Read -> 修改结构体 -> Apply -> Save”流程，完整字段和代码见 `RaceBearSDK_API.md` 第 8 节。
 
+游戏安装、插件和平台诊断也直接使用结构体，不需要解析 JSON：
+
+```cpp
+RB_Game_RefreshInstallations();
+RB_GameInstallInfo install{};
+RB_Game_GetInstallInfo(0, &install);
+
+RB_Plugin_Refresh();
+RB_PluginCatalog plugins{};
+RB_Plugin_GetCatalog(&plugins);
+
+const int platformIndex = RB_Platform_ReadSelectedIndex();
+RB_PlatformConfig platform{};
+RB_Platform_ReadConfigByIndex(platformIndex, &platform);
+```
+
 ## 4. qmake 配置
 
 仍使用 qmake 的 Qt 5 项目可以加入：
