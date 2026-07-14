@@ -98,6 +98,14 @@ enum RB_CustomGameInputMode
 	RB_CUSTOM_INPUT_6DOF = 2         // 已计算的归一化6DOF，绕过动态映射后进入平台姿态层。
 };
 
+// 安全带输入模式。当前遥测算法始终可用；HID 和混合模式要求宿主提供对应 HID 输入源。
+enum RB_SeatbeltInputMode
+{
+	RB_SEATBELT_INPUT_TELEMETRY = 0,
+	RB_SEATBELT_INPUT_HID = 1,
+	RB_SEATBELT_INPUT_MIXED = 2
+};
+
 // 直接6DOF选项，可按位组合。
 enum RB_CustomGameDofOptions
 {
@@ -710,57 +718,57 @@ struct RB_OutputConfig
 {
 	int Size;                                      // 结构体字节数，由 SDK 写入。
 	int Version;                                   // 结构体版本，当前为 1。
-	int CANindex;                                  // CAN 设备索引，当前单设备通常为 0。
-	int ConnectionSpeed;                           // 输出连接/软启动速度参数。
-	int ParkPositionPercent;                       // 停车位置百分比。
-	int AutoConnect;                               // 是否允许自动连接，1=允许。
-	int OutBit;                                    // 普通串口/UDP 输出位宽。
-	char OutputKind[RB_TEXT_SMALL];                // 输出类型，例如 Serial/UDP/MMF/CAN。
-	int Type;                                      // 输出数据格式类型。
-	int BaudRate;                                  // 串口波特率。
-	char Port[RB_TEXT_MEDIUM];                     // 串口端口名。
-	char IpAddrs[RB_TEXT_MEDIUM];                  // UDP 远程 IP。
-	int UdpPort;                                   // UDP 远程端口。
-	int UdpLPort;                                  // UDP 本地端口。
-	char MMFName[RB_TEXT_MEDIUM];                  // 内存映射名称。
-	char StartString[RB_TEXT_LARGE];               // 连接后起始命令。
-	char StartTime[RB_TEXT_SMALL];                 // 起始命令延时文本。
-	char OutPutString[RB_TEXT_LARGE];              // 周期输出命令模板。
-	char OutPutTime[RB_TEXT_SMALL];                // 周期输出间隔文本。
-	char EndString[RB_TEXT_LARGE];                 // 断开前结束命令。
-	char EndTime[RB_TEXT_SMALL];                   // 结束命令延时文本。
+	int CANindex;                                  // CAN 设备零基索引；非 CAN 输出保留读取值，当前单设备通常为 0。
+	int ConnectionSpeed;                           // CAN 连接/软启动速度参数；非 CAN 输出保留读取值。
+	int ParkPositionPercent;                       // CAN 停车位置，0-100%。
+	int AutoConnect;                               // 1=允许自动连接，0=仅手动连接。
+	int OutBit;                                    // 普通 Serial/UDP 输出位宽，常用 8、16 或 32 bit。
+	char OutputKind[RB_TEXT_SMALL];                // 输出类型；有效值必须来自 RB_Output_GetKind()。
+	int Type;                                      // 旧版兼容类型；新前端按 OutputKind 判断，读取后原样保留。
+	int BaudRate;                                  // Serial 波特率，例如 115200；其他输出保留读取值。
+	char Port[RB_TEXT_MEDIUM];                     // Serial 端口名，例如 "COM3"。
+	char IpAddrs[RB_TEXT_MEDIUM];                  // UDP 远程 IPv4 地址，例如 "127.0.0.1"。
+	int UdpPort;                                   // UDP 远程端口，1-65535。
+	int UdpLPort;                                  // UDP 本地绑定端口，1-65535。
+	char MMFName[RB_TEXT_MEDIUM];                  // MMF 映射名称；仅 MMF 输出使用。
+	char StartString[RB_TEXT_LARGE];               // 连接后发送一次的命令模板；空字符串表示不发送。
+	char StartTime[RB_TEXT_SMALL];                 // StartString 延迟，十进制毫秒文本，例如 "0"。
+	char OutPutString[RB_TEXT_LARGE];              // 周期命令模板，例如 "<A1><A2><A3><A4>"。
+	char OutPutTime[RB_TEXT_SMALL];                // 周期输出间隔，十进制毫秒文本，例如 "2"。
+	char EndString[RB_TEXT_LARGE];                 // 断开前发送一次的命令模板；空字符串表示不发送。
+	char EndTime[RB_TEXT_SMALL];                   // EndString 延迟，十进制毫秒文本，例如 "0"。
 };
 
 // 动态滤波单个输入的滤波参数。
 struct RB_FilterEffect
 {
-	int Enabled;                                   // 是否启用该输入滤波。
-	int Dof;                                       // 输出 DOF 索引。
-	int InMapping;                                 // 输入映射方式。
-	double InGain;                                 // 输入增益。
-	int OutScaling;                                // 输出缩放。
-	int Proportion;                                // 比例参数。
-	int Strength;                                  // 强度参数。
-	int Smoothing;                                 // 平滑参数。
-	int DeadZone;                                  // 死区参数。
-	int Washout;                                   // Washout 参数。
-	int Sensitivity;                               // 灵敏度参数。
-	int SensitivityStrength;                       // 灵敏度强度。
+	int Enabled;                                   // 1=启用该通道滤波链，0=该通道不参与输出。
+	int Dof;                                       // 目标 DOF：0=Sway、1=Surge、2=Heave、3=Yaw、4=Roll、5=Pitch。
+	int InMapping;                                 // 输入达到满输出所需的绝对量；0 表示不产生有效映射。
+	double InGain;                                 // 输入增益和方向；1.0 原方向，-1.0 反向，可使用小数。
+	int OutScaling;                                // 最大输出占当前 DOF PoseLimit 的百分比，建议 0-100。
+	int Proportion;                                // Logistic 有效输出范围占 PoseLimit 的百分比，0=关闭 Logistic。
+	int Strength;                                  // Logistic 曲线强度，0=关闭；运行时按 value*0.1 使用。
+	int Smoothing;                                 // 低通平滑强度，0=关闭；数值越大响应越慢。
+	int DeadZone;                                  // 输出死区占最大输出范围的百分比，0=关闭。
+	int Washout;                                   // 加速度输入的高通洗出强度，0=关闭；姿态输入不会应用。
+	int Sensitivity;                               // GUARD 安全区百分比，0=关闭输出保护。
+	int SensitivityStrength;                       // GUARD 保护强度百分比，0=关闭；仅 Sensitivity>0 时有效。
 };
 
 struct RB_DynamicInputEffect
 {
-	int Enabled;                                   // 是否启用该输入。
-	int InputType;                                 // 输入类型。
-	int TelemetryIndex;                            // 遥测值索引。
-	char Key[RB_TEXT_SMALL];                       // 遥测 key。
+	int Enabled;                                   // 1=启用该输入通道，0=保留配置但不参与计算。
+	int InputType;                                 // SDK 内部输入模板类型；从现有配置读取并保留。
+	int TelemetryIndex;                            // 当前运行时遥测索引；使用 RB_Telemetry_FindIndexByKey() 解析。
+	char Key[RB_TEXT_SMALL];                       // 稳定遥测 key；配置持久化应以 Key 为准。
 	RB_FilterEffect Filter;                        // 该输入对应滤波参数。
 };
 
 struct RB_DynamicDofEffect
 {
-	int Enabled;                                   // 是否启用该 DOF 槽位。
-	int InputCount;                                // Inputs 中有效输入数量。
+	int Enabled;                                   // 1=启用整个 DOF，0=禁用该 DOF 的全部输入。
+	int InputCount;                                // Inputs 中有效输入数，范围 0-RB_DYNAMIC_MAX_INPUTS。
 	RB_DynamicInputEffect Inputs[RB_DYNAMIC_MAX_INPUTS]; // 输入数组。
 };
 
@@ -773,13 +781,13 @@ struct RB_DynamicV2Profile
 
 struct RB_MotionEffectOutputRoute
 {
-	int Enabled;                                   // 是否启用该输出路由。
-	int Dof;                                       // 叠加到的 DOF 索引。
-	double OutputRatio;                            // 路由输出比例。
-	double Direction;                              // 输出方向，通常 1 或 -1。
-	double Threshold;                              // 该路由触发阈值。
-	double Frequency;                              // 事件/脉冲频率参数，单位 Hz。
-	double Duration;                               // 单次事件持续时间，单位秒。
+	int Enabled;                                   // 1=启用该输出路由。
+	int Dof;                                       // 目标 DOF：0=Sway、1=Surge、2=Heave、3=Yaw、4=Roll、5=Pitch。
+	double OutputRatio;                            // 路由输出比例，1.0=100%，0.5=50%。
+	double Direction;                              // 输出方向，通常 1.0 或 -1.0。
+	double Threshold;                              // 当前路由触发阈值；具体单位由效果目录和输入遥测决定。
+	double Frequency;                              // 当前路由脉冲频率，单位 Hz；非脉冲效果保留默认值。
+	double Duration;                               // 当前路由单次持续时间，单位秒。
 };
 
 struct RB_MotionEffectConfig
@@ -814,11 +822,11 @@ struct RB_HapticEffectConfig
 	int EffectType;                                // 震动效果类型索引。
 	int InputIndex;                                // 主输入遥测索引。
 	int SecondaryInputIndex;                       // 辅助输入遥测索引。
-	int OutputChannel;                             // 输出通道索引。
-	double Gain;                                   // 输出增益。
-	double Threshold;                              // 触发阈值。
-	double MinOutput;                              // 最小输出。
-	double MaxOutput;                              // 最大输出。
+	int OutputChannel;                             // 输出通道索引，0-6 对应 Haptic1-Haptic7。
+	double Gain;                                   // 输出增益；0 表示无输出。
+	double Threshold;                              // 触发阈值；具体单位由效果目录和输入遥测决定。
+	double MinOutput;                              // 最小位输出，通常 0。
+	double MaxOutput;                              // 最大位输出，默认 65535。
 	double Frequency;                              // 频率参数，单位 Hz。
 	double Direction;                              // 输出方向。
 };
@@ -837,11 +845,11 @@ struct RB_WindEffectConfig
 	int Enabled;                                   // 是否启用风感模拟。
 	double InputMinKmh;                            // 起风速度，单位 km/h。
 	double InputMaxKmh;                            // 满风速度，单位 km/h。
-	double OutputMinWorkPercent;                   // 最小有效输出百分比。
-	double Gamma;                                  // 输出曲线 gamma。
-	double MasterGainPercent;                      // 风感总增益百分比。
-	double ChannelGainPercent[RB_WIND_CHANNEL_COUNT]; // 每通道增益补偿，百分比。
-	double ChannelOffsetPercent[RB_WIND_CHANNEL_COUNT]; // 每通道偏移补偿，百分比。
+	double OutputMinWorkPercent;                   // 风扇开始有效工作的最低输出，0-100%。
+	double Gamma;                                  // 曲线指数，1.0=线性；大于 1 降低低速输出，小于 1 提高低速输出。
+	double MasterGainPercent;                      // 风感总增益，0-100%。
+	double ChannelGainPercent[RB_WIND_CHANNEL_COUNT]; // Wind1-Wind4 增益补偿，-100% 到 100%，0=不补偿。
+	double ChannelOffsetPercent[RB_WIND_CHANNEL_COUNT]; // Wind1-Wind4 偏移补偿，-100% 到 100%，0=不补偿。
 };
 
 struct RB_SeatbeltEffectConfig
@@ -849,22 +857,22 @@ struct RB_SeatbeltEffectConfig
 	int Size;                                      // 结构体字节数，由 SDK 写入。
 	int Version;                                   // 结构体版本，当前为 1。
 	int Enabled;                                   // 是否启用安全带模拟。
-	int InputMode;                                 // 输入模式，见内部 SeatbeltInputMode。
+	int InputMode;                                 // RB_SeatbeltInputMode；当前推荐 RB_SEATBELT_INPUT_TELEMETRY。
 	double BasePreloadPercent;                     // 基础预紧百分比。
 	double StartSpeedKmh;                          // 动态张紧起效车速，单位 km/h。
-	double FullSpeedKmh;                           // 旧版速度比例字段，保留兼容。
-	double MasterGainPercent;                      // 安全带总增益百分比。
-	double ReleaseSpeedPercent;                    // 释放速度百分比。
+	double FullSpeedKmh;                           // 兼容字段，当前算法不使用；读取后原样保留。
+	double MasterGainPercent;                      // 安全带总增益，0-200%。
+	double ReleaseSpeedPercent;                    // 输出回落速度，0-100%；越大释放越快。
 	int BrakeEnabled;                              // 是否启用刹车张紧。
-	double BrakePedalGainPercent;                  // 刹车踏板触发门限/增益百分比。
-	double BrakeDecelGainPercent;                  // 刹车减速度张紧增益百分比。
+	double BrakePedalGainPercent;                  // 刹车踏板激活门限，0-100%。
+	double BrakeDecelGainPercent;                  // Surge 刹车减速度张紧增益，0-200%。
 	int LateralEnabled;                            // 是否启用横向张紧。
-	double LateralGainPercent;                     // 横向张紧增益百分比。
-	double LateralDeadzoneG;                       // 横向 G 死区。
-	int CrashEnabled;                              // 是否启用碰撞张紧。
-	double CrashThresholdPercent;                  // 碰撞触发阈值百分比。
-	double CrashHoldMs;                            // 碰撞保持时间，毫秒。
-	double CrashOutputPercent;                     // 碰撞输出百分比。
+	double LateralGainPercent;                     // Sway 横向张紧增益，0-200%。
+	double LateralDeadzoneG;                       // 横向加速度死区，单位 G，建议大于等于 0。
+	int CrashEnabled;                              // 兼容字段，当前算法不使用；读取后原样保留。
+	double CrashThresholdPercent;                  // 兼容字段，当前算法不使用。
+	double CrashHoldMs;                            // 兼容字段，单位毫秒，当前算法不使用。
+	double CrashOutputPercent;                     // 兼容字段，当前算法不使用。
 	int LeftEnabled;                               // 左安全带通道是否启用。
 	int RightEnabled;                              // 右安全带通道是否启用。
 	double LeftOutputRatioPercent;                 // 左安全带输出比例百分比。
@@ -1202,16 +1210,28 @@ RB_API int RB_Platform_GetStrokeParameterName(int platformIndex, int strokeIndex
 
 /**
  * @brief 按输出实例索引读取输出配置。
+ * @param instanceIndex 输出实例零基索引，范围 [0, RB_Output_GetInstanceCount())。
+ * @param config 接收完整配置的结构体指针；调用前零初始化。
+ * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示索引或指针无效；RB_ERROR 表示读取失败。
+ * @note 编辑页面必须先读取完整结构体，再修改目标字段，不能从空结构体直接保存。
  */
 RB_API int RB_Output_ReadInstanceConfigByIndex(int instanceIndex, RB_OutputConfig* config);
 
 /**
  * @brief 按输出实例索引保存输出配置。
+ * @param instanceIndex 输出实例零基索引。
+ * @param config 要保存的完整配置；字符串均为 UTF-8、NUL 结尾。
+ * @return RB_OK 表示已保存；其他值表示参数无效或写入失败。
+ * @note 修改 Port、IP、端口、CAN 索引等连接参数前，应先断开该实例。
  */
 RB_API int RB_Output_SaveInstanceConfigByIndex(int instanceIndex, const RB_OutputConfig* config);
 
 /**
  * @brief 按输出实例索引将输出配置应用到运行态。
+ * @param instanceIndex 输出实例零基索引。
+ * @param config 要应用的完整配置。
+ * @return RB_OK 表示运行态已接受配置；其他值表示实例不存在或应用失败。
+ * @note Apply 不表示用户要求立即连接，也不能替代 Save。
  */
 RB_API int RB_Output_ApplyInstanceConfigByIndex(int instanceIndex, const RB_OutputConfig* config);
 
@@ -1231,6 +1251,59 @@ RB_API int RB_Output_GetCatalog(RB_OutputCatalog* catalog);
 RB_API int RB_Output_GetInstanceCount();
 
 /**
+ * @brief 返回 SDK 支持的输出类型数量。
+ * @return 大于等于 0 的类型数量；初始化前也可以调用。
+ */
+RB_API int RB_Output_GetKindCount();
+
+/**
+ * @brief 按索引读取可传给 RB_Output_AddInstance() 的输出类型 key。
+ * @param kindIndex 输出类型零基索引，范围 [0, RB_Output_GetKindCount())。
+ * @param buffer 接收 UTF-8、NUL 结尾类型 key 的缓冲区。
+ * @param bufferSize buffer 总字节数。
+ * @return RB_OK、RB_BUFFER_TOO_SMALL 或 RB_INVALID_ARGUMENT。
+ */
+RB_API int RB_Output_GetKind(int kindIndex, char* buffer, int bufferSize);
+
+/**
+ * @brief 确保至少存在一个默认 Serial 输出实例。
+ * @return RB_OK 表示配置已经存在或创建成功；负数表示初始化或写入失败。
+ */
+RB_API int RB_Output_EnsureDefaultConfig();
+
+/**
+ * @brief 返回启用 AutoConnect 的输出实例数量。
+ * @return 大于等于 0 的实例数量；失败按 0 处理并读取 SDK 日志。
+ */
+RB_API int RB_Output_GetAutoConnectInstanceCount();
+
+/**
+ * @brief 读取指定输出实例的稳定 key。
+ * @return RB_OK、RB_BUFFER_TOO_SMALL 或 RB_INVALID_ARGUMENT。
+ */
+RB_API int RB_Output_GetInstanceKey(int instanceIndex, char* buffer, int bufferSize);
+
+/**
+ * @brief 添加输出实例。
+ * @param outputKind "Serial"、"UDP"、"MMF" 或 "CAN"。
+ * @return 成功时返回新实例的零基索引；失败返回负数错误码。
+ */
+RB_API int RB_Output_AddInstance(const char* outputKind);
+
+/**
+ * @brief 删除指定输出实例及其配置。
+ * @note 删除前必须先断开实例；删除后后续实例索引可能变化，应刷新目录。
+ */
+RB_API int RB_Output_DeleteInstanceByIndex(int instanceIndex);
+
+/**
+ * @brief 连接指定输出实例。
+ * @param instanceIndex 输出实例零基索引。
+ * @return RB_OK 表示连接流程已成功启动；其他值表示索引无效或启动失败。
+ */
+RB_API int RB_Output_ConnectInstanceByIndex(int instanceIndex);
+
+/**
  * @brief 查询指定输出实例是否已经连接。
  * @param instanceIndex 输出实例零基索引。
  * @return 1 表示已连接，0 表示未连接或索引无效。
@@ -1238,11 +1311,61 @@ RB_API int RB_Output_GetInstanceCount();
 RB_API int RB_Output_IsInstanceConnected(int instanceIndex);
 
 /**
+ * @brief 查询指定实例是否已进入周期输出运行态。
+ * @param instanceIndex 输出实例零基索引。
+ * @return 1 表示正在周期输出；0 表示未运行或索引无效。
+ */
+RB_API int RB_Output_IsInstanceRuntimeActive(int instanceIndex);
+
+/**
+ * @brief 查询是否存在任意周期输出运行态。
+ * @return 1 表示至少一个实例正在输出；0 表示全部未运行。
+ */
+RB_API int RB_Output_IsAnyRuntimeActive();
+
+/**
  * @brief 断开指定输出实例。
  * @param instanceIndex 输出实例零基索引。
  * @return RB_OK 表示成功，其他值表示索引无效或断开失败。
  */
 RB_API int RB_Output_DisconnectInstanceByIndex(int instanceIndex);
+
+/**
+ * @brief 连接全部输出实例。
+ * @return 大于等于 0 表示成功发起连接的实例数量；负数表示整体操作失败。
+ */
+RB_API int RB_Output_ConnectAll();
+
+/**
+ * @brief 只连接 AutoConnect=1 的输出实例。
+ * @return 大于等于 0 表示成功发起连接的实例数量；负数表示整体操作失败。
+ */
+RB_API int RB_Output_ConnectAuto();
+
+/**
+ * @brief 断开全部输出实例。
+ * @return 大于等于 0 表示成功发起断开的实例数量；负数表示整体操作失败。
+ */
+RB_API int RB_Output_DisconnectAll();
+
+/**
+ * @brief 查询全部输出是否已完成断开。
+ * @return 1 表示全部断开；0 表示仍有连接或正在执行断开状态机。
+ */
+RB_API int RB_Output_AreAllDisconnected();
+
+/**
+ * @brief 请求全部输出按各自结束命令和状态机安全断开。
+ * @return RB_OK 表示请求已提交；调用方应继续轮询 RB_Output_AreAllDisconnected()。
+ */
+RB_API int RB_Output_RequestDisconnectAll();
+
+/**
+ * @brief 按配置名读取 6DOF 动态配置。
+ * @param profileName UTF-8 配置名，例如 "_Default"。
+ * @param profile 接收完整配置的结构体指针。
+ */
+RB_API int RB_Dynamic_ReadProfile(const char* profileName, RB_DynamicV2Profile* profile);
 
 /**
  * @brief 按动态配置索引读取 6DOF 动态配置。
@@ -1281,6 +1404,58 @@ RB_API int RB_Dynamic_GetProfileCount();
 RB_API int RB_Dynamic_GetProfileName(int profileIndex, char* buffer, int bufferSize);
 
 /**
+ * @brief 返回当前游戏绑定的动态配置索引。
+ * @return 有效零基索引；无当前游戏、无绑定或读取失败时返回负数。
+ */
+RB_API int RB_Dynamic_ReadCurrentGameProfileIndex();
+
+/**
+ * @brief 把指定动态配置索引绑定到当前游戏。
+ * @param profileIndex 动态配置零基索引。
+ * @return RB_OK 表示保存成功；其他值表示无当前游戏、索引无效或写入失败。
+ */
+RB_API int RB_Dynamic_SaveCurrentGameProfileIndex(int profileIndex);
+
+/**
+ * @brief 删除指定动态配置及同名运动增强、震动配置。
+ * @param profileIndex 动态配置零基索引。
+ * @return RB_OK 表示删除成功；其他值表示索引无效或删除失败。
+ * @note 删除后配置索引会变化，前端必须刷新配置目录。
+ */
+RB_API int RB_Dynamic_DeleteProfileByIndex(int profileIndex);
+
+/**
+ * @brief 一次读取运动增强效果目录。
+ * @param catalog 接收效果名称、说明和输出说明；调用前零初始化。
+ * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示 catalog 为空。
+ */
+RB_API int RB_MotionEffect_GetCatalog(RB_EffectCatalog* catalog);
+
+/**
+ * @brief 返回运动增强配置数量。
+ * @return 大于等于 0 的配置数量；失败返回负数。
+ * @note 配置名称与动态配置目录保持对应。
+ */
+RB_API int RB_MotionEffect_GetProfileCount();
+
+/**
+ * @brief 按索引读取运动增强配置名。
+ * @param profileIndex 配置零基索引。
+ * @param buffer 接收 UTF-8、NUL 结尾名称的缓冲区。
+ * @param bufferSize buffer 总字节数。
+ * @return RB_OK、RB_BUFFER_TOO_SMALL 或 RB_INVALID_ARGUMENT。
+ */
+RB_API int RB_MotionEffect_GetProfileName(int profileIndex, char* buffer, int bufferSize);
+
+/**
+ * @brief 删除指定名称的运动增强配置。
+ * @param profileName UTF-8 配置名。
+ * @return RB_OK 表示删除成功；其他值表示名称无效或删除失败。
+ * @note 通常应通过 RB_Dynamic_DeleteProfileByIndex() 成组删除。
+ */
+RB_API int RB_MotionEffect_DeleteProfile(const char* profileName);
+
+/**
  * @brief 按配置名读取运动增强配置。
  */
 RB_API int RB_MotionEffect_ReadProfile(const char* profileName, RB_MotionEffectProfile* profile);
@@ -1311,14 +1486,54 @@ RB_API int RB_MotionEffect_ApplyProfileToCurrentRig(const RB_MotionEffectProfile
 RB_API int RB_MotionEffect_GetDefaultConfig(int effectIndex, RB_MotionEffectConfig* config);
 
 /**
+ * @brief 一次读取震动效果目录。
+ * @param catalog 接收目录的结构体指针；调用前零初始化。
+ * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示 catalog 为空。
+ */
+RB_API int RB_Haptic_GetCatalog(RB_EffectCatalog* catalog);
+
+/**
  * @brief 按配置名读取震动效果配置。
  */
 RB_API int RB_Haptic_ReadProfile(const char* profileName, RB_HapticEffectProfile* profile);
 
 /**
+ * @brief 按动态配置索引读取同名震动配置。
+ * @param profileIndex 动态配置零基索引。
+ * @param profile 接收完整震动配置的结构体指针。
+ * @return RB_OK 表示成功；其他值表示索引无效或读取失败。
+ * @note 缺少同名配置时读取默认配置。
+ */
+RB_API int RB_Haptic_ReadProfileByIndex(int profileIndex, RB_HapticEffectProfile* profile);
+
+/**
  * @brief 按配置名保存震动效果配置。
  */
 RB_API int RB_Haptic_SaveProfile(const char* profileName, const RB_HapticEffectProfile* profile);
+
+/**
+ * @brief 按动态配置索引保存同名震动配置。
+ * @param profileIndex 动态配置零基索引。
+ * @param profile 要保存的完整震动配置。
+ * @return RB_OK 表示保存成功；其他值表示参数无效或写入失败。
+ */
+RB_API int RB_Haptic_SaveProfileByIndex(int profileIndex, const RB_HapticEffectProfile* profile);
+
+/**
+ * @brief 将震动配置应用到当前运行态。
+ * @param profile 要应用的完整震动配置。
+ * @return RB_OK 表示应用成功；其他值表示参数无效或运行态不可用。
+ * @note Apply 不写配置文件。
+ */
+RB_API int RB_Haptic_ApplyProfileToCurrentFunction(const RB_HapticEffectProfile* profile);
+
+/**
+ * @brief 读取指定震动效果的默认参数。
+ * @param effectIndex RB_Haptic_GetCatalog() 返回的效果索引。
+ * @param config 接收默认参数的结构体指针。
+ * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示索引或指针无效。
+ */
+RB_API int RB_Haptic_GetDefaultConfig(int effectIndex, RB_HapticEffectConfig* config);
 
 /**
  * @brief 读取默认风感配置。
@@ -1341,6 +1556,14 @@ RB_API int RB_Wind_SaveConfig(const RB_WindEffectConfig* config);
 RB_API int RB_Wind_ApplyConfigToCurrentFunction(const RB_WindEffectConfig* config);
 
 /**
+ * @brief 启用或关闭风感测试输出。
+ * @param enabled 1=测试，0=恢复当前运行配置。
+ * @param outputPercent 四通道统一测试输出，范围 0-100%。
+ * @return RB_OK 表示测试状态已更新；其他值表示运行态不可用。
+ */
+RB_API int RB_Wind_SetTestOutput(int enabled, double outputPercent);
+
+/**
  * @brief 读取默认安全带配置。
  */
 RB_API int RB_Seatbelt_GetDefaultConfig(RB_SeatbeltEffectConfig* config);
@@ -1359,6 +1582,15 @@ RB_API int RB_Seatbelt_SaveConfig(const RB_SeatbeltEffectConfig* config);
  * @brief 将安全带配置应用到当前运行中的安全带功能。
  */
 RB_API int RB_Seatbelt_ApplyConfigToCurrentFunction(const RB_SeatbeltEffectConfig* config);
+
+/**
+ * @brief 启用或关闭左右安全带测试输出。
+ * @param enabled 1=测试，0=恢复当前运行配置。
+ * @param leftPercent 左通道测试输出，范围 0-100%。
+ * @param rightPercent 右通道测试输出，范围 0-100%。
+ * @return RB_OK 表示测试状态已更新；其他值表示运行态不可用。
+ */
+RB_API int RB_Seatbelt_SetTestOutput(int enabled, double leftPercent, double rightPercent);
 
 /**
  * @brief 执行统一动作命令，并可返回命令结果 JSON。

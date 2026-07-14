@@ -135,11 +135,15 @@ RB_Runtime_Shutdown()         退出前必须
 
 SDK 0.4.2 将本参数从 Hz 改为 ms。旧代码中的 `RB_Runtime_StartLoop(100)` 必须按实际需求改为毫秒值，不能直接沿用。
 
+SDK 0.4.3 补齐动态滤波、输出实例、运动增强、震动、风感和安全带的结构体配置流程，并支持全新 `AppDataName` 自动生成默认运行配置。常规前端不再需要直接编辑配置 JSON。
+
 宿主程序不需要为 SDK 调用 `CoInitializeEx()` 或 `CoUninitialize()`。SDK 在自己的线程中管理 COM 生命周期。
 
 ## 4. 应用目录名和配置位置
 
 `RB_Runtime_SetAppDataName()` 用于隔离不同产品的数据。例如传入 `MyMotionApp` 后，SDK 会在当前用户目录下使用该名称保存配置和授权。
+
+首次使用全新名称时，SDK 会自动创建平台默认配置、`_Default` 动态配置及后续功能配置文件。第三方产品不应为了取得默认参数而共用 `%APPDATA%\Racebear`，也不要复制 SimRacebear 用户目录作为模板。
 
 应用目录名要求：
 
@@ -474,7 +478,33 @@ InterlockedIncrement64(reinterpret_cast<volatile LONG64*>(&block->WriteSequence)
 
 目录 JSON 都包含 `count` 和 `items`，具体字段由 SDK 返回内容决定。调用方应使用正式 JSON 解析库，不要用字符串查找或拼接解析 JSON。
 
-## 8. 保存配置
+## 8. 配置接口
+
+正式 C++、Qt、炫彩或其他原生前端应优先使用结构体接口。JSON 接口只用于脚本、迁移工具、诊断工具和需要保留未来未知字段的高级场景，不能要求最终用户手工编辑 JSON 文件或在产品界面中直接修改 JSON 文本。
+
+各配置页面统一遵循以下流程：
+
+1. 从 SDK 目录取得有效索引、名称和可选 key。
+2. 调用对应 `Read...` 接口读取完整结构体。
+3. 只修改用户调整的字段，保留其他读取值。
+4. 调用 `Apply...` 更新运行态预览。
+5. 用户确认后调用 `Save...` 持久化。
+6. 再次读取并刷新 UI，确认保存结果。
+
+常规前端不需要编辑以下 JSON 包，直接使用对应结构体接口：
+
+| JSON 包 | 主要结构体接口 |
+| ------- | -------------- |
+| `config.telemetry` | `RB_Game_ReadConfig()` / `RB_Game_SaveConfig()` |
+| `config.dynamicV2` | `RB_Dynamic_ReadProfileByIndex()` / `RB_Dynamic_SaveProfileByIndex()` / `RB_Dynamic_ApplyProfileToCurrentRig()` |
+| `config.platform` | `RB_Platform_ReadConfigByIndex()` / `RB_Platform_SaveConfigByIndex()` / `RB_Platform_ApplyConfigToCurrentRig()` |
+| `config.output` | `RB_Output_ReadInstanceConfigByIndex()` / `RB_Output_SaveInstanceConfigByIndex()` / `RB_Output_ApplyInstanceConfigByIndex()` |
+| 运动增强配置 | `RB_MotionEffect_ReadProfileByIndex()` / `RB_MotionEffect_SaveProfileByIndex()` / `RB_MotionEffect_ApplyProfileToCurrentRig()` |
+| 震动配置 | `RB_Haptic_ReadProfileByIndex()` / `RB_Haptic_SaveProfileByIndex()` / `RB_Haptic_ApplyProfileToCurrentFunction()` |
+| 风感配置 | `RB_Wind_ReadConfig()` / `RB_Wind_SaveConfig()` / `RB_Wind_ApplyConfigToCurrentFunction()` |
+| 安全带配置 | `RB_Seatbelt_ReadConfig()` / `RB_Seatbelt_SaveConfig()` / `RB_Seatbelt_ApplyConfigToCurrentFunction()` |
+
+### 8.0 JSON 高级接口
 
 只有以下 key 可以写入：
 
@@ -517,9 +547,9 @@ if (ReadSdkJson("config.output", outputJson)) {
 
 不要从空字符串手工创建完整配置。首次运行时先初始化 SDK，再读取 SDK 已生成或已加载的配置作为编辑基础。
 
-## 8.1 结构体配置示例
+## 8.1 结构体配置接口
 
-如果调用方不想直接处理完整 JSON，可以使用 SDK 已公开的结构体配置接口。结构体接口适合常规前端，JSON 接口适合调试工具、脚本或需要保留未知字段的高级编辑器。
+结构体接口是常规前端的主要接入方式。调用方不需要定位配置文件，也不需要了解内部 JSON 节点名称。
 
 ### 8.1.1 动态滤波参数
 
@@ -606,14 +636,74 @@ if (rc != RB_OK) {
 | `Key` | 稳定遥测 key，例如 `rb.motion.linear.lateral_acceleration` |
 | `Filter.Enabled` | 是否启用当前通道滤波 |
 | `Filter.Dof` | 当前输入输出到的 DOF 索引 |
-| `Filter.InGain` | 输入增益，`double` |
-| `Filter.Strength` | 滤波强度，UI 整数参数 |
-| `Filter.Smoothing` | 平滑参数，UI 整数参数 |
-| `Filter.DeadZone` | 输入死区，UI 整数参数 |
-| `Filter.Washout` | 回中/洗出参数，UI 整数参数 |
-| `Filter.Proportion`、`OutScaling`、`Sensitivity`、`SensitivityStrength` | 对应高级滤波参数；保留未在 UI 中修改的读取值 |
+| `Filter.InMapping` | 输入达到满输出所需的绝对量；必须与所选遥测值单位一致，0 表示无有效映射 |
+| `Filter.InGain` | 输入增益和方向；`1.0` 原方向，`-1.0` 反向，可使用小数 |
+| `Filter.OutScaling` | 最大输出占当前 DOF `PoseLimit` 的百分比，建议 `0-100` |
+| `Filter.Proportion` | Logistic 有效范围占 `PoseLimit` 的百分比；`0` 关闭 Logistic |
+| `Filter.Strength` | Logistic 曲线强度；`0` 关闭，运行时按该值乘 `0.1` 使用 |
+| `Filter.Smoothing` | 低通平滑；`0` 关闭，数值越大响应越慢 |
+| `Filter.DeadZone` | 输出死区占最大输出范围的百分比；`0` 关闭 |
+| `Filter.Washout` | 加速度输入高通洗出强度；`0` 关闭，姿态输入不会应用 |
+| `Filter.Sensitivity` | GUARD 输出保护安全区百分比；`0` 关闭 |
+| `Filter.SensitivityStrength` | GUARD 保护强度百分比；仅 `Sensitivity>0` 时生效 |
 
-增加或删除输入通道时，应先读取整个 `RB_DynamicV2Profile`，在对应 `Dofs[dofIndex].Inputs` 中移动结构体并同步修改 `InputCount`，最后保存整个配置。不能只传单个 `RB_FilterEffect`，因为 SDK 保存接口接收的是完整配置包。
+增加输入通道时，不要手写 `TelemetryIndex`。先从 `RB_Telemetry_GetCatalog()` 取得稳定 `Key`，再调用 `RB_Telemetry_FindIndexByKey()` 解析当前索引：
+
+```cpp
+RB_DynamicDofEffect& dof = profile.Dofs[dofIndex];
+if (dof.InputCount >= RB_DYNAMIC_MAX_INPUTS) {
+    return;
+}
+
+const char* telemetryKey = "rb.motion.linear.lateral_acceleration";
+const int telemetryIndex = RB_Telemetry_FindIndexByKey(telemetryKey);
+if (telemetryIndex < 0) {
+    return;
+}
+
+RB_DynamicInputEffect& input = dof.Inputs[dof.InputCount];
+input = {};
+input.Enabled = 1;
+input.TelemetryIndex = telemetryIndex;
+strcpy_s(input.Key, sizeof(input.Key), telemetryKey);
+input.Filter.Enabled = 1;
+input.Filter.Dof = dofIndex;
+input.Filter.InMapping = 1;
+input.Filter.InGain = 1.0;
+input.Filter.OutScaling = 100;
+++dof.InputCount;
+```
+
+删除输入通道时需要保持数组连续：
+
+```cpp
+for (int i = inputIndex; i + 1 < dof.InputCount; ++i) {
+    dof.Inputs[i] = dof.Inputs[i + 1];
+}
+if (dof.InputCount > 0) {
+    --dof.InputCount;
+    dof.Inputs[dof.InputCount] = {};
+}
+```
+
+最后保存整个 `RB_DynamicV2Profile`。不能只传单个 `RB_FilterEffect`，因为同一个 DOF 的多个输入通道拥有各自独立参数。
+
+配置创建、绑定和删除：
+
+```cpp
+RB_DynamicV2Profile copy{};
+if (RB_Dynamic_ReadProfileByIndex(sourceIndex, &copy) == RB_OK &&
+    RB_Dynamic_SaveProfile("MyProfile", &copy) == RB_OK) {
+    // 新配置已经进入目录，刷新目录后取得它的新索引。
+}
+
+RB_Dynamic_SaveCurrentGameProfileIndex(selectedIndex);
+
+// 删除会同时清理同名动态、运动增强和震动配置；随后必须刷新全部配置目录。
+RB_Dynamic_DeleteProfileByIndex(selectedIndex);
+```
+
+### 8.1.2 运动增强参数
 
 读取并修改运动增强参数：
 
@@ -625,12 +715,12 @@ if (RB_MotionEffect_ReadProfileByIndex(0, &effects) == RB_OK) {
     gearShift.Enabled = 1;
     gearShift.Threshold = 50;
     gearShift.Frequency = 25;
-    gearShift.Gain = 100;
+    gearShift.Gain = 1.0;
 
     // 每条 Routes 表示一个输出通道路由，Enabled=0 的路由会被忽略。
     gearShift.Routes[0].Enabled = 1;
     gearShift.Routes[0].Dof = 2;
-    gearShift.Routes[0].OutputRatio = 100;
+    gearShift.Routes[0].OutputRatio = 1.0;
     gearShift.Routes[0].Frequency = 25;
     gearShift.Routes[0].Duration = 0.08;
 
@@ -638,6 +728,31 @@ if (RB_MotionEffect_ReadProfileByIndex(0, &effects) == RB_OK) {
     RB_MotionEffect_ApplyProfileToCurrentRig(&effects);
 }
 ```
+
+运动增强目录与字段：
+
+```cpp
+RB_EffectCatalog effectCatalog{};
+if (RB_MotionEffect_GetCatalog(&effectCatalog) == RB_OK) {
+    // 使用 Items[i].Index 访问 Effects[effectIndex]，Name/Description 仅用于显示。
+}
+```
+
+| 字段 | 含义 |
+| ---- | ---- |
+| `Enabled` | 是否启用效果 |
+| `EffectType` | 效果类型；使用默认配置或读取值，不要与目录索引脱离 |
+| `InputIndex`、`SecondaryInputIndex` | 主/辅助遥测运行时索引，使用遥测 key 重新解析 |
+| `Gain` | 效果自身增益，`1.0=100%` |
+| `RouteCount` | `Routes` 中连续有效路由数量，范围 `0-RB_MOTION_ROUTE_COUNT` |
+| `Routes[i].Dof` | 目标 DOF，范围 `0-5` |
+| `OutputRatio` | 当前路由比例，`1.0=100%` |
+| `Direction` | 通常为 `1.0` 或 `-1.0` |
+| `Threshold` | 当前路由触发阈值，单位随效果输入而变化 |
+| `Frequency` | 当前路由频率，单位 Hz |
+| `Duration` | 当前路由持续时间，单位秒 |
+
+`MotionEffectConfig` 尾部的 `Threshold`、`Limit`、`Frequency`、`Decay`、`OutputDof`、`SecondaryOutputDof`、`SecondaryGain` 和 `Direction` 是旧配置兼容字段。新前端主要编辑 `Routes`；没有明确迁移需求时应保留读取值。
 
 读取默认效果参数：
 
@@ -647,6 +762,46 @@ if (RB_MotionEffect_GetDefaultConfig(0, &config) == RB_OK) {
     // 可把默认值填入 UI，再由用户修改后保存到 RB_MotionEffectProfile。
 }
 ```
+
+配置名称与动态配置保持对应。可使用 `RB_MotionEffect_GetProfileCount()` 和 `RB_MotionEffect_GetProfileName()` 枚举，也可以直接使用同索引的动态配置名。删除整组配置优先调用 `RB_Dynamic_DeleteProfileByIndex()`。
+
+### 8.1.3 震动效果参数
+
+```cpp
+RB_EffectCatalog hapticCatalog{};
+if (RB_Haptic_GetCatalog(&hapticCatalog) != RB_OK) {
+    return;
+}
+
+RB_HapticEffectProfile haptic{};
+if (RB_Haptic_ReadProfileByIndex(profileIndex, &haptic) != RB_OK) {
+    return;
+}
+
+const int effectIndex = hapticCatalog.Items[0].Index;
+RB_HapticEffectConfig& effect = haptic.Effects[effectIndex];
+effect.Enabled = 1;
+effect.OutputChannel = 0; // Haptic1。
+effect.Gain = 1.0;
+effect.MinOutput = 0.0;
+effect.MaxOutput = 65535.0;
+
+RB_Haptic_ApplyProfileToCurrentFunction(&haptic);
+RB_Haptic_SaveProfileByIndex(profileIndex, &haptic);
+```
+
+| 字段 | 含义 |
+| ---- | ---- |
+| `OutputChannel` | `0-6`，对应 `Haptic1-Haptic7` |
+| `Gain` | 输出增益；`0` 表示不输出 |
+| `Threshold` | 触发阈值，单位取决于效果输入 |
+| `MinOutput`、`MaxOutput` | 最小/最大位输出，默认范围 `0-65535` |
+| `Frequency` | 频率或节奏参数，单位 Hz |
+| `Direction` | 通常为 `1.0` 或 `-1.0` |
+
+新增效果时先调用 `RB_Haptic_GetDefaultConfig(effectIndex, &config)`，不要从全零结构体猜默认值。震动配置与动态配置共用配置名和索引。
+
+### 8.1.4 风感参数
 
 读取并修改风感参数：
 
@@ -664,7 +819,23 @@ wind.MasterGainPercent = 100;
 
 RB_Wind_SaveConfig(&wind);
 RB_Wind_ApplyConfigToCurrentFunction(&wind);
+
+// 测试按钮按下时启用，松开、离开页面和程序退出前必须关闭。
+RB_Wind_SetTestOutput(1, 50.0);
+RB_Wind_SetTestOutput(0, 0.0);
 ```
+
+| 字段 | 单位和范围 |
+| ---- | ---------- |
+| `InputMinKmh` | 起风速度，km/h，必须大于等于 0 |
+| `InputMaxKmh` | 满风速度，km/h，必须大于 `InputMinKmh` |
+| `OutputMinWorkPercent` | 风扇最低有效输出，`0-100%` |
+| `Gamma` | `1.0` 线性；大于 1 降低低速输出，小于 1 提高低速输出 |
+| `MasterGainPercent` | 总增益，`0-100%` |
+| `ChannelGainPercent[0-3]` | Wind1-Wind4 增益补偿，`-100%` 到 `100%` |
+| `ChannelOffsetPercent[0-3]` | Wind1-Wind4 偏移补偿，`-100%` 到 `100%` |
+
+### 8.1.5 安全带参数
 
 读取并修改安全带参数：
 
@@ -675,7 +846,7 @@ if (RB_Seatbelt_ReadConfig(&seatbelt) != RB_OK) {
 }
 
 seatbelt.Enabled = 1;
-seatbelt.InputMode = 0;
+seatbelt.InputMode = RB_SEATBELT_INPUT_TELEMETRY;
 seatbelt.BasePreloadPercent = 5;
 seatbelt.StartSpeedKmh = 20;
 seatbelt.MasterGainPercent = 100;
@@ -687,9 +858,28 @@ seatbelt.LateralGainPercent = 60;
 
 RB_Seatbelt_SaveConfig(&seatbelt);
 RB_Seatbelt_ApplyConfigToCurrentFunction(&seatbelt);
+
+RB_Seatbelt_SetTestOutput(1, 40.0, 40.0);
+RB_Seatbelt_SetTestOutput(0, 0.0, 0.0);
 ```
 
-### 8.1.5 输出参数
+| 字段 | 单位和范围 |
+| ---- | ---------- |
+| `BasePreloadPercent` | 固定基础预紧，`0-100%`，不随车速增加 |
+| `StartSpeedKmh` | 动态张紧起效速度，km/h |
+| `FullSpeedKmh` | 旧版兼容字段，当前算法不使用，保留读取值 |
+| `MasterGainPercent` | 总增益，`0-200%` |
+| `ReleaseSpeedPercent` | 回落速度，`0-100%`，越大释放越快 |
+| `BrakePedalGainPercent` | 刹车踏板激活门限，`0-100%` |
+| `BrakeDecelGainPercent` | Surge 刹车减速度增益，`0-200%` |
+| `LateralGainPercent` | Sway 横向张紧增益，`0-200%` |
+| `LateralDeadzoneG` | 横向加速度死区，单位 G |
+| `LeftOutputRatioPercent`、`RightOutputRatioPercent` | 左右通道输出比例，`0-100%` |
+| `CrashEnabled` 及三个 Crash 参数 | 旧版兼容字段，当前算法不使用 |
+
+`RB_SEATBELT_INPUT_HID` 和 `RB_SEATBELT_INPUT_MIXED` 只有在宿主接入 HID 输入源后才有意义。普通游戏遥测前端应使用 `RB_SEATBELT_INPUT_TELEMETRY`。
+
+### 8.1.6 输出参数
 
 每个输出实例对应一个 `RB_OutputConfig`。`instanceIndex` 是当前输出实例列表的零基索引，范围由 `RB_Output_GetInstanceCount()` 决定。先读取再修改，能够保留当前输出类型不认识或当前页面未显示的字段。
 
@@ -715,7 +905,7 @@ output.ConnectionSpeed = 50;
 strcpy_s(output.StartString, sizeof(output.StartString), "START");
 strcpy_s(output.StartTime, sizeof(output.StartTime), "100");
 strcpy_s(output.OutPutString, sizeof(output.OutPutString), "HA<A1><A2><A3><A4>");
-strcpy_s(output.OutPutTime, sizeof(output.OutPutTime), "10");
+strcpy_s(output.OutPutTime, sizeof(output.OutPutTime), "2"); // 单位 ms。
 strcpy_s(output.EndString, sizeof(output.EndString), "STOP");
 strcpy_s(output.EndTime, sizeof(output.EndTime), "100");
 
@@ -736,22 +926,85 @@ if (rc != RB_OK) {
 
 | 输出类型 | 必填或常用字段 |
 | -------- | -------------- |
-| 串口 | `OutputKind`、`Port`、`BaudRate`、`OutBit`、命令和延时字段 |
+| Serial | `OutputKind`、`Port`、`BaudRate`、`OutBit`、命令和延时字段 |
 | UDP | `OutputKind`、`IpAddrs`、`UdpPort`、`UdpLPort`、命令和延时字段 |
 | MMF | `OutputKind`、`MMFName`、命令模板 |
 | CAN | `OutputKind`、`CANindex`、`ConnectionSpeed`、`ParkPositionPercent`、`AutoConnect` |
+| Sim-FAN | Serial 字段和 Wind1-Wind4 输出命令模板 |
+| Vibration | Serial 字段和 Haptic1-Haptic7 输出命令模板 |
 
 通用输出字段：
 
 | 字段 | 说明 |
 | ---- | ---- |
-| `OutputKind` | 输出类型 key。创建实例时优先使用 SDK 输出目录提供的值，不要让用户自由输入 |
+| `OutputKind` | 输出类型 key。必须来自 `RB_Output_GetKind()`，不要让用户自由输入 |
+| `Type` | 旧版兼容字段；新前端按 `OutputKind` 判断类型，读取后原样保留 |
 | `AutoConnect` | `1` 表示 SDK 自动连接该实例 |
 | `ConnectionSpeed` | 连接、回零或过渡速度百分比，具体约束以当前输出类型为准 |
 | `ParkPositionPercent` | 停放位置百分比 |
 | `StartString` / `StartTime` | 连接后的起始命令及延时文本 |
 | `OutPutString` / `OutPutTime` | 周期输出模板及输出间隔文本 |
 | `EndString` / `EndTime` | 断开前的结束命令及延时文本 |
+
+三个时间字段都是十进制毫秒文本，不是 Hz：`"2"` 表示约每 2 ms 输出一次，`"100"` 表示延迟 100 ms。使用文本是为了兼容现有配置格式，前端保存前必须验证为非负十进制数。
+
+输出实例的完整生命周期：
+
+```cpp
+// 输出类型下拉框必须由 SDK 枚举，不能硬编码或让用户自由输入。
+for (int i = 0; i < RB_Output_GetKindCount(); ++i) {
+    char kind[RB_TEXT_SMALL]{};
+    if (RB_Output_GetKind(i, kind, sizeof(kind)) == RB_OK) {
+        // 把 kind 添加到 UI，并把原文保存为选项数据。
+    }
+}
+
+// 首次运行没有输出实例时创建一个 Serial 实例。
+if (RB_Output_GetInstanceCount() == 0) {
+    const int newIndex = RB_Output_AddInstance("Serial");
+    if (newIndex < 0) {
+        return;
+    }
+}
+
+const int instanceIndex = 0;
+RB_OutputConfig config{};
+if (RB_Output_ReadInstanceConfigByIndex(instanceIndex, &config) != RB_OK) {
+    return;
+}
+
+// 连接参数只能在断开后修改。
+if (RB_Output_IsInstanceConnected(instanceIndex)) {
+    if (RB_Output_DisconnectInstanceByIndex(instanceIndex) != RB_OK) {
+        return;
+    }
+}
+
+strcpy_s(config.Port, sizeof(config.Port), "COM3");
+config.BaudRate = 115200;
+if (RB_Output_SaveInstanceConfigByIndex(instanceIndex, &config) == RB_OK &&
+    RB_Output_ApplyInstanceConfigByIndex(instanceIndex, &config) == RB_OK) {
+    RB_Output_ConnectInstanceByIndex(instanceIndex);
+}
+
+// 删除前先断开；删除后索引变化，必须刷新列表。
+RB_Output_DisconnectInstanceByIndex(instanceIndex);
+RB_Output_DeleteInstanceByIndex(instanceIndex);
+```
+
+自动连接和程序退出：
+
+```cpp
+RB_Output_ConnectAuto();
+
+// 退出时让每个实例执行自己的结束命令，并等待状态机完成。
+RB_Output_RequestDisconnectAll();
+while (!RB_Output_AreAllDisconnected()) {
+    Sleep(10);
+}
+```
+
+不要在 UI 线程中无限等待。正式程序应使用定时器轮询并设置合理的退出超时。
 
 UDP 参数示例：
 

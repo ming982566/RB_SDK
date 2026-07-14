@@ -2,6 +2,8 @@
 
 本示例使用公开 C ABI，演示 SDK 初始化、内部计算循环、运行状态、JSON 数据包、Command、日志和正常退出。
 
+`configuration_examples.cpp` 另外提供动态滤波、Serial 输出、运动增强、震动和风感的完整“读取 -> 修改 -> 应用 -> 保存”代码。为了避免示例启动后覆盖用户配置，这些函数只参与编译验证，不由 `main.cpp` 自动调用。
+
 ## 构建
 
 在 Visual Studio 2019 Developer PowerShell 中执行：

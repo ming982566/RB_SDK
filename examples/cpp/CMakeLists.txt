@@ -17,7 +17,12 @@ get_filename_component(RACEBEAR_SDK_ROOT
     ABSOLUTE)
 
 # 公开头只需要 RaceBearSDK.h，不应包含 src 下的任何私有头文件。
-add_executable(RaceBearSDKCppExample main.cpp custom_game_example.cpp custom_game_example.h)
+add_executable(RaceBearSDKCppExample
+    main.cpp
+    custom_game_example.cpp
+    custom_game_example.h
+    configuration_examples.cpp
+    configuration_examples.h)
 target_compile_features(RaceBearSDKCppExample PRIVATE cxx_std_17)
 
 # 示例源码使用 UTF-8 无 BOM 中文注释；VS2019 必须显式按 UTF-8 解析源码。

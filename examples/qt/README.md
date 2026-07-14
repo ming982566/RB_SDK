@@ -84,7 +84,7 @@ public:
     // state() 返回最近一次定时器读取的副本，UI 不直接高频调用 DLL。
     const RB_RuntimeState& state() const { return state_; }
 
-    // 目录/配置使用低频 JSON 接口；动作统一使用 Command 接口。
+    // 目录 JSON 只用于低频列表；常规配置页面直接使用 RaceBearSDK.h 结构体接口。
     QJsonObject readJson(const char* key, bool* ok = nullptr) const;
     QJsonObject runCommand(
         const char* command,
@@ -323,6 +323,31 @@ args.insert("gameKey", selectedGameKey);
 backend_->runCommand("game.launch", args);
 ```
 
+配置页面不需要把 JSON 暴露给用户。以风感页面为例：
+
+```cpp
+RB_WindEffectConfig wind{};
+if (RB_Wind_ReadConfig(&wind) == RB_OK) {
+    // 页面打开时把结构体值填入控件。
+    inputMinSpinBox_->setValue(wind.InputMinKmh);
+    inputMaxSpinBox_->setValue(wind.InputMaxKmh);
+    masterGainSlider_->setValue(qRound(wind.MasterGainPercent));
+}
+
+// Apply 用于即时预览，Save 用于用户确认后持久化。
+wind.InputMinKmh = inputMinSpinBox_->value();
+wind.InputMaxKmh = inputMaxSpinBox_->value();
+wind.MasterGainPercent = masterGainSlider_->value();
+RB_Wind_ApplyConfigToCurrentFunction(&wind);
+RB_Wind_SaveConfig(&wind);
+
+// 测试按钮松开、页面关闭和程序退出前都必须关闭测试输出。
+RB_Wind_SetTestOutput(1, 50.0);
+RB_Wind_SetTestOutput(0, 0.0);
+```
+
+动态滤波、输出、运动增强、震动和安全带使用同样的“Read -> 修改结构体 -> Apply -> Save”流程，完整字段和代码见 `RaceBearSDK_API.md` 第 8 节。
+
 ## 4. qmake 配置
 
 仍使用 qmake 的 Qt 5 项目可以加入：
@@ -381,7 +406,8 @@ PySide/PyQt 应直接复用 `examples/python/racebear_sdk.py`，然后使用 Qt 
 - Qt、宿主程序和 RaceBear SDK 必须全部为 x64。
 - 推荐使用 MSVC 2019 x64 Kit。
 - SDK 文本通过 `QString::fromUtf8()` 转换。
-- JSON 使用 `QJsonDocument` 和 `QJsonObject`，不要拼接 JSON 字符串。
+- 常规配置页面使用结构体接口；只有目录、脚本和高级工具才读取 JSON。
+- 必须生成 JSON 参数时使用 `QJsonDocument` 和 `QJsonObject`，不要拼接字符串。
 - SDK 内部循环由 `RB_Runtime_StartLoop()` 驱动，Qt `QTimer` 只负责刷新 UI。
 - 窗口退出前先停止所有 Qt 定时器和线程，再调用 `RB_Runtime_Shutdown()`。
 - SDK 或串口回调不保证位于 Qt 主线程，必须通过信号槽转发。

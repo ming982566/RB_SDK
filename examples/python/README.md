@@ -2,6 +2,22 @@
 
 本示例使用 Python 标准库 `ctypes`，不需要安装任何 pip 包。
 
+`racebear_sdk.py` 已映射动态滤波、输出、运动增强、震动、风感和安全带结构体。常规设置页面应使用 `read_dynamic_profile()`、`read_output()`、`read_wind()` 等结构体方法，不需要读取或手工编辑配置 JSON。
+
+例如修改风感配置：
+
+```python
+wind = sdk.read_wind()
+wind.InputMinKmh = 20.0
+wind.InputMaxKmh = 180.0
+wind.MasterGainPercent = 100.0
+sdk.save_wind(wind, apply=True)
+
+# 测试结束必须关闭，否则测试值会继续覆盖实时风感。
+sdk.set_wind_test(True, 50.0)
+sdk.set_wind_test(False)
+```
+
 要求：
 
 - Windows x64。

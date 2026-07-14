@@ -26,6 +26,14 @@ RB_TEXT_MEDIUM = 128
 RB_TEXT_LARGE = 260
 RB_DOF_COUNT = 6
 RB_WIND_CHANNEL_COUNT = 4
+RB_DYNAMIC_DOF_COUNT = 8
+RB_DYNAMIC_MAX_INPUTS = 8
+RB_MOTION_EFFECT_COUNT = 5
+RB_MOTION_ROUTE_COUNT = 6
+RB_HAPTIC_EFFECT_COUNT = 7
+RB_MAX_OUTPUT_INSTANCES = 32
+RB_MAX_OUTPUT_KEYS = 128
+RB_MAX_EFFECTS = 32
 RB_MAX_CAN_MOTORS = 16
 RB_MAX_TELEMETRY_VALUES = 512
 RB_CUSTOM_TRANSPORT_MMF = 1
@@ -259,6 +267,208 @@ class RB_SerialPortInfo(ctypes.Structure):
     ]
 
 
+class RB_OutputConfig(ctypes.Structure):
+    """单个 Serial/UDP/MMF/CAN 输出实例的完整配置。"""
+
+    _fields_ = [
+        ("Size", ctypes.c_int),
+        ("Version", ctypes.c_int),
+        ("CANindex", ctypes.c_int),
+        ("ConnectionSpeed", ctypes.c_int),
+        ("ParkPositionPercent", ctypes.c_int),
+        ("AutoConnect", ctypes.c_int),
+        ("OutBit", ctypes.c_int),
+        ("OutputKind", ctypes.c_char * RB_TEXT_SMALL),
+        ("Type", ctypes.c_int),
+        ("BaudRate", ctypes.c_int),
+        ("Port", ctypes.c_char * RB_TEXT_MEDIUM),
+        ("IpAddrs", ctypes.c_char * RB_TEXT_MEDIUM),
+        ("UdpPort", ctypes.c_int),
+        ("UdpLPort", ctypes.c_int),
+        ("MMFName", ctypes.c_char * RB_TEXT_MEDIUM),
+        ("StartString", ctypes.c_char * RB_TEXT_LARGE),
+        ("StartTime", ctypes.c_char * RB_TEXT_SMALL),
+        ("OutPutString", ctypes.c_char * RB_TEXT_LARGE),
+        ("OutPutTime", ctypes.c_char * RB_TEXT_SMALL),
+        ("EndString", ctypes.c_char * RB_TEXT_LARGE),
+        ("EndTime", ctypes.c_char * RB_TEXT_SMALL),
+    ]
+
+
+class RB_EffectCatalogItem(ctypes.Structure):
+    _fields_ = [
+        ("Index", ctypes.c_int),
+        ("Name", ctypes.c_char * RB_TEXT_MEDIUM),
+        ("Description", ctypes.c_char * RB_TEXT_LARGE),
+        ("OutputText", ctypes.c_char * RB_TEXT_MEDIUM),
+    ]
+
+
+class RB_EffectCatalog(ctypes.Structure):
+    _fields_ = [
+        ("Size", ctypes.c_int),
+        ("Version", ctypes.c_int),
+        ("Count", ctypes.c_int),
+        ("Items", RB_EffectCatalogItem * RB_MAX_EFFECTS),
+    ]
+
+
+class RB_FilterEffect(ctypes.Structure):
+    """一个动态输入通道的完整滤波链参数。"""
+
+    _fields_ = [
+        ("Enabled", ctypes.c_int),
+        ("Dof", ctypes.c_int),
+        ("InMapping", ctypes.c_int),
+        ("InGain", ctypes.c_double),
+        ("OutScaling", ctypes.c_int),
+        ("Proportion", ctypes.c_int),
+        ("Strength", ctypes.c_int),
+        ("Smoothing", ctypes.c_int),
+        ("DeadZone", ctypes.c_int),
+        ("Washout", ctypes.c_int),
+        ("Sensitivity", ctypes.c_int),
+        ("SensitivityStrength", ctypes.c_int),
+    ]
+
+
+class RB_DynamicInputEffect(ctypes.Structure):
+    _fields_ = [
+        ("Enabled", ctypes.c_int),
+        ("InputType", ctypes.c_int),
+        ("TelemetryIndex", ctypes.c_int),
+        ("Key", ctypes.c_char * RB_TEXT_SMALL),
+        ("Filter", RB_FilterEffect),
+    ]
+
+
+class RB_DynamicDofEffect(ctypes.Structure):
+    _fields_ = [
+        ("Enabled", ctypes.c_int),
+        ("InputCount", ctypes.c_int),
+        ("Inputs", RB_DynamicInputEffect * RB_DYNAMIC_MAX_INPUTS),
+    ]
+
+
+class RB_DynamicV2Profile(ctypes.Structure):
+    """八个动态槽位及每槽最多八个独立输入通道。"""
+
+    _fields_ = [
+        ("Size", ctypes.c_int),
+        ("Version", ctypes.c_int),
+        ("Dofs", RB_DynamicDofEffect * RB_DYNAMIC_DOF_COUNT),
+    ]
+
+
+class RB_MotionEffectOutputRoute(ctypes.Structure):
+    _fields_ = [
+        ("Enabled", ctypes.c_int),
+        ("Dof", ctypes.c_int),
+        ("OutputRatio", ctypes.c_double),
+        ("Direction", ctypes.c_double),
+        ("Threshold", ctypes.c_double),
+        ("Frequency", ctypes.c_double),
+        ("Duration", ctypes.c_double),
+    ]
+
+
+class RB_MotionEffectConfig(ctypes.Structure):
+    _fields_ = [
+        ("Enabled", ctypes.c_int),
+        ("EffectType", ctypes.c_int),
+        ("InputIndex", ctypes.c_int),
+        ("SecondaryInputIndex", ctypes.c_int),
+        ("Gain", ctypes.c_double),
+        ("RouteCount", ctypes.c_int),
+        ("Routes", RB_MotionEffectOutputRoute * RB_MOTION_ROUTE_COUNT),
+        ("Threshold", ctypes.c_double),
+        ("Limit", ctypes.c_double),
+        ("Frequency", ctypes.c_double),
+        ("Decay", ctypes.c_double),
+        ("OutputDof", ctypes.c_int),
+        ("SecondaryOutputDof", ctypes.c_int),
+        ("SecondaryGain", ctypes.c_double),
+        ("Direction", ctypes.c_double),
+    ]
+
+
+class RB_MotionEffectProfile(ctypes.Structure):
+    _fields_ = [
+        ("Size", ctypes.c_int),
+        ("Version", ctypes.c_int),
+        ("Effects", RB_MotionEffectConfig * RB_MOTION_EFFECT_COUNT),
+    ]
+
+
+class RB_HapticEffectConfig(ctypes.Structure):
+    _fields_ = [
+        ("Enabled", ctypes.c_int),
+        ("EffectType", ctypes.c_int),
+        ("InputIndex", ctypes.c_int),
+        ("SecondaryInputIndex", ctypes.c_int),
+        ("OutputChannel", ctypes.c_int),
+        ("Gain", ctypes.c_double),
+        ("Threshold", ctypes.c_double),
+        ("MinOutput", ctypes.c_double),
+        ("MaxOutput", ctypes.c_double),
+        ("Frequency", ctypes.c_double),
+        ("Direction", ctypes.c_double),
+    ]
+
+
+class RB_HapticEffectProfile(ctypes.Structure):
+    _fields_ = [
+        ("Size", ctypes.c_int),
+        ("Version", ctypes.c_int),
+        ("Effects", RB_HapticEffectConfig * RB_HAPTIC_EFFECT_COUNT),
+    ]
+
+
+class RB_WindEffectConfig(ctypes.Structure):
+    _fields_ = [
+        ("Size", ctypes.c_int),
+        ("Version", ctypes.c_int),
+        ("Enabled", ctypes.c_int),
+        ("InputMinKmh", ctypes.c_double),
+        ("InputMaxKmh", ctypes.c_double),
+        ("OutputMinWorkPercent", ctypes.c_double),
+        ("Gamma", ctypes.c_double),
+        ("MasterGainPercent", ctypes.c_double),
+        ("ChannelGainPercent", ctypes.c_double * RB_WIND_CHANNEL_COUNT),
+        ("ChannelOffsetPercent", ctypes.c_double * RB_WIND_CHANNEL_COUNT),
+    ]
+
+
+class RB_SeatbeltEffectConfig(ctypes.Structure):
+    _fields_ = [
+        ("Size", ctypes.c_int),
+        ("Version", ctypes.c_int),
+        ("Enabled", ctypes.c_int),
+        ("InputMode", ctypes.c_int),
+        ("BasePreloadPercent", ctypes.c_double),
+        ("StartSpeedKmh", ctypes.c_double),
+        ("FullSpeedKmh", ctypes.c_double),
+        ("MasterGainPercent", ctypes.c_double),
+        ("ReleaseSpeedPercent", ctypes.c_double),
+        ("BrakeEnabled", ctypes.c_int),
+        ("BrakePedalGainPercent", ctypes.c_double),
+        ("BrakeDecelGainPercent", ctypes.c_double),
+        ("LateralEnabled", ctypes.c_int),
+        ("LateralGainPercent", ctypes.c_double),
+        ("LateralDeadzoneG", ctypes.c_double),
+        ("CrashEnabled", ctypes.c_int),
+        ("CrashThresholdPercent", ctypes.c_double),
+        ("CrashHoldMs", ctypes.c_double),
+        ("CrashOutputPercent", ctypes.c_double),
+        ("LeftEnabled", ctypes.c_int),
+        ("RightEnabled", ctypes.c_int),
+        ("LeftOutputRatioPercent", ctypes.c_double),
+        ("RightOutputRatioPercent", ctypes.c_double),
+        ("LeftReverse", ctypes.c_int),
+        ("RightReverse", ctypes.c_int),
+    ]
+
+
 class RB_ExternalTelemetryValue(ctypes.Structure):
     """外部游戏单个遥测值；Index由稳定key在启动时解析。"""
 
@@ -447,6 +657,75 @@ class RaceBearSDK:
         self._dll.RB_Log_Read.argtypes = [ctypes.POINTER(ctypes.c_char), ctypes.c_int]
         self._dll.RB_Log_Read.restype = ctypes.c_int
 
+        # 常规前端配置接口。Python 也直接传结构体，不要求客户编辑 JSON。
+        self._dll.RB_Output_GetInstanceCount.argtypes = []
+        self._dll.RB_Output_GetInstanceCount.restype = ctypes.c_int
+        self._dll.RB_Output_GetKindCount.argtypes = []
+        self._dll.RB_Output_GetKindCount.restype = ctypes.c_int
+        self._dll.RB_Output_GetKind.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_char), ctypes.c_int]
+        self._dll.RB_Output_GetKind.restype = ctypes.c_int
+        self._dll.RB_Output_AddInstance.argtypes = [ctypes.c_char_p]
+        self._dll.RB_Output_AddInstance.restype = ctypes.c_int
+        self._dll.RB_Output_DeleteInstanceByIndex.argtypes = [ctypes.c_int]
+        self._dll.RB_Output_DeleteInstanceByIndex.restype = ctypes.c_int
+        self._dll.RB_Output_ReadInstanceConfigByIndex.argtypes = [ctypes.c_int, ctypes.POINTER(RB_OutputConfig)]
+        self._dll.RB_Output_ReadInstanceConfigByIndex.restype = ctypes.c_int
+        self._dll.RB_Output_SaveInstanceConfigByIndex.argtypes = [ctypes.c_int, ctypes.POINTER(RB_OutputConfig)]
+        self._dll.RB_Output_SaveInstanceConfigByIndex.restype = ctypes.c_int
+        self._dll.RB_Output_ApplyInstanceConfigByIndex.argtypes = [ctypes.c_int, ctypes.POINTER(RB_OutputConfig)]
+        self._dll.RB_Output_ApplyInstanceConfigByIndex.restype = ctypes.c_int
+        self._dll.RB_Output_ConnectInstanceByIndex.argtypes = [ctypes.c_int]
+        self._dll.RB_Output_ConnectInstanceByIndex.restype = ctypes.c_int
+        self._dll.RB_Output_DisconnectInstanceByIndex.argtypes = [ctypes.c_int]
+        self._dll.RB_Output_DisconnectInstanceByIndex.restype = ctypes.c_int
+
+        self._dll.RB_Dynamic_GetProfileCount.argtypes = []
+        self._dll.RB_Dynamic_GetProfileCount.restype = ctypes.c_int
+        self._dll.RB_Dynamic_GetProfileName.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_char), ctypes.c_int]
+        self._dll.RB_Dynamic_GetProfileName.restype = ctypes.c_int
+        self._dll.RB_Dynamic_ReadProfileByIndex.argtypes = [ctypes.c_int, ctypes.POINTER(RB_DynamicV2Profile)]
+        self._dll.RB_Dynamic_ReadProfileByIndex.restype = ctypes.c_int
+        self._dll.RB_Dynamic_SaveProfileByIndex.argtypes = [ctypes.c_int, ctypes.POINTER(RB_DynamicV2Profile)]
+        self._dll.RB_Dynamic_SaveProfileByIndex.restype = ctypes.c_int
+        self._dll.RB_Dynamic_ApplyProfileToCurrentRig.argtypes = [ctypes.POINTER(RB_DynamicV2Profile)]
+        self._dll.RB_Dynamic_ApplyProfileToCurrentRig.restype = ctypes.c_int
+
+        self._dll.RB_MotionEffect_GetCatalog.argtypes = [ctypes.POINTER(RB_EffectCatalog)]
+        self._dll.RB_MotionEffect_GetCatalog.restype = ctypes.c_int
+        self._dll.RB_MotionEffect_ReadProfileByIndex.argtypes = [ctypes.c_int, ctypes.POINTER(RB_MotionEffectProfile)]
+        self._dll.RB_MotionEffect_ReadProfileByIndex.restype = ctypes.c_int
+        self._dll.RB_MotionEffect_SaveProfileByIndex.argtypes = [ctypes.c_int, ctypes.POINTER(RB_MotionEffectProfile)]
+        self._dll.RB_MotionEffect_SaveProfileByIndex.restype = ctypes.c_int
+        self._dll.RB_MotionEffect_ApplyProfileToCurrentRig.argtypes = [ctypes.POINTER(RB_MotionEffectProfile)]
+        self._dll.RB_MotionEffect_ApplyProfileToCurrentRig.restype = ctypes.c_int
+
+        self._dll.RB_Haptic_GetCatalog.argtypes = [ctypes.POINTER(RB_EffectCatalog)]
+        self._dll.RB_Haptic_GetCatalog.restype = ctypes.c_int
+        self._dll.RB_Haptic_ReadProfileByIndex.argtypes = [ctypes.c_int, ctypes.POINTER(RB_HapticEffectProfile)]
+        self._dll.RB_Haptic_ReadProfileByIndex.restype = ctypes.c_int
+        self._dll.RB_Haptic_SaveProfileByIndex.argtypes = [ctypes.c_int, ctypes.POINTER(RB_HapticEffectProfile)]
+        self._dll.RB_Haptic_SaveProfileByIndex.restype = ctypes.c_int
+        self._dll.RB_Haptic_ApplyProfileToCurrentFunction.argtypes = [ctypes.POINTER(RB_HapticEffectProfile)]
+        self._dll.RB_Haptic_ApplyProfileToCurrentFunction.restype = ctypes.c_int
+
+        self._dll.RB_Wind_ReadConfig.argtypes = [ctypes.POINTER(RB_WindEffectConfig)]
+        self._dll.RB_Wind_ReadConfig.restype = ctypes.c_int
+        self._dll.RB_Wind_SaveConfig.argtypes = [ctypes.POINTER(RB_WindEffectConfig)]
+        self._dll.RB_Wind_SaveConfig.restype = ctypes.c_int
+        self._dll.RB_Wind_ApplyConfigToCurrentFunction.argtypes = [ctypes.POINTER(RB_WindEffectConfig)]
+        self._dll.RB_Wind_ApplyConfigToCurrentFunction.restype = ctypes.c_int
+        self._dll.RB_Wind_SetTestOutput.argtypes = [ctypes.c_int, ctypes.c_double]
+        self._dll.RB_Wind_SetTestOutput.restype = ctypes.c_int
+
+        self._dll.RB_Seatbelt_ReadConfig.argtypes = [ctypes.POINTER(RB_SeatbeltEffectConfig)]
+        self._dll.RB_Seatbelt_ReadConfig.restype = ctypes.c_int
+        self._dll.RB_Seatbelt_SaveConfig.argtypes = [ctypes.POINTER(RB_SeatbeltEffectConfig)]
+        self._dll.RB_Seatbelt_SaveConfig.restype = ctypes.c_int
+        self._dll.RB_Seatbelt_ApplyConfigToCurrentFunction.argtypes = [ctypes.POINTER(RB_SeatbeltEffectConfig)]
+        self._dll.RB_Seatbelt_ApplyConfigToCurrentFunction.restype = ctypes.c_int
+        self._dll.RB_Seatbelt_SetTestOutput.argtypes = [ctypes.c_int, ctypes.c_double, ctypes.c_double]
+        self._dll.RB_Seatbelt_SetTestOutput.restype = ctypes.c_int
+
         # 外部游戏源使用稳定key解析索引，再按固定结构体提交完整遥测帧。
         self._dll.RB_Telemetry_FindIndexByKey.argtypes = [ctypes.c_char_p]
         self._dll.RB_Telemetry_FindIndexByKey.restype = ctypes.c_int
@@ -521,6 +800,158 @@ class RaceBearSDK:
         if rc != RB_OK:
             raise RaceBearError("RB_State_Read", rc)
         return state
+
+    def dynamic_profile_names(self) -> List[str]:
+        """返回动态配置名；同一索引也用于运动增强和震动配置。"""
+        count = self._dll.RB_Dynamic_GetProfileCount()
+        if count < 0:
+            raise RaceBearError("RB_Dynamic_GetProfileCount", count)
+        names: List[str] = []
+        for index in range(count):
+            buffer = ctypes.create_string_buffer(RB_TEXT_MEDIUM)
+            rc = self._dll.RB_Dynamic_GetProfileName(index, buffer, len(buffer))
+            if rc != RB_OK:
+                raise RaceBearError("RB_Dynamic_GetProfileName", rc)
+            names.append(buffer.value.decode("utf-8", errors="replace"))
+        return names
+
+    def read_dynamic_profile(self, profile_index: int) -> RB_DynamicV2Profile:
+        """读取完整动态配置；修改 Dofs/Inputs/Filter 后传给 save_dynamic_profile。"""
+        profile = RB_DynamicV2Profile()
+        rc = self._dll.RB_Dynamic_ReadProfileByIndex(profile_index, ctypes.byref(profile))
+        if rc != RB_OK:
+            raise RaceBearError("RB_Dynamic_ReadProfileByIndex", rc)
+        return profile
+
+    def save_dynamic_profile(self, profile_index: int, profile: RB_DynamicV2Profile, apply: bool = True) -> None:
+        """保存完整动态配置，并按需立即应用到当前平台。"""
+        rc = self._dll.RB_Dynamic_SaveProfileByIndex(profile_index, ctypes.byref(profile))
+        if rc != RB_OK:
+            raise RaceBearError("RB_Dynamic_SaveProfileByIndex", rc)
+        if apply:
+            rc = self._dll.RB_Dynamic_ApplyProfileToCurrentRig(ctypes.byref(profile))
+            if rc != RB_OK:
+                raise RaceBearError("RB_Dynamic_ApplyProfileToCurrentRig", rc)
+
+    def read_output(self, instance_index: int) -> RB_OutputConfig:
+        """读取单个输出实例的完整配置。"""
+        config = RB_OutputConfig()
+        rc = self._dll.RB_Output_ReadInstanceConfigByIndex(instance_index, ctypes.byref(config))
+        if rc != RB_OK:
+            raise RaceBearError("RB_Output_ReadInstanceConfigByIndex", rc)
+        return config
+
+    def output_kinds(self) -> List[str]:
+        """返回可传给 add_output() 的输出类型 key，前端不应硬编码此列表。"""
+        result: List[str] = []
+        for index in range(self._dll.RB_Output_GetKindCount()):
+            buffer = ctypes.create_string_buffer(RB_TEXT_SMALL)
+            rc = self._dll.RB_Output_GetKind(index, buffer, len(buffer))
+            if rc != RB_OK:
+                raise RaceBearError("RB_Output_GetKind", rc)
+            result.append(buffer.value.decode("utf-8", errors="replace"))
+        return result
+
+    def save_output(self, instance_index: int, config: RB_OutputConfig, apply: bool = True) -> None:
+        """保存输出配置；连接参数应在该实例断开后修改。"""
+        rc = self._dll.RB_Output_SaveInstanceConfigByIndex(instance_index, ctypes.byref(config))
+        if rc != RB_OK:
+            raise RaceBearError("RB_Output_SaveInstanceConfigByIndex", rc)
+        if apply:
+            rc = self._dll.RB_Output_ApplyInstanceConfigByIndex(instance_index, ctypes.byref(config))
+            if rc != RB_OK:
+                raise RaceBearError("RB_Output_ApplyInstanceConfigByIndex", rc)
+
+    def add_output(self, output_kind: str) -> int:
+        """创建 Serial、UDP、MMF 或 CAN 输出实例并返回新索引。"""
+        index = self._dll.RB_Output_AddInstance(output_kind.encode("utf-8"))
+        if index < 0:
+            raise RaceBearError("RB_Output_AddInstance", index)
+        return index
+
+    def read_motion_effects(self, profile_index: int) -> RB_MotionEffectProfile:
+        """读取与动态配置同索引的运动增强配置。"""
+        profile = RB_MotionEffectProfile()
+        rc = self._dll.RB_MotionEffect_ReadProfileByIndex(profile_index, ctypes.byref(profile))
+        if rc != RB_OK:
+            raise RaceBearError("RB_MotionEffect_ReadProfileByIndex", rc)
+        return profile
+
+    def save_motion_effects(self, profile_index: int, profile: RB_MotionEffectProfile, apply: bool = True) -> None:
+        """保存运动增强配置，并按需立即应用到当前平台。"""
+        rc = self._dll.RB_MotionEffect_SaveProfileByIndex(profile_index, ctypes.byref(profile))
+        if rc != RB_OK:
+            raise RaceBearError("RB_MotionEffect_SaveProfileByIndex", rc)
+        if apply:
+            rc = self._dll.RB_MotionEffect_ApplyProfileToCurrentRig(ctypes.byref(profile))
+            if rc != RB_OK:
+                raise RaceBearError("RB_MotionEffect_ApplyProfileToCurrentRig", rc)
+
+    def read_haptic_effects(self, profile_index: int) -> RB_HapticEffectProfile:
+        """读取与动态配置同索引的七路震动效果配置。"""
+        profile = RB_HapticEffectProfile()
+        rc = self._dll.RB_Haptic_ReadProfileByIndex(profile_index, ctypes.byref(profile))
+        if rc != RB_OK:
+            raise RaceBearError("RB_Haptic_ReadProfileByIndex", rc)
+        return profile
+
+    def save_haptic_effects(self, profile_index: int, profile: RB_HapticEffectProfile, apply: bool = True) -> None:
+        """保存震动效果配置，并按需立即应用到 Function 运行态。"""
+        rc = self._dll.RB_Haptic_SaveProfileByIndex(profile_index, ctypes.byref(profile))
+        if rc != RB_OK:
+            raise RaceBearError("RB_Haptic_SaveProfileByIndex", rc)
+        if apply:
+            rc = self._dll.RB_Haptic_ApplyProfileToCurrentFunction(ctypes.byref(profile))
+            if rc != RB_OK:
+                raise RaceBearError("RB_Haptic_ApplyProfileToCurrentFunction", rc)
+
+    def read_wind(self) -> RB_WindEffectConfig:
+        """读取当前风感配置。"""
+        config = RB_WindEffectConfig()
+        rc = self._dll.RB_Wind_ReadConfig(ctypes.byref(config))
+        if rc != RB_OK:
+            raise RaceBearError("RB_Wind_ReadConfig", rc)
+        return config
+
+    def save_wind(self, config: RB_WindEffectConfig, apply: bool = True) -> None:
+        """保存风感配置，并按需立即应用。"""
+        rc = self._dll.RB_Wind_SaveConfig(ctypes.byref(config))
+        if rc != RB_OK:
+            raise RaceBearError("RB_Wind_SaveConfig", rc)
+        if apply:
+            rc = self._dll.RB_Wind_ApplyConfigToCurrentFunction(ctypes.byref(config))
+            if rc != RB_OK:
+                raise RaceBearError("RB_Wind_ApplyConfigToCurrentFunction", rc)
+
+    def set_wind_test(self, enabled: bool, output_percent: float = 0.0) -> None:
+        """设置四路统一风感测试；离开页面和退出前必须关闭。"""
+        rc = self._dll.RB_Wind_SetTestOutput(int(enabled), output_percent)
+        if rc != RB_OK:
+            raise RaceBearError("RB_Wind_SetTestOutput", rc)
+
+    def read_seatbelt(self) -> RB_SeatbeltEffectConfig:
+        """读取当前安全带配置。"""
+        config = RB_SeatbeltEffectConfig()
+        rc = self._dll.RB_Seatbelt_ReadConfig(ctypes.byref(config))
+        if rc != RB_OK:
+            raise RaceBearError("RB_Seatbelt_ReadConfig", rc)
+        return config
+
+    def save_seatbelt(self, config: RB_SeatbeltEffectConfig, apply: bool = True) -> None:
+        """保存安全带配置，并按需立即应用。"""
+        rc = self._dll.RB_Seatbelt_SaveConfig(ctypes.byref(config))
+        if rc != RB_OK:
+            raise RaceBearError("RB_Seatbelt_SaveConfig", rc)
+        if apply:
+            rc = self._dll.RB_Seatbelt_ApplyConfigToCurrentFunction(ctypes.byref(config))
+            if rc != RB_OK:
+                raise RaceBearError("RB_Seatbelt_ApplyConfigToCurrentFunction", rc)
+
+    def set_seatbelt_test(self, enabled: bool, left_percent: float = 0.0, right_percent: float = 0.0) -> None:
+        """设置左右安全带测试；离开页面和退出前必须关闭。"""
+        rc = self._dll.RB_Seatbelt_SetTestOutput(int(enabled), left_percent, right_percent)
+        if rc != RB_OK:
+            raise RaceBearError("RB_Seatbelt_SetTestOutput", rc)
 
     def read_json(self, key: str) -> Any:
         """读取并解析低频 JSON 数据包，缓冲区不足时自动翻倍重试。"""
