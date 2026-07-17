@@ -4,7 +4,7 @@
 
 `racebear_sdk.py` 已映射动态滤波、输出、运动增强、震动、风感和安全带结构体。常规设置页面应使用 `read_dynamic_profile()`、`read_output()`、`read_wind()` 等结构体方法，不需要读取或手工编辑配置 JSON。
 
-0.4.4 还提供 `game_installations()`、`read_game_config()`、`connect_game_source()`、`plugin_catalog()` 和手动平台测试方法。它们与 C++ 使用同一结构体和返回值规则。
+0.4.5 还提供 `dynamic_input_candidates()`、`game_installations()`、`read_game_config()`、`connect_game_source()`、`plugin_catalog()` 和手动平台测试方法。动态通道必须来自按 DOF 返回的候选目录，不能直接使用完整遥测目录。
 
 例如修改风感配置：
 

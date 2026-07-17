@@ -4,6 +4,7 @@ param(
     [string]$Version,
 
     [string]$SdkSourceRoot = 'D:\AI_Workspace\RaceBear_SDK',
+    [string]$SampleSourceRoot = 'D:\AI_Workspace\Racebear-motion',
     [string]$Repository = 'ming982566/RB_SDK',
     [switch]$SkipBuild
 )
@@ -53,7 +54,82 @@ function Copy-SdkPackage {
     Copy-Item (Join-Path $releaseSource 'RaceBearSDK.lib') (Join-Path $publishRoot 'bin\x64\Release') -Force
     Copy-Item (Join-Path $SdkSourceRoot 'include\RaceBearSDK.h') (Join-Path $publishRoot 'include\RaceBearSDK.h') -Force
     Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_API.md') (Join-Path $publishRoot 'RaceBearSDK_API.md') -Force
-    Copy-Item (Join-Path $SdkSourceRoot 'examples\*') (Join-Path $publishRoot 'examples') -Recurse -Force
+    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_FRONTEND_GUIDE.md') (Join-Path $publishRoot 'RaceBearSDK_FRONTEND_GUIDE.md') -Force
+    # SDK language examples are flat source directories. Copy only files so local
+    # CMake builds and Python caches can never enter the distribution package.
+    foreach ($exampleName in @('cpp', 'python', 'qt')) {
+        $exampleSource = Join-Path $SdkSourceRoot "examples\$exampleName"
+        $exampleTarget = Join-Path $publishRoot "examples\$exampleName"
+        if (Test-Path -LiteralPath $exampleTarget) {
+            Remove-Item -LiteralPath $exampleTarget -Recurse -Force
+        }
+        New-Item -ItemType Directory -Path $exampleTarget -Force | Out-Null
+        Get-ChildItem -LiteralPath $exampleSource -File | Copy-Item -Destination $exampleTarget -Force
+    }
+}
+
+function Copy-FrontendSample {
+    if (-not (Test-Path -LiteralPath (Join-Path $SampleSourceRoot 'RaceBearMotionStudio.sln'))) {
+        throw "Frontend sample not found: $SampleSourceRoot"
+    }
+
+    $sampleTarget = Join-Path $publishRoot 'examples\RaceBearMotionStudio'
+    $publishFullPath = [IO.Path]::GetFullPath($publishRoot).TrimEnd('\') + '\'
+    $sampleFullPath = [IO.Path]::GetFullPath($sampleTarget)
+    if (-not $sampleFullPath.StartsWith($publishFullPath, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Invalid sample target: $sampleFullPath"
+    }
+    if (Test-Path -LiteralPath $sampleTarget) {
+        Remove-Item -LiteralPath $sampleTarget -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $sampleTarget -Force | Out-Null
+
+    # Explicit allowlist: frontend source and required public SDK artifacts only.
+    foreach ($directory in @('src', 'tests', 'docs')) {
+        Copy-Item (Join-Path $SampleSourceRoot $directory) $sampleTarget -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path (Join-Path $sampleTarget 'include') -Force | Out-Null
+    Copy-Item (Join-Path $SampleSourceRoot 'include\RaceBearSDK.h') (Join-Path $sampleTarget 'include\RaceBearSDK.h') -Force
+    foreach ($configuration in @('Debug', 'Release')) {
+        $binaryTarget = Join-Path $sampleTarget "bin\x64\$configuration"
+        New-Item -ItemType Directory -Path $binaryTarget -Force | Out-Null
+        Copy-Item (Join-Path $SampleSourceRoot "bin\x64\$configuration\RaceBearSDK.dll") $binaryTarget -Force
+        Copy-Item (Join-Path $SampleSourceRoot "bin\x64\$configuration\RaceBearSDK.lib") $binaryTarget -Force
+    }
+    foreach ($file in @(
+        'RaceBearMotionStudio.sln',
+        'RaceBearMotionStudio.vcxproj',
+        'RaceBearMotionStudio.vcxproj.filters',
+        'README.md',
+        'SDK_COVERAGE.md',
+        'SDK_GAPS.md'
+    )) {
+        Copy-Item (Join-Path $SampleSourceRoot $file) $sampleTarget -Force
+    }
+}
+
+function Assert-NoPrivateSdkSource {
+    $forbiddenPaths = @(
+        (Join-Path $publishRoot 'src'),
+        (Join-Path $publishRoot 'tests'),
+        (Join-Path $publishRoot 'InternalReferences'),
+        (Join-Path $publishRoot 'RaceBearSDK.sln'),
+        (Join-Path $publishRoot 'RaceBearSDK.vcxproj'),
+        (Join-Path $publishRoot 'RaceBearSDK.vcxproj.filters'),
+        (Join-Path $publishRoot 'RaceBearSDK.vcxproj.user')
+    )
+    foreach ($path in $forbiddenPaths) {
+        if (Test-Path -LiteralPath $path) {
+            throw "Private SDK source path found in publish repository: $path"
+        }
+    }
+
+    foreach ($name in @('RaceBearSDK.cpp', 'RaceBearRuntimeForSDK.cpp', 'RaceBearSDKPrivateExports.h')) {
+        $match = Get-ChildItem -LiteralPath $publishRoot -Recurse -File -Filter $name | Select-Object -First 1
+        if ($match) {
+            throw "Private SDK implementation file found: $($match.FullName)"
+        }
+    }
 }
 
 if (-not (Test-Path -LiteralPath $project)) {
@@ -77,6 +153,8 @@ try {
     }
 
     Copy-SdkPackage
+    Copy-FrontendSample
+    Assert-NoPrivateSdkSource
 
     if (Test-Path -LiteralPath $archivePath) {
         Remove-Item -LiteralPath $archivePath -Force
@@ -90,6 +168,7 @@ try {
         (Join-Path $publishRoot 'include'),
         (Join-Path $publishRoot 'examples'),
         (Join-Path $publishRoot 'RaceBearSDK_API.md'),
+        (Join-Path $publishRoot 'RaceBearSDK_FRONTEND_GUIDE.md'),
         (Join-Path $publishRoot 'README.md'),
         (Join-Path $publishRoot 'LICENSE')
     )

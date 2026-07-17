@@ -11,6 +11,8 @@
 // 5. Call RB_Runtime_Shutdown() once before process exit. Shutdown automatically stops the runtime loop.
 // 6. All char buffers are UTF-8. wchar_t* parameters are Windows UTF-16.
 // 7. For full integration steps, examples, return-value rules, and field units, read docs/RaceBearSDK_API.md.
+// 8. When License.OutputAllowed is 0, protected calculated fields are zeroed and runtime Apply/test/connect APIs return RB_LICENSE_REQUIRED.
+//    Configuration, catalogs, raw telemetry, license actions, serial utilities, disconnect, and reset APIs remain available.
 #ifdef RACEBEARSDK_EXPORTS
 #define RB_API extern "C" __declspec(dllexport)
 #else
@@ -23,10 +25,11 @@ enum RB_Result
 	RB_OK = 0,                    // 成功。
 	RB_ERROR = -1,                // 通用失败。
 	RB_INVALID_ARGUMENT = -2,     // 参数为空、类型无效或索引越界。
-	RB_BUFFER_TOO_SMALL = -3      // 调用方传入的文本缓冲区太小。
+	RB_BUFFER_TOO_SMALL = -3,     // 调用方传入的文本缓冲区太小。
+	RB_LICENSE_REQUIRED = -4      // 当前授权无效或试用已到期，受保护运行功能不可用。
 };
 
-// SDK 授权状态。授权无效时 SDK 不退出宿主程序，只锁定真实输出能力。
+// SDK 授权状态。授权无效时 SDK 不退出宿主程序，但停止专有计算并锁定运行态 Apply、测试和输出连接。
 enum RB_LicenseState
 {
 	RB_LICENSE_UNKNOWN = 0,        // 尚未完成授权检查。
@@ -56,7 +59,7 @@ enum RB_LicenseProblem
 enum RB_ConfigType
 {
 	RB_CONFIG_TELEMETRY = 1,    // 游戏遥测配置。
-	RB_CONFIG_DYNAMIC_V2 = 2,   // 动态滤波、运动增强、震动等动态配置。
+	RB_CONFIG_DYNAMIC_V2 = 2,   // 动态滤波配置；运动增强和震动使用独立的类型化接口。
 	RB_CONFIG_PLATFORM = 3,     // 平台结构和运行参数配置。
 	RB_CONFIG_OUTPUT = 4        // 输出实例配置。
 };
@@ -79,6 +82,7 @@ enum RB_Limits
 	RB_CUSTOM_PACKET_MAX_SIZE = 8192,// 自定义游戏MMF/UDP单帧最大字节数。
 	RB_DYNAMIC_DOF_COUNT = 8,        // 动态配置 DOF 槽位数。
 	RB_DYNAMIC_MAX_INPUTS = 8,       // 每个 DOF 最大输入数。
+	RB_DYNAMIC_MAX_CANDIDATES = 8,   // 单个 DOF 可添加的输入效果候选上限。
 	RB_MOTION_EFFECT_COUNT = 5,      // 运动增强效果数量。
 	RB_MOTION_ROUTE_COUNT = 6,       // 每个运动增强效果最大输出路由数。
 	RB_HAPTIC_EFFECT_COUNT = 7,      // 震动效果数量。
@@ -318,7 +322,7 @@ struct RB_GameCatalog
 // 遥测值目录项。
 struct RB_TelemetryCatalogItem
 {
-	int Index;                                   // 遥测值索引。
+	int Index;                                   // 当前进程内真实遥测索引；目录可能跳过内部保留槽位，不能用数组行号代替。
 	unsigned int FieldId;                        // 自定义游戏线协议稳定字段号。
 	char Key[RB_TEXT_SMALL];                     // 稳定 key。
 	char Name[RB_TEXT_MEDIUM];                   // 显示名称。
@@ -482,7 +486,7 @@ struct RB_TelemetryCatalog
 	int Size;                                    // 结构体字节数，由 SDK 填写。
 	int Version;                                 // 结构体版本，当前为3（包含Unit和FieldId）。
 	int Count;                                   // Items 中有效项数量。
-	RB_TelemetryCatalogItem Items[RB_MAX_TELEMETRY_VALUES]; // 遥测值项数组。
+	RB_TelemetryCatalogItem Items[RB_MAX_TELEMETRY_VALUES]; // 仅包含公共遥测值；内部兼容槽位不会进入目录。
 };
 
 // 输出实例目录项。
@@ -763,17 +767,17 @@ struct RB_OutputConfig
 struct RB_FilterEffect
 {
 	int Enabled;                                   // 1=启用该通道滤波链，0=该通道不参与输出。
-	int Dof;                                       // 目标 DOF：0=Sway、1=Surge、2=Heave、3=Yaw、4=Roll、5=Pitch。
-	int InMapping;                                 // 输入达到满输出所需的绝对量；0 表示不产生有效映射。
-	double InGain;                                 // 输入增益和方向；1.0 原方向，-1.0 反向，可使用小数。
-	int OutScaling;                                // 最大输出占当前 DOF PoseLimit 的百分比，建议 0-100。
-	int Proportion;                                // Logistic 有效输出范围占 PoseLimit 的百分比，0=关闭 Logistic。
-	int Strength;                                  // Logistic 曲线强度，0=关闭；运行时按 value*0.1 使用。
-	int Smoothing;                                 // 低通平滑强度，0=关闭；数值越大响应越慢。
-	int DeadZone;                                  // 输出死区占最大输出范围的百分比，0=关闭。
-	int Washout;                                   // 加速度输入的高通洗出强度，0=关闭；姿态输入不会应用。
-	int Sensitivity;                               // GUARD 安全区百分比，0=关闭输出保护。
-	int SensitivityStrength;                       // GUARD 保护强度百分比，0=关闭；仅 Sensitivity>0 时有效。
+	int Dof;                                       // 输入模板类型镜像；保存时SDK按InputType规范化，前端无需修改。
+	int InMapping;                                 // 范围 0-int最大值；单位跟随输入遥测，启用通道时必须大于0。
+	double InGain;                                 // 任意有限小数；1.0原方向，-1.0反向，0关闭有效输出。
+	int OutScaling;                                // 范围0-100；最大输出占当前DOF PoseLimit的百分比，0关闭输出。
+	int Proportion;                                // 范围0-100；Logistic有效范围占PoseLimit的百分比，0关闭Logistic。
+	int Strength;                                  // 范围0-100；Logistic锐度，运行时按value*0.1使用，0关闭Logistic。
+	int Smoothing;                                 // 范围0-100；低通平滑强度，0关闭，数值越大响应越慢。
+	int DeadZone;                                  // 范围0-100；输出死区占最大输出范围的百分比，0关闭。
+	int Washout;                                   // 范围0-100；加速度模板的高通洗出强度，0关闭。
+	int Sensitivity;                               // 范围0-100；GUARD安全区占有效输出范围的百分比，0关闭保护。
+	int SensitivityStrength;                       // 范围0-100；GUARD保护强度，0关闭，仅Sensitivity>0时有效。
 };
 
 struct RB_DynamicInputEffect
@@ -781,8 +785,26 @@ struct RB_DynamicInputEffect
 	int Enabled;                                   // 1=启用该输入通道，0=保留配置但不参与计算。
 	int InputType;                                 // SDK 内部输入模板类型；从现有配置读取并保留。
 	int TelemetryIndex;                            // 当前运行时遥测索引；使用 RB_Telemetry_FindIndexByKey() 解析。
-	char Key[RB_TEXT_SMALL];                       // 稳定遥测 key；配置持久化应以 Key 为准。
+	char Key[RB_TEXT_SMALL];                       // 稳定通道效果 key，例如 Sway、YawRate、RoadImpact。
 	RB_FilterEffect Filter;                        // 该输入对应滤波参数。
+};
+
+// 单个目标 DOF 可添加的输入通道效果。候选由 SDK 维护，前端不得自行列出全部遥测字段。
+struct RB_DynamicInputCandidateItem
+{
+	char Key[RB_TEXT_SMALL];                       // 通道效果 key，同时用于用户界面显示。
+	int InputType;                                 // 对应的 SDK 输入模板类型。
+	int TelemetryIndex;                            // 当前运行时遥测索引。
+	char TelemetryKey[RB_TEXT_SMALL];              // 稳定遥测 key，用于诊断和跨运行解析。
+};
+
+struct RB_DynamicInputCandidateCatalog
+{
+	int Size;                                      // 结构体字节数，由 SDK 写入。
+	int Version;                                   // 当前为 1。
+	int DofIndex;                                  // 本目录对应的目标 DOF，范围 0-7。
+	int Count;                                     // Items 中有效候选数量。
+	RB_DynamicInputCandidateItem Items[RB_DYNAMIC_MAX_CANDIDATES];
 };
 
 struct RB_DynamicDofEffect
@@ -1542,6 +1564,15 @@ RB_API int RB_Dynamic_GetProfileCount();
 RB_API int RB_Dynamic_GetProfileName(int profileIndex, char* buffer, int bufferSize);
 
 /**
+ * @brief 读取指定目标 DOF 可以添加的输入通道效果目录。
+ * @param dofIndex 目标 DOF：0=Sway、1=Surge、2=Heave、3=Yaw、4=Roll、5=Pitch、6=SwayToRoll、7=SurgeToPitch。
+ * @param catalog 接收候选目录；调用前零初始化。
+ * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示索引或指针无效；RB_ERROR 表示目录读取失败。
+ * @note 前端应显示 Items[].Key，只允许添加目录中的候选，并通过 Key 防止同一 DOF 重复添加。
+ */
+RB_API int RB_Dynamic_GetInputCandidateCatalog(int dofIndex, RB_DynamicInputCandidateCatalog* catalog);
+
+/**
  * @brief 返回当前游戏绑定的动态配置索引。
  * @return 有效零基索引；无当前游戏、无绑定或读取失败时返回负数。
  */
@@ -1572,7 +1603,7 @@ RB_API int RB_MotionEffect_GetCatalog(RB_EffectCatalog* catalog);
 /**
  * @brief 返回运动增强配置数量。
  * @return 大于等于 0 的配置数量；失败返回负数。
- * @note 配置名称与动态配置目录保持对应。
+ * @note 运动增强拥有独立配置目录；索引只能与 RB_MotionEffect_GetProfileName() 配套使用，不能复用动态滤波索引。
  */
 RB_API int RB_MotionEffect_GetProfileCount();
 
@@ -1589,7 +1620,7 @@ RB_API int RB_MotionEffect_GetProfileName(int profileIndex, char* buffer, int bu
  * @brief 删除指定名称的运动增强配置。
  * @param profileName UTF-8 配置名。
  * @return RB_OK 表示删除成功；其他值表示名称无效或删除失败。
- * @note 通常应通过 RB_Dynamic_DeleteProfileByIndex() 成组删除。
+ * @note 本函数只删除运动增强配置；动态滤波和震动配置不受影响。
  */
 RB_API int RB_MotionEffect_DeleteProfile(const char* profileName);
 

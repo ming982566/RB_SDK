@@ -346,7 +346,7 @@ RB_Wind_SetTestOutput(1, 50.0);
 RB_Wind_SetTestOutput(0, 0.0);
 ```
 
-动态滤波、输出、运动增强、震动和安全带使用同样的“Read -> 修改结构体 -> Apply -> Save”流程，完整字段和代码见 `RaceBearSDK_API.md` 第 8 节。
+动态滤波、输出、运动增强、震动和安全带使用同样的“Read -> 修改结构体 -> Apply -> Save”流程，完整字段和代码见 `RaceBearSDK_API.md` 第 8 节。动态输入下拉框应按当前 DOF 调用 `RB_Dynamic_GetInputCandidateCatalog()`；把 `Items[i].Key` 作为显示文本、候选索引放入 `Qt::UserRole`，不要直接展示完整遥测目录。
 
 游戏安装、插件和平台诊断也直接使用结构体，不需要解析 JSON：
 

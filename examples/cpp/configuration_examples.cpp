@@ -4,15 +4,21 @@
 
 #include <cstring>
 
-int ConfigureDynamicInputExample(int profileIndex, int dofIndex, const char* telemetryKey)
+int ConfigureDynamicInputExample(int profileIndex, int dofIndex, int candidateIndex)
 {
-	if (dofIndex < 0 || dofIndex >= RB_DOF_COUNT || telemetryKey == nullptr) {
+	if (dofIndex < 0 || dofIndex >= RB_DYNAMIC_DOF_COUNT) {
 		return RB_INVALID_ARGUMENT;
 	}
+	RB_DynamicInputCandidateCatalog candidates{};
+	int rc = RB_Dynamic_GetInputCandidateCatalog(dofIndex, &candidates);
+	if (rc != RB_OK || candidateIndex < 0 || candidateIndex >= candidates.Count) {
+		return rc == RB_OK ? RB_INVALID_ARGUMENT : rc;
+	}
+	const RB_DynamicInputCandidateItem& candidate = candidates.Items[candidateIndex];
 
 	// Always read the complete profile first so untouched DOFs and channels survive.
 	RB_DynamicV2Profile profile{};
-	int rc = RB_Dynamic_ReadProfileByIndex(profileIndex, &profile);
+	rc = RB_Dynamic_ReadProfileByIndex(profileIndex, &profile);
 	if (rc != RB_OK) {
 		return rc;
 	}
@@ -22,20 +28,15 @@ int ConfigureDynamicInputExample(int profileIndex, int dofIndex, const char* tel
 		return RB_ERROR;
 	}
 
-	// Persist the stable key and resolve the runtime index for the loaded SDK version.
-	const int telemetryIndex = RB_Telemetry_FindIndexByKey(telemetryKey);
-	if (telemetryIndex < 0) {
-		return RB_INVALID_ARGUMENT;
-	}
-
 	RB_DynamicInputEffect& input = dof.Inputs[dof.InputCount];
 	input = {};
 	input.Enabled = 1;
-	input.TelemetryIndex = telemetryIndex;
-	strcpy_s(input.Key, sizeof(input.Key), telemetryKey);
+	input.InputType = candidate.InputType;
+	input.TelemetryIndex = candidate.TelemetryIndex;
+	strcpy_s(input.Key, sizeof(input.Key), candidate.Key);
 	input.Filter.Enabled = 1;
-	input.Filter.Dof = dofIndex;
-	input.Filter.InMapping = 1;
+	input.Filter.Dof = input.InputType;
+	input.Filter.InMapping = 20;
 	input.Filter.InGain = 1.0;
 	input.Filter.OutScaling = 100;
 	++dof.InputCount;
@@ -78,11 +79,11 @@ int ConfigureSerialOutputExample(int instanceIndex, const char* portName)
 	return rc == RB_OK ? RB_Output_ApplyInstanceConfigByIndex(instanceIndex, &output) : rc;
 }
 
-int ConfigureAdditionalEffectsExample(int profileIndex)
+int ConfigureAdditionalEffectsExample(int motionProfileIndex, int dynamicProfileIndex)
 {
-	// Motion and haptic profiles use the same profile index as the dynamic profile.
+	// 运动增强拥有独立目录，motionProfileIndex 必须来自运动增强配置选择框。
 	RB_MotionEffectProfile motion{};
-	int rc = RB_MotionEffect_ReadProfileByIndex(profileIndex, &motion);
+	int rc = RB_MotionEffect_ReadProfileByIndex(motionProfileIndex, &motion);
 	if (rc != RB_OK) {
 		return rc;
 	}
@@ -92,13 +93,14 @@ int ConfigureAdditionalEffectsExample(int profileIndex)
 	if (rc != RB_OK) {
 		return rc;
 	}
-	rc = RB_MotionEffect_SaveProfileByIndex(profileIndex, &motion);
+	rc = RB_MotionEffect_SaveProfileByIndex(motionProfileIndex, &motion);
 	if (rc != RB_OK) {
 		return rc;
 	}
 
+	// 震动内容独立，但当前 ByIndex 接口按动态配置索引查找同名震动节点。
 	RB_HapticEffectProfile haptic{};
-	rc = RB_Haptic_ReadProfileByIndex(profileIndex, &haptic);
+	rc = RB_Haptic_ReadProfileByIndex(dynamicProfileIndex, &haptic);
 	if (rc != RB_OK) {
 		return rc;
 	}
@@ -109,7 +111,7 @@ int ConfigureAdditionalEffectsExample(int profileIndex)
 	if (rc != RB_OK) {
 		return rc;
 	}
-	rc = RB_Haptic_SaveProfileByIndex(profileIndex, &haptic);
+	rc = RB_Haptic_SaveProfileByIndex(dynamicProfileIndex, &haptic);
 	if (rc != RB_OK) {
 		return rc;
 	}

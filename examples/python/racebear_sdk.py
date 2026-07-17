@@ -19,6 +19,7 @@ RB_OK = 0
 RB_ERROR = -1
 RB_INVALID_ARGUMENT = -2
 RB_BUFFER_TOO_SMALL = -3
+RB_LICENSE_REQUIRED = -4
 
 # 固定数组上限直接对应 RaceBearSDK.h 中的 RB_Limits。
 RB_TEXT_SMALL = 64
@@ -28,6 +29,7 @@ RB_DOF_COUNT = 6
 RB_WIND_CHANNEL_COUNT = 4
 RB_DYNAMIC_DOF_COUNT = 8
 RB_DYNAMIC_MAX_INPUTS = 8
+RB_DYNAMIC_MAX_CANDIDATES = 8
 RB_MOTION_EFFECT_COUNT = 5
 RB_MOTION_ROUTE_COUNT = 6
 RB_HAPTIC_EFFECT_COUNT = 7
@@ -422,6 +424,27 @@ class RB_DynamicInputEffect(ctypes.Structure):
     ]
 
 
+class RB_DynamicInputCandidateItem(ctypes.Structure):
+    """SDK 允许添加到某个目标 DOF 的通道效果。"""
+
+    _fields_ = [
+        ("Key", ctypes.c_char * RB_TEXT_SMALL),
+        ("InputType", ctypes.c_int),
+        ("TelemetryIndex", ctypes.c_int),
+        ("TelemetryKey", ctypes.c_char * RB_TEXT_SMALL),
+    ]
+
+
+class RB_DynamicInputCandidateCatalog(ctypes.Structure):
+    _fields_ = [
+        ("Size", ctypes.c_int),
+        ("Version", ctypes.c_int),
+        ("DofIndex", ctypes.c_int),
+        ("Count", ctypes.c_int),
+        ("Items", RB_DynamicInputCandidateItem * RB_DYNAMIC_MAX_CANDIDATES),
+    ]
+
+
 class RB_DynamicDofEffect(ctypes.Structure):
     _fields_ = [
         ("Enabled", ctypes.c_int),
@@ -763,6 +786,10 @@ class RaceBearSDK:
         self._dll.RB_Dynamic_GetProfileCount.restype = ctypes.c_int
         self._dll.RB_Dynamic_GetProfileName.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_char), ctypes.c_int]
         self._dll.RB_Dynamic_GetProfileName.restype = ctypes.c_int
+        self._dll.RB_Dynamic_GetInputCandidateCatalog.argtypes = [
+            ctypes.c_int, ctypes.POINTER(RB_DynamicInputCandidateCatalog)
+        ]
+        self._dll.RB_Dynamic_GetInputCandidateCatalog.restype = ctypes.c_int
         self._dll.RB_Dynamic_ReadProfileByIndex.argtypes = [ctypes.c_int, ctypes.POINTER(RB_DynamicV2Profile)]
         self._dll.RB_Dynamic_ReadProfileByIndex.restype = ctypes.c_int
         self._dll.RB_Dynamic_SaveProfileByIndex.argtypes = [ctypes.c_int, ctypes.POINTER(RB_DynamicV2Profile)]
@@ -949,6 +976,14 @@ class RaceBearSDK:
         if rc != RB_OK:
             raise RaceBearError("RB_Dynamic_ReadProfileByIndex", rc)
         return profile
+
+    def dynamic_input_candidates(self, dof_index: int) -> RB_DynamicInputCandidateCatalog:
+        """返回指定 DOF 可添加的通道效果；不要用完整遥测目录替代。"""
+        catalog = RB_DynamicInputCandidateCatalog()
+        rc = self._dll.RB_Dynamic_GetInputCandidateCatalog(dof_index, ctypes.byref(catalog))
+        if rc != RB_OK:
+            raise RaceBearError("RB_Dynamic_GetInputCandidateCatalog", rc)
+        return catalog
 
     def save_dynamic_profile(self, profile_index: int, profile: RB_DynamicV2Profile, apply: bool = True) -> None:
         """保存完整动态配置，并按需立即应用到当前平台。"""

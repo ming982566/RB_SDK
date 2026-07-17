@@ -1,4 +1,7 @@
-# RaceBear SDK 接入手册
+# RaceBear SDK API 手册与参数参考
+
+> 第三方开发完整前端时，请先阅读 `RaceBearSDK_FRONTEND_GUIDE.md`。该文档按页面
+> 说明正确调用顺序和配置所有权；本手册主要作为字段、协议和 API 细节参考。
 
 本文面向需要使用 RaceBear SDK 开发 Windows 前端的第三方开发者。按照本文完成配置后，前端可以读取遥测和运动状态、管理配置、控制游戏及输出、显示授权状态，并使用 SDK 提供的串口能力。
 
@@ -13,7 +16,7 @@
 | `include/RaceBearSDK.h`           | 唯一公开 C/C++ 头文件，包含函数、结构体、枚举和字段说明 |
 | `bin/x64/Release/RaceBearSDK.lib` | Visual C++ 导入库，链接阶段使用                         |
 | `bin/x64/Release/RaceBearSDK.dll` | SDK 运行库，部署时放在宿主 EXE 同目录                   |
-| `RaceBearSDK_API.md`              | 本接入手册                                              |
+| `docs/RaceBearSDK_API.md`         | 本接入手册                                              |
 | `RaceBearSDK.pdb`                 | 可选，仅用于分析 SDK 内部崩溃位置                       |
 
 目标电脑需要安装 Microsoft Visual C++ 2015-2022 Redistributable x64。`RaceBearSDK.dll` 的其它依赖均为 Windows 系统组件。
@@ -138,6 +141,12 @@ SDK 0.4.2 将本参数从 Hz 改为 ms。旧代码中的 `RB_Runtime_StartLoop(1
 SDK 0.4.3 补齐动态滤波、输出实例、运动增强、震动、风感和安全带的结构体配置流程，并支持全新 `AppDataName` 自动生成默认运行配置。常规前端不再需要直接编辑配置 JSON。
 
 SDK 0.4.4 公开游戏安装与遥测源配置、功能插件目录、平台数值诊断和手动测试接口，并在结构体 Save/Apply 入口增加基础参数校验。CAN 和 LAN 的完整设备管理仍不属于当前第三方公开范围。
+
+SDK 0.4.5 修复 CAN 实时位置的 USB 发送队列：未发送的位置批次采用最新值覆盖，短时 USB 阻塞恢复后不会补发过期轨迹；同时修复动态配置回读时丢弃公共遥测目录所创建输入通道的问题。该版本不改变公开 ABI。
+
+SDK 0.4.6 将授权限制统一收口到 SDK。未授权或试用到期后，SDK 停止专有运动计算、安全断开输出、屏蔽受保护状态，并让运行态 Apply、手动测试和输出连接返回 `RB_LICENSE_REQUIRED`。授权恢复后，当前遥测源会从零重新淡入。
+
+SDK 0.4.7 从公共遥测目录隐藏历史 SimTools 专用兼容槽位，但保留内部槽位和原始索引，避免旧配置及后续遥测索引错位。目录数组行号不再等同于遥测索引，调用方必须读取每项的 `Index`。
 
 宿主程序不需要为 SDK 调用 `CoInitializeEx()` 或 `CoUninitialize()`。SDK 在自己的线程中管理 COM 生命周期。
 
@@ -337,7 +346,7 @@ if (rc == RB_OK) {
 
 ### 接入第三方自研游戏
 
-自研游戏不需要实现SDK内部Source类。调用方先读取`RB_TelemetryCatalog`，配置和代码只保存`RB_TelemetryCatalogItem::Key`；启动时通过`RB_Telemetry_FindIndexByKey()`解析当前进程索引。索引可能随SDK版本调整，禁止写入配置或网络协议。
+自研游戏不需要实现SDK内部Source类。调用方先读取`RB_TelemetryCatalog`，配置和代码只保存`RB_TelemetryCatalogItem::Key`；启动时通过`RB_Telemetry_FindIndexByKey()`解析当前进程索引。索引可能随SDK版本调整，禁止写入配置或网络协议。公共目录会跳过内部保留和历史兼容槽位，所以`Items[i].Index`不保证等于数组行号`i`，调用数值接口时必须使用返回的`Index`。
 
 常用RaceBear key和单位示例：
 
@@ -628,6 +637,52 @@ if (rc != RB_OK) {
 
 动态输入和滤波字段：
 
+前端不能把完整遥测目录直接作为动态通道效果列表。应按当前目标 DOF
+调用 `RB_Dynamic_GetInputCandidateCatalog()`，显示返回的 `Items[i].Key`，
+并使用同一项的 `InputType`、`TelemetryIndex` 和 `Key` 创建输入。已经存在于
+当前 DOF 的 Key 不得重复添加。
+
+```cpp
+RB_DynamicInputCandidateCatalog candidates{};
+if (RB_Dynamic_GetInputCandidateCatalog(dofIndex, &candidates) == RB_OK) {
+    for (int i = 0; i < candidates.Count; ++i) {
+        const RB_DynamicInputCandidateItem& item = candidates.Items[i];
+        // UI 显示 item.Key；item.TelemetryKey 只用于诊断说明。
+    }
+}
+```
+
+当前候选矩阵：
+
+| 目标 DOF | 通道效果 Key | 遥测 Key | 用途 |
+| -------- | ------------ | -------- | ---- |
+| Sway | `Sway` | `rb.motion.lateral.acceleration` | 横向加速度主体 |
+| Sway | `VelocityLateral` | `rb.motion.lateral.speed` | 横向速度补充 |
+| Surge | `Surge` | `rb.motion.longitudinal.acceleration` | 纵向加速度主体 |
+| Surge | `VelocityForward` | `rb.motion.longitudinal.speed` | 纵向速度补充 |
+| Surge | `ThrottleKick` | `rb.vehicle.throttle` | 油门变化带来的纵向反馈 |
+| Surge | `BrakeDive` | `rb.vehicle.brake` | 制动输入带来的前俯反馈 |
+| Heave | `Heave` | `rb.motion.vertical.acceleration` | 垂向加速度主体 |
+| Heave | `VelocityUp` | `rb.motion.vertical.speed` | 垂向速度补充 |
+| Heave | `SuspensionMix` | `rb.derived.suspension.activity` | 四轮悬架活动派生值 |
+| Heave | `RoadImpact` | `rb.derived.road.impact` | 路面冲击派生包络 |
+| Yaw | `YawPosition` | `rb.motion.yaw.position` | 偏航姿态角 |
+| Yaw | `YawRate` | `rb.motion.yaw.speed` | 偏航角速度 |
+| Yaw | `TractionLoss` | `rb.vehicle.yaw.slip.angle` | 车辆侧滑角 |
+| Yaw | `VelocityLateral` | `rb.motion.lateral.speed` | 横向速度补充 |
+| Roll | `Roll` | `rb.motion.roll.position` | 横滚姿态角 |
+| Roll | `RollRate` | `rb.motion.roll.speed` | 横滚角速度 |
+| Roll | `TractionLoss` | `rb.vehicle.yaw.slip.angle` | 侧滑横滚反馈 |
+| Pitch | `Pitch` | `rb.motion.pitch.position` | 俯仰姿态角 |
+| Pitch | `PitchRate` | `rb.motion.pitch.speed` | 俯仰角速度 |
+| Pitch | `VelocityForward` | `rb.motion.longitudinal.speed` | 纵向速度补充 |
+| SwayToRoll | `SwayToRoll` | `rb.motion.lateral.acceleration` | 横向加速度倾斜协调 |
+| SurgeToPitch | `SurgeToPitch` | `rb.motion.longitudinal.acceleration` | 纵向加速度倾斜协调 |
+
+`Items[].TelemetryIndex` 只在当前 SDK 运行期间有效；配置中持久化的是效果
+`Key` 和 SDK 写入的 `TelemetryKey`。前端通常只向用户显示效果 Key，不应让用户
+直接编辑 `InputType` 或运行时索引。
+
 | 字段 | 传入内容 |
 | ---- | -------- |
 | `RB_DynamicDofEffect::Enabled` | `1` 启用整个 DOF，`0` 禁用 |
@@ -635,21 +690,35 @@ if (rc != RB_OK) {
 | `RB_DynamicInputEffect::Enabled` | `1` 启用当前输入通道 |
 | `InputType` | SDK 输入类型；应保留读取值，除非前端正在执行数据源切换 |
 | `TelemetryIndex` | 当前运行时遥测索引；不要持久化自行计算的旧索引 |
-| `Key` | 稳定遥测 key，例如 `rb.motion.linear.lateral_acceleration` |
+| `Key` | 稳定通道效果 key，例如 `Sway`、`YawRate`、`RoadImpact`；必须来自候选目录 |
 | `Filter.Enabled` | 是否启用当前通道滤波 |
-| `Filter.Dof` | 当前输入输出到的 DOF 索引 |
-| `Filter.InMapping` | 输入达到满输出所需的绝对量；必须与所选遥测值单位一致，0 表示无有效映射 |
-| `Filter.InGain` | 输入增益和方向；`1.0` 原方向，`-1.0` 反向，可使用小数 |
-| `Filter.OutScaling` | 最大输出占当前 DOF `PoseLimit` 的百分比，建议 `0-100` |
-| `Filter.Proportion` | Logistic 有效范围占 `PoseLimit` 的百分比；`0` 关闭 Logistic |
-| `Filter.Strength` | Logistic 曲线强度；`0` 关闭，运行时按该值乘 `0.1` 使用 |
-| `Filter.Smoothing` | 低通平滑；`0` 关闭，数值越大响应越慢 |
-| `Filter.DeadZone` | 输出死区占最大输出范围的百分比；`0` 关闭 |
-| `Filter.Washout` | 加速度输入高通洗出强度；`0` 关闭，姿态输入不会应用 |
-| `Filter.Sensitivity` | GUARD 输出保护安全区百分比；`0` 关闭 |
-| `Filter.SensitivityStrength` | GUARD 保护强度百分比；仅 `Sensitivity>0` 时生效 |
+| `Filter.Dof` | 旧配置字段，镜像 `InputType`；保存时 SDK 自动规范化，前端不要修改 |
 
-增加输入通道时，不要手写 `TelemetryIndex`。先从 `RB_Telemetry_GetCatalog()` 取得稳定 `Key`，再调用 `RB_Telemetry_FindIndexByKey()` 解析当前索引：
+滤波数值参数的范围和单位：
+
+| 字段 | SDK 接受范围 | 单位 | 含义与特殊值 |
+| ---- | ------------ | ---- | ------------ |
+| `Filter.InMapping` | `int`，`0` 到 `INT_MAX` | 输入遥测自身单位 | 输入达到正负满输出所需的绝对量。单位从候选项的 `TelemetryKey` 对应遥测目录 `Unit` 读取，例如 `g`、`deg`、`deg/s`、`km/h`。`0` 表示无有效映射；输入通道启用时必须大于 `0`。该字段没有统一 UI 上限，应使用非负整数输入框。 |
+| `Filter.InGain` | 任意有限 `double` | 倍率 | 输入增益和方向。常用 `1.0`（原方向）或 `-1.0`（反向），允许小数；`0` 表示无有效输出。SDK 不规定固定最小值和最大值，UI 应使用支持正负号和小数的输入框。NaN 和正负无穷会被拒绝。 |
+| `Filter.OutScaling` | `int`，`0-100` | `%` | 最大输出占当前 DOF `PoseLimit` 的比例。`0` 使当前滤波链输出为 `0`，`100` 允许达到完整 `PoseLimit`。 |
+| `Filter.Proportion` | `int`，`0-100` | `%` | Logistic 软限幅的有效输出范围占 `PoseLimit` 的比例。必须与 `Strength` 同时大于 `0` 才启用 Logistic；`0` 仅关闭软限幅，不关闭前面的基础输出链。 |
+| `Filter.Strength` | `int`，`0-100` | UI 标度 | Logistic 软限幅锐度。内部参数为 `Strength * 0.1`，即有效内部范围 `0-10`。必须与 `Proportion` 同时大于 `0` 才生效。 |
+| `Filter.Smoothing` | `int`，`0-100` | UI 标度 | DEMA 低通平滑强度；内部参数为 `Smoothing * 10`。`0` 关闭，数值越大响应越慢。它不是毫秒数或 Hz。 |
+| `Filter.DeadZone` | `int`，`0-100` | `%` | 中心死区占 `OutScaling` 所确定最大输出范围的比例。`0` 关闭；死区外的数据会重新映射到完整输出范围。 |
+| `Filter.Washout` | `int`，`0-100` | UI 标度 | DEMA 高通洗出强度；内部参数为 `Washout * 10`。`0` 关闭。只对 Sway、Surge、Heave 的加速度模板生效；Yaw、Roll、Pitch、Traction Loss 和两个倾斜协调槽位会忽略该字段。它不是毫秒数或 Hz。 |
+| `Filter.Sensitivity` | `int`，`0-100` | `%` | GUARD/GUARD2 的安全区占当前有效输出范围的比例。`0` 关闭冲击保护；还必须满足 `SensitivityStrength > 0` 才会建立保护滤波器。 |
+| `Filter.SensitivityStrength` | `int`，`0-100` | `%` | GUARD/GUARD2 的保护强度。内部强度按 `1 + value / 100 * 9` 换算，即 `1-10`；`0` 关闭保护，仅在 `Sensitivity > 0` 时生效。 |
+
+除 `InMapping` 和 `InGain` 外，其余八个数值字段都是严格的 `0-100`：传入负数或大于
+`100` 的值时，Apply/Save 会拒绝整个动态配置。不要在写入前静默取模；前端应限制控件范围
+或明确提示参数无效。`Filter.Enabled`、输入通道 `Enabled` 和 DOF `Enabled` 都只接受
+`0` 或 `1`。
+
+滤波链的执行顺序为：`GAIN -> REMAP -> GUARD/GUARD2 -> DEADZONE -> DEMAHP
+(仅加速度模板) -> DEMALP -> LOGISTIC`。因此 `OutScaling` 是硬输出上限，
+`Proportion/Strength` 只控制末级软限幅，不能用它们代替 `OutScaling`。
+
+增加输入通道时使用当前 DOF 候选目录中的完整项，不要从遥测目录任意挑选字段：
 
 ```cpp
 RB_DynamicDofEffect& dof = profile.Dofs[dofIndex];
@@ -657,20 +726,23 @@ if (dof.InputCount >= RB_DYNAMIC_MAX_INPUTS) {
     return;
 }
 
-const char* telemetryKey = "rb.motion.linear.lateral_acceleration";
-const int telemetryIndex = RB_Telemetry_FindIndexByKey(telemetryKey);
-if (telemetryIndex < 0) {
+RB_DynamicInputCandidateCatalog candidates{};
+const int selectedCandidateIndex = 0; // 来自当前 DOF 候选组合框的 ItemData。
+if (RB_Dynamic_GetInputCandidateCatalog(dofIndex, &candidates) != RB_OK ||
+    selectedCandidateIndex < 0 || selectedCandidateIndex >= candidates.Count) {
     return;
 }
+const RB_DynamicInputCandidateItem& candidate = candidates.Items[selectedCandidateIndex];
 
 RB_DynamicInputEffect& input = dof.Inputs[dof.InputCount];
 input = {};
 input.Enabled = 1;
-input.TelemetryIndex = telemetryIndex;
-strcpy_s(input.Key, sizeof(input.Key), telemetryKey);
+input.InputType = candidate.InputType;
+input.TelemetryIndex = candidate.TelemetryIndex;
+strcpy_s(input.Key, sizeof(input.Key), candidate.Key);
 input.Filter.Enabled = 1;
-input.Filter.Dof = dofIndex;
-input.Filter.InMapping = 1;
+input.Filter.Dof = input.InputType; // 兼容字段；SDK保存时会自动规范化。
+input.Filter.InMapping = 20;
 input.Filter.InGain = 1.0;
 input.Filter.OutScaling = 100;
 ++dof.InputCount;
@@ -765,7 +837,14 @@ if (RB_MotionEffect_GetDefaultConfig(0, &config) == RB_OK) {
 }
 ```
 
-配置名称与动态配置保持对应。可使用 `RB_MotionEffect_GetProfileCount()` 和 `RB_MotionEffect_GetProfileName()` 枚举，也可以直接使用同索引的动态配置名。删除整组配置优先调用 `RB_Dynamic_DeleteProfileByIndex()`。
+运动增强拥有独立配置目录。配置选择框必须使用
+`RB_MotionEffect_GetProfileCount()` 和 `RB_MotionEffect_GetProfileName()` 枚举；
+`RB_MotionEffect_ReadProfileByIndex()` 的索引只属于运动增强目录，不能复用动态滤波
+选择框中的索引。创建配置使用 `RB_MotionEffect_SaveProfile(name, ...)`，删除只使用
+`RB_MotionEffect_DeleteProfile(name)`。
+
+`RB_Dynamic_DeleteProfileByIndex()` 为兼容当前产品配置链，会同时清理与动态配置同名
+的运动增强和震动节点。第三方只想删除运动增强方案时不得调用它。
 
 ### 8.1.3 震动效果参数
 
@@ -801,7 +880,12 @@ RB_Haptic_SaveProfileByIndex(profileIndex, &haptic);
 | `Frequency` | 频率或节奏参数，单位 Hz |
 | `Direction` | 通常为 `1.0` 或 `-1.0` |
 
-新增效果时先调用 `RB_Haptic_GetDefaultConfig(effectIndex, &config)`，不要从全零结构体猜默认值。震动配置与动态配置共用配置名和索引。
+新增效果时先调用 `RB_Haptic_GetDefaultConfig(effectIndex, &config)`，不要从全零结构体猜默认值。
+
+震动结构体与动态滤波结构体互相独立，但当前 SDK 没有公开独立的震动配置目录。
+`RB_Haptic_ReadProfileByIndex()` 和 `RB_Haptic_SaveProfileByIndex()` 的参数是动态配置
+索引，用于查找同名震动节点。也可以先通过 `RB_Dynamic_GetProfileName()` 取得名称，
+再调用按名称版本。不要把运动增强目录索引传给震动接口。
 
 ### 8.1.4 风感参数
 
@@ -1284,6 +1368,10 @@ RB_ManualPose_SetTestEnabled(0);
 
 ## 8.7 保存参数校验
 
+保存成功后的正确验证方式是再次调用对应 `Read` 接口，并用 SDK 回读结果刷新 UI。
+不要对整个公开结构体执行 `memcmp`：固定字符串剩余空间、保留字段和 SDK 规范化
+字段可能产生字节差异，但不代表业务字段保存失败。
+
 0.4.4 起，结构体 Save/Apply 接口会在写文件或修改运行态之前执行基础校验。以下情况返回 `RB_INVALID_ARGUMENT`：
 
 - 数组计数超出固定容量，DOF、路由或输出通道索引越界。
@@ -1385,7 +1473,24 @@ const int rc = RB_Command_Run(
 
 正式产品应使用 JSON 库生成激活参数，避免用户输入中的引号或反斜杠破坏 JSON。
 
-授权无效时 SDK 不会强制退出宿主程序。状态读取、配置和激活功能仍可使用，但所有真实硬件输出会被锁定为不可用。
+授权无效时 SDK 不会强制退出宿主程序。配置读取、编辑和保存、目录、原始遥测、授权操作、串口工具、断开和复位功能仍可使用。
+
+以下能力属于受保护运行功能：
+
+- Source 派生/最终遥测、平台最终 6DOF 和执行器值。
+- 运动增强、震动、风感和安全带的计算结果。
+- 平台、动态滤波、运动增强、震动、风感、安全带和输出配置的运行态 Apply。
+- 手动平台测试、风感/安全带测试输出和输出连接。
+
+授权无效或试用到期时：
+
+- `RB_State_Read()` 仍返回 `RB_OK`，授权、游戏、Source 连接、输出连接和 CAN 状态仍可读取；受保护的数值字段统一返回 0。
+- `RB_Telemetry_GetRawValue()` 仍返回游戏原始数据，`RB_Telemetry_GetProcessedValue()` 返回 0。
+- 上述运行态 Apply、测试启用和输出连接接口返回 `RB_LICENSE_REQUIRED`（`-4`）。关闭测试、测试归零和输出断开仍然允许。
+- `runtime.reloadConfig`、`output.connectAll` 和 `output.connectAuto` Command 返回 `RB_LICENSE_REQUIRED`，结果 JSON 中 `ok=false` 且 `code=-4`。
+- 已连接输出进入安全断开状态；授权恢复后，仍在连接的 Source 从零重新淡入，不直接跳到当前姿态。
+
+前端应优先判断 `state.License.OutputAllowed`，并对 `RB_LICENSE_REQUIRED` 提示用户激活或等待授权恢复。不要把锁定状态下的 0 当作真实车辆或平台数据。
 
 ## 11. 串口接入
 
@@ -1584,6 +1689,81 @@ void DrainSdkLogs()
 2. 目标程序和所有插件均为 x64。
 3. 连续启动、初始化、关闭程序多次不会异常退出。
 4. SDK 内部循环由 `RB_Runtime_StartLoop()` 驱动，前端没有重复计算循环。
+
+## 17. 公共 API 完整索引
+
+本节补充正文流程中不常出现的辅助接口。函数签名、参数范围和返回值仍以
+`RaceBearSDK.h` 中紧邻声明的注释为准。
+
+### 17.1 生命周期与系统
+
+| API | 使用时机 |
+| --- | -------- |
+| `RB_Runtime_GetAppDataName()` | 初始化前后确认当前独立配置目录名。 |
+| `RB_Runtime_IsLoopRunning()` / `RB_Runtime_IsLoopPaused()` | 刷新宿主的启动、暂停按钮状态。 |
+| `RB_Runtime_PauseLoop()` / `RB_Runtime_ResumeLoop()` / `RB_Runtime_StopLoop()` | 用户明确控制 SDK 内部计算循环；正常退出仍调用 `RB_Runtime_Shutdown()`。 |
+| `RB_System_ReadConfigOrDefault()` / `RB_System_SaveConfig()` | 读取和保存 SDK 公共系统设置；宿主自己的语言、托盘和窗口设置应独立保存。 |
+
+### 17.2 游戏、遥测与动态配置
+
+| API | 使用时机 |
+| --- | -------- |
+| `RB_Game_GetInstallCount()` | 安装扫描后遍历已发现游戏。 |
+| `RB_Game_FindInstallPathByKey()` | 只需要安装路径文本、不需要完整 `RB_GameInstallInfo` 时使用。 |
+| `RB_Game_ReloadCustomRegistry()` / `RB_Game_UnregisterCustom()` | 外部修改注册表后重载，或移除正式自定义游戏。 |
+| `RB_ExternalSource_GetState()` | 显示宿主直提数据源的连接、序号和收帧数量。 |
+| `RB_Telemetry_GetRawValue()` / `RB_Telemetry_GetProcessedValue()` | 遥测诊断页面按目录索引读取单值；不要把索引持久化。 |
+| `RB_Dynamic_ReadCurrentGameProfileIndex()` | 游戏切换后同步动态配置选择框。 |
+| `RB_MotionEffect_DeleteProfile()` | 独立维护运动增强配置的高级工具使用；常规前端优先随 Dynamic 配置统一删除。 |
+
+### 17.3 平台、输出与手动测试
+
+| API | 使用时机 |
+| --- | -------- |
+| `RB_Platform_SaveSelectedIndex()` | 只保存平台选择，不改写完整平台参数。 |
+| `RB_ManualPose_GetDrive()` | 回读手动测试页当前某个 DOF 输入。 |
+| `RB_Output_EnsureDefaultConfig()` | 全新产品目录初始化后显式确保至少有一个输出实例。 |
+| `RB_Output_GetAutoConnectInstanceCount()` | 启动前判断是否存在自动连接实例。 |
+| `RB_Output_GetInstanceKey()` | 只需要实例稳定 Key 时使用。 |
+| `RB_Output_ConnectAll()` / `RB_Output_DisconnectAll()` | 用户明确要求操作所有实例；正常退出优先使用安全请求接口。 |
+| `RB_Output_IsInstanceRuntimeActive()` / `RB_Output_IsAnyRuntimeActive()` | 区分“连接已建立”和“周期输出运行态已启动”。 |
+
+### 17.4 串口高级接口
+
+| API | 使用时机 |
+| --- | -------- |
+| `RB_Serial_GetVersion()` | 诊断页显示内部串口库版本。 |
+| `RB_Serial_IsOpen()` / `RB_Serial_GetReadBufferUsedLen()` | 刷新端口状态和异步缓存占用。 |
+| `RB_Serial_SetOperateMode()` | 在 `Open` 前选择同步或异步读取。 |
+| `RB_Serial_ConnectReadEvent()` / `RB_Serial_DisconnectReadEvent()` | 异步模式注册/注销可读通知；回调内不要直接操作 UI。 |
+| `RB_Serial_ConnectHotPlugEvent()` / `RB_Serial_DisconnectHotPlugEvent()` | 监听 COM 口增加和移除。 |
+| `RB_Serial_SetAutoReconnectEnabled()` / `RB_Serial_IsAutoReconnectEnabled()` | 配置并查询自动重连开关。 |
+| `RB_Serial_SetAutoReconnectInterval()` / `RB_Serial_GetAutoReconnectInterval()` | 设置和读取自动重连间隔，单位毫秒。 |
+| `RB_Serial_TryReconnectNow()` | 用户点击“立即重连”时触发一次连接尝试。 |
+| `RB_Serial_SetTimeoutConfig()` / `RB_Serial_GetTimeoutConfig()` | 配置或回读 Windows 串口读写超时。 |
+| `RB_Serial_SetDtr()` / `RB_Serial_SetRts()` | 端口打开后控制 DTR/RTS 线路。 |
+
+### 17.5 调试资源监视器
+
+| API | 使用时机 |
+| --- | -------- |
+| `RB_Debug_OpenMonitor()` | Debug 或现场诊断时打开 SDK 原生资源窗口。 |
+| `RB_Debug_IsMonitorOpen()` | 同步宿主菜单或按钮状态。 |
+| `RB_Debug_CloseMonitor()` | 关闭诊断窗口；宿主退出前也应调用。 |
+
+## 18. 发布包检查清单
+
+第三方发布或更新 SDK 时应同步同一次 VS2019 构建产生的文件：
+
+- `include/RaceBearSDK.h`
+- `bin/x64/Debug/RaceBearSDK.dll` 和 `.lib`
+- `bin/x64/Release/RaceBearSDK.dll` 和 `.lib`
+- `docs/RaceBearSDK_API.md`
+- `examples/cpp`、`examples/python`、`examples/qt`
+
+Debug 和 Release DLL 的 `RB_Runtime_GetVersion()` 必须一致。不要只替换 DLL 而保留
+旧头文件，也不要把不同构建时间的 DLL/LIB 混合发布。更新后至少运行候选目录、
+动态配置往返、公共配置 Smoke 和示例前端正常退出测试。
 5. 授权有效、过期、无网络和反激活状态均能正确显示。
 6. 未授权时真实输出确实被锁定。
 7. 游戏检测、遥测连接、输出连接和断开流程均能恢复。

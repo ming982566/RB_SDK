@@ -7,6 +7,7 @@
 | `cpp` | Visual Studio 2019、CMake、标准 C++17 | 是 |
 | `python` | 64 位 Python 3.8+、`ctypes` | 是，不需要 pip 依赖 |
 | `qt` | Qt 5/Qt 6 C++、PySide/PyQt | 当前提供完整接入代码和项目配置，本机未安装 Qt，未做 Qt 编译 |
+| `RaceBearMotionStudio` | Visual Studio 2019、Win32/Common Controls、C++17 | 是，包含完整前端源码和解决方案 |
 
 建议先运行 `cpp` 或 `python` 示例确认 SDK 环境正常，再把相同生命周期接入正式前端。
 

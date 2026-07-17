@@ -16,3 +16,16 @@ cmake_install.cmake
 *.pdb
 *.exp
 *.ilk
+
+# Private SDK implementation must never enter the distribution repository
+/src/
+/tests/
+/InternalReferences/
+/RaceBearSDK.sln
+/RaceBearSDK.vcxproj
+/RaceBearSDK.vcxproj.filters
+/RaceBearSDK.vcxproj.user
+**/obj-app/
+**/bin-app/
+**/__pycache__/
+*.pyc

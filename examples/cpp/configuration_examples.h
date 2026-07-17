@@ -1,9 +1,9 @@
 #pragma once
 
-// These examples show complete read-modify-apply-save flows. They are not
-// called by main.cpp because running them would overwrite the user's config.
-int ConfigureDynamicInputExample(int profileIndex, int dofIndex, const char* telemetryKey);
+// 这些示例展示完整的“读取-修改-应用-保存”流程。main.cpp 不会自动调用，
+// 避免示例启动后覆盖用户配置或驱动真实硬件。
+int ConfigureDynamicInputExample(int profileIndex, int dofIndex, int candidateIndex);
 int ConfigureSerialOutputExample(int instanceIndex, const char* portName);
-int ConfigureAdditionalEffectsExample(int profileIndex);
+int ConfigureAdditionalEffectsExample(int motionProfileIndex, int dynamicProfileIndex);
 int ConfigureGameTelemetryExample(const char* gameKey, int catalogIndex, int sourcePort);
 int InspectPluginsAndManualPoseExample();

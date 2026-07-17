@@ -7,10 +7,12 @@ VS2019 x64 DLL SDK package for the RaceBear backend.
 Third-party developers should read:
 
 - `include/RaceBearSDK.h`: minimal public C ABI header for normal frontends.
+- `RaceBearSDK_FRONTEND_GUIDE.md`: page-by-page guide for building a complete frontend.
 - `RaceBearSDK_API.md`: integration guide, call order, examples, field units, and common failure causes.
 - `examples/cpp`: buildable VS2019/CMake C++ console example.
 - `examples/python`: dependency-free Python `ctypes` binding and runnable example.
 - `examples/qt`: Qt 5/Qt 6 integration guide and adapter code.
+- `examples/RaceBearMotionStudio`: complete VS2019 Win32 frontend sample with source code.
 
 The SDK is intended to be usable with only the public header, import library,
 DLL, and documentation. Backend source code is not required for normal
@@ -25,8 +27,9 @@ integration.
 - `bin/x64/Release/RaceBearSDK.dll`: Release runtime for end-user applications.
 - `bin/x64/Release/RaceBearSDK.lib`: Release import library.
 - `include/RaceBearSDK.h`: public C/C++ API header.
+- `RaceBearSDK_FRONTEND_GUIDE.md`: complete frontend implementation guide.
 - `RaceBearSDK_API.md`: Chinese integration guide.
-- `examples/`: C++, Python, and Qt integration examples.
+- `examples/`: C++, Python, Qt, and complete Win32 frontend examples.
 
 The package is built with Visual Studio 2019 `v142` for Windows x64. Host
 applications must also be x64.
