@@ -184,12 +184,12 @@ try {
         Invoke-Checked git @('commit', '-m', "Release RaceBear SDK $Version")
     }
 
-    Invoke-Checked git @('-c', 'http.proxy=', '-c', 'https.proxy=', 'push', 'origin', 'main')
+    Invoke-Checked git @('-c', 'http.proxy=', '-c', 'https.proxy=', '-c', 'http.version=HTTP/1.1', 'push', 'origin', 'main')
 
     $existingTag = & git tag --list $tag
     if (-not $existingTag) {
         Invoke-Checked git @('tag', '-a', $tag, '-m', "RaceBear SDK $Version")
-        Invoke-Checked git @('-c', 'http.proxy=', '-c', 'https.proxy=', 'push', 'origin', $tag)
+        Invoke-Checked git @('-c', 'http.proxy=', '-c', 'https.proxy=', '-c', 'http.version=HTTP/1.1', 'push', 'origin', $tag)
     }
 
     $releaseExists = $false
