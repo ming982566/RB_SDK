@@ -16,20 +16,21 @@
 | `include/RaceBearSDK.h`           | 唯一公开 C/C++ 头文件，包含函数、结构体、枚举和字段说明 |
 | `bin/x64/Release/RaceBearSDK.lib` | Visual C++ 导入库，链接阶段使用                         |
 | `bin/x64/Release/RaceBearSDK.dll` | SDK 运行库，部署时放在宿主 EXE 同目录                   |
-| `docs/RaceBearSDK_API.md`         | 本接入手册                                              |
-| `RaceBearSDK.pdb`                 | 可选，仅用于分析 SDK 内部崩溃位置                       |
+| `RaceBearSDK_API.md`              | 本接入手册                                              |
+| `RaceBearSDK_FRONTEND_GUIDE.md`   | 完整第三方前端的页面设计与调用流程                      |
 
 目标电脑需要安装 Microsoft Visual C++ 2015-2022 Redistributable x64。`RaceBearSDK.dll` 的其它依赖均为 Windows 系统组件。
 
 不要混用不同版本 SDK 包中的 `.h`、`.lib` 和 `.dll`。三者必须来自同一次发布。
 
-SDK 目录提供了三套现成示例：
+SDK 目录提供了四套现成示例：
 
 | 目录              | 内容                                            |
 | ----------------- | ----------------------------------------------- |
 | `examples/cpp`    | 可使用 VS2019/CMake 构建的 C++ 控制台示例       |
 | `examples/python` | 无第三方依赖的 Python `ctypes` 封装和运行示例   |
 | `examples/qt`     | Qt 5/Qt 6 的 CMake、qmake、适配类和线程模型说明 |
+| `examples/RaceBearMotionStudio` | 可直接用 VS2019 构建的完整 Win32 前端示例 |
 
 ## 2. 配置 Visual Studio 项目
 
@@ -1751,24 +1752,24 @@ void DrainSdkLogs()
 | `RB_Debug_IsMonitorOpen()` | 同步宿主菜单或按钮状态。 |
 | `RB_Debug_CloseMonitor()` | 关闭诊断窗口；宿主退出前也应调用。 |
 
-## 18. 发布包检查清单
+## 18. 升级 SDK 依赖检查清单
 
-第三方发布或更新 SDK 时应同步同一次 VS2019 构建产生的文件：
+第三方应用升级 RaceBear SDK 时，应从同一个 Release 同步替换以下依赖：
 
 - `include/RaceBearSDK.h`
-- `bin/x64/Debug/RaceBearSDK.dll` 和 `.lib`
-- `bin/x64/Release/RaceBearSDK.dll` 和 `.lib`
-- `docs/RaceBearSDK_API.md`
-- `examples/cpp`、`examples/python`、`examples/qt`
+- 当前构建配置对应的 `bin/x64/Debug` 或 `bin/x64/Release` DLL/LIB
+- `RaceBearSDK_API.md` 和 `RaceBearSDK_FRONTEND_GUIDE.md`
 
-Debug 和 Release DLL 的 `RB_Runtime_GetVersion()` 必须一致。不要只替换 DLL 而保留
-旧头文件，也不要把不同构建时间的 DLL/LIB 混合发布。更新后至少运行候选目录、
-动态配置往返、公共配置 Smoke 和示例前端正常退出测试。
-5. 授权有效、过期、无网络和反激活状态均能正确显示。
-6. 未授权时真实输出确实被锁定。
-7. 游戏检测、遥测连接、输出连接和断开流程均能恢复。
-8. JSON 保存后保留未知字段，没有用字符串拼接破坏配置。
-9. 串口热插拔和读取回调不会直接跨线程操作 UI。
-10. 退出前停止所有前端定时器和工作线程，再调用 `RB_Runtime_Shutdown()`。
+不要只替换 DLL 而保留旧头文件或导入库。升级后至少完成以下验证：
+
+1. `RB_Runtime_GetVersion()` 与目标 Release 版本一致。
+2. Debug、Release 和宿主程序均为 x64，且各自使用匹配配置的 DLL/LIB。
+3. SDK 能够重复初始化、启动内部循环并正常关闭。
+4. 授权有效、过期、无网络和反激活状态均能正确显示。
+5. 未授权时真实输出确实被锁定。
+6. 游戏检测、遥测连接、输出连接和断开流程均能恢复。
+7. 配置保存和回读成功，未知 JSON 字段没有被宿主破坏。
+8. 串口热插拔和读取回调不会直接跨线程操作 UI。
+9. 退出前停止所有前端定时器和工作线程，再调用 `RB_Runtime_Shutdown()`。
 
 函数的精确参数、返回值、结构体字段和单位以同一发布包中的 `RaceBearSDK.h` 为准。本手册负责说明接入流程，头文件负责说明单个接口合同。

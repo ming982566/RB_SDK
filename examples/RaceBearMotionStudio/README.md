@@ -28,4 +28,4 @@ sample directory. Application data is isolated under the SDK app-data name
 - Connected output instances must be disconnected before connection settings can be saved or applied.
 - Closing the app stops UI timers/callbacks, requests safe output disconnect, then shuts down the SDK.
 
-See [SDK_COVERAGE.md](SDK_COVERAGE.md) for the interface map and [SDK_GAPS.md](SDK_GAPS.md) for capabilities not present in the public SDK.
+See [RaceBearSDK_FRONTEND_GUIDE.md](../../RaceBearSDK_FRONTEND_GUIDE.md) for the complete frontend workflow and [RaceBearSDK_API.md](../../RaceBearSDK_API.md) for API and parameter details.

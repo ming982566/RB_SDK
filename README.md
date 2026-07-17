@@ -178,7 +178,8 @@ RB_Command_Run("output.connectAuto", "{}", buffer, size);
 
 - `include/` public SDK headers.
 - `bin/` Debug and Release runtime binaries.
-- `examples/` third-party C++, Python, and Qt integration examples.
+- `examples/` third-party C++, Python, Qt, and complete Win32 frontend examples.
+- `RaceBearSDK_FRONTEND_GUIDE.md` complete frontend workflow guide.
 - `RaceBearSDK_API.md` complete integration guide.
 
 ## Notes

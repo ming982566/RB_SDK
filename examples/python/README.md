@@ -25,12 +25,12 @@ sdk.set_wind_test(False)
 - Windows x64。
 - 64 位 Python 3.8 或更高版本。
 - Microsoft Visual C++ 2015-2022 Redistributable x64。
-- `bin\x64\Release\RaceBearSDK.dll` 已由 SDK 项目生成。
+- SDK 包中存在 `bin\x64\Release\RaceBearSDK.dll`。
 
 运行：
 
 ```powershell
-cd D:\AI_Workspace\RaceBear_SDK\examples\python
+cd <SDK解压目录>\examples\python
 py -3 example.py
 ```
 

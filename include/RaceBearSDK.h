@@ -10,7 +10,7 @@
 // 4. Call RB_Runtime_StartLoop() to let the SDK drive backend calculations internally.
 // 5. Call RB_Runtime_Shutdown() once before process exit. Shutdown automatically stops the runtime loop.
 // 6. All char buffers are UTF-8. wchar_t* parameters are Windows UTF-16.
-// 7. For full integration steps, examples, return-value rules, and field units, read docs/RaceBearSDK_API.md.
+// 7. For full integration steps, examples, return-value rules, and field units, read RaceBearSDK_API.md.
 // 8. When License.OutputAllowed is 0, protected calculated fields are zeroed and runtime Apply/test/connect APIs return RB_LICENSE_REQUIRED.
 //    Configuration, catalogs, raw telemetry, license actions, serial utilities, disconnect, and reset APIs remain available.
 #ifdef RACEBEARSDK_EXPORTS
@@ -1139,7 +1139,7 @@ RB_API int RB_Game_ReloadCustomRegistry();
 
 /**
  * @brief 按固定数据 key 读取 UTF-8 JSON 包。
- * @param key 数据包 key；支持范围见 docs/RaceBearSDK_API.md 的“JSON 数据包”章节。
+ * @param key 数据包 key；支持范围见 RaceBearSDK_API.md 的“JSON 数据包”章节。
  * @param buffer 接收 UTF-8、NUL 结尾 JSON 的调用方缓冲区。
  * @param bufferSize buffer 的总容量，单位为字节且必须大于 0。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示 key 或缓冲区无效；RB_BUFFER_TOO_SMALL 表示容量不足；RB_ERROR 表示读取失败。
@@ -1148,7 +1148,7 @@ RB_API int RB_Data_ReadJson(const char* key, char* buffer, int bufferSize);
 
 /**
  * @brief 按固定配置 key 写入完整 UTF-8 JSON 配置文档。
- * @param key 可写配置包 key；支持范围见 docs/RaceBearSDK_API.md 的“JSON 数据包”章节。
+ * @param key 可写配置包 key；支持范围见 RaceBearSDK_API.md 的“JSON 数据包”章节。
  * @param jsonText UTF-8、NUL 结尾的完整 JSON 文本，不能为空。
  * @return RB_OK 表示写入成功；RB_INVALID_ARGUMENT 表示 key 或文本无效；RB_ERROR 表示保存失败。
  * @note 保存后是否需要执行 runtime.reloadConfig 命令，取决于对应配置的使用场景。
@@ -1763,7 +1763,7 @@ RB_API int RB_Seatbelt_SetTestOutput(int enabled, double leftPercent, double rig
 
 /**
  * @brief 执行统一动作命令，并可返回命令结果 JSON。
- * @param command UTF-8、NUL 结尾的命令 key；支持范围见 docs/RaceBearSDK_API.md 的“Command”章节。
+ * @param command UTF-8、NUL 结尾的命令 key；支持范围见 RaceBearSDK_API.md 的“Command”章节。
  * @param argsJson UTF-8、NUL 结尾的参数对象；无参数命令应传 "{}"。
  * @param resultBuffer 可选的结果缓冲区；不需要结果时可传 nullptr。
  * @param resultBufferSize resultBuffer 的总容量，单位为字节；传入缓冲区时必须大于 0。

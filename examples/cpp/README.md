@@ -6,10 +6,9 @@
 
 ## 构建
 
-在 Visual Studio 2019 Developer PowerShell 中执行：
+在 SDK 解压目录的 `examples\cpp` 中打开 Visual Studio 2019 Developer PowerShell，执行：
 
 ```powershell
-cd D:\AI_Workspace\RaceBear_SDK\examples\cpp
 cmake -S . -B build -G "Visual Studio 16 2019" -A x64
 cmake --build build --config Release
 ```
