@@ -2,8 +2,6 @@
 
 Native Windows x64 motion-simulation frontend for RaceBear SDK 0.4.7. It uses Win32/Common Controls, C++17 and the SDK-owned 2 ms runtime loop. No real output is connected automatically.
 
-![RaceBear Motion Studio](docs/images/RaceBearMotionStudio.png)
-
 ## Build with Visual Studio 2019
 
 Open `RaceBearMotionStudio.sln`, select `x64` and build the required Debug or
@@ -17,7 +15,9 @@ Run:
 ```
 
 The build copies the matching Debug or Release `RaceBearSDK.dll` beside the
-executable. Application data is isolated under the SDK app-data name
+executable from the repository root `bin` directory. The project also uses the
+repository root `include/RaceBearSDK.h`; no SDK files are duplicated inside the
+sample directory. Application data is isolated under the SDK app-data name
 `RaceBearMotionStudio`.
 
 ## Hardware safety

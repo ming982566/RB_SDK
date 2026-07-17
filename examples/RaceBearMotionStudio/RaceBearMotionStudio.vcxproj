@@ -42,6 +42,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
+    <RaceBearSdkRoot>$(ProjectDir)..\..\</RaceBearSdkRoot>
     <OutDir>$(ProjectDir)bin-app\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)obj-app\$(Configuration)\</IntDir>
     <TargetName>RaceBearMotionStudio</TargetName>
@@ -53,17 +54,17 @@
       <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(RaceBearSdkRoot)include;$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(ProjectDir)bin\x64\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(RaceBearSdkRoot)bin\x64\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>RaceBearSDK.lib;comctl32.lib;comdlg32.lib;shlwapi.lib;ws2_32.lib;uxtheme.lib;dwmapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y "$(ProjectDir)bin\x64\$(Configuration)\RaceBearSDK.dll" "$(OutDir)RaceBearSDK.dll"</Command>
+      <Command>copy /Y "$(RaceBearSdkRoot)bin\x64\$(Configuration)\RaceBearSDK.dll" "$(OutDir)RaceBearSDK.dll"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -75,7 +76,7 @@
       <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(RaceBearSdkRoot)include;$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -83,11 +84,11 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(ProjectDir)bin\x64\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(RaceBearSdkRoot)bin\x64\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>RaceBearSDK.lib;comctl32.lib;comdlg32.lib;shlwapi.lib;ws2_32.lib;uxtheme.lib;dwmapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y "$(ProjectDir)bin\x64\$(Configuration)\RaceBearSDK.dll" "$(OutDir)RaceBearSDK.dll"</Command>
+      <Command>copy /Y "$(RaceBearSdkRoot)bin\x64\$(Configuration)\RaceBearSDK.dll" "$(OutDir)RaceBearSDK.dll"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -103,7 +104,7 @@
     <ClCompile Include="src\pages\SettingsPages.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\RaceBearSDK.h" />
+    <ClInclude Include="..\..\include\RaceBearSDK.h" />
     <ClInclude Include="src\App.h" />
     <ClInclude Include="src\SdkRuntime.h" />
     <ClInclude Include="src\Ui.h" />

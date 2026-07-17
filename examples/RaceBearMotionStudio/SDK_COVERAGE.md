@@ -1,6 +1,6 @@
 # RaceBear SDK frontend coverage
 
-Baseline: the unmodified `include/RaceBearSDK.h`, matching x64 DLL/LIB files, and `docs/RaceBearSDK_API.md`.
+Baseline: the repository root `../../include/RaceBearSDK.h`, matching `../../bin/x64` DLL/LIB files, and `../../RaceBearSDK_API.md`.
 
 Status terms: **Implemented** means the UI calls the public API and checks its return value. **Public summary only** means the SDK intentionally exposes read-only/basic capability. **SDK gap** is documented in `SDK_GAPS.md`.
 

@@ -1,6 +1,6 @@
 # RaceBear SDK gaps
 
-Baseline: `include/RaceBearSDK.h` and `docs/RaceBearSDK_API.md`, audited 2026-07-15.
+Baseline: the repository root `../../include/RaceBearSDK.h` and `../../RaceBearSDK_API.md`, audited 2026-07-17.
 
 The application does not emulate or invent the following capabilities:
 

@@ -4,7 +4,6 @@ param(
     [string]$Version,
 
     [string]$SdkSourceRoot = 'D:\AI_Workspace\RaceBear_SDK',
-    [string]$SampleSourceRoot = 'D:\AI_Workspace\Racebear-motion',
     [string]$Repository = 'ming982566/RB_SDK',
     [switch]$SkipBuild
 )
@@ -68,46 +67,6 @@ function Copy-SdkPackage {
     }
 }
 
-function Copy-FrontendSample {
-    if (-not (Test-Path -LiteralPath (Join-Path $SampleSourceRoot 'RaceBearMotionStudio.sln'))) {
-        throw "Frontend sample not found: $SampleSourceRoot"
-    }
-
-    $sampleTarget = Join-Path $publishRoot 'examples\RaceBearMotionStudio'
-    $publishFullPath = [IO.Path]::GetFullPath($publishRoot).TrimEnd('\') + '\'
-    $sampleFullPath = [IO.Path]::GetFullPath($sampleTarget)
-    if (-not $sampleFullPath.StartsWith($publishFullPath, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Invalid sample target: $sampleFullPath"
-    }
-    if (Test-Path -LiteralPath $sampleTarget) {
-        Remove-Item -LiteralPath $sampleTarget -Recurse -Force
-    }
-    New-Item -ItemType Directory -Path $sampleTarget -Force | Out-Null
-
-    # Explicit allowlist: frontend source and required public SDK artifacts only.
-    foreach ($directory in @('src', 'tests', 'docs')) {
-        Copy-Item (Join-Path $SampleSourceRoot $directory) $sampleTarget -Recurse -Force
-    }
-    New-Item -ItemType Directory -Path (Join-Path $sampleTarget 'include') -Force | Out-Null
-    Copy-Item (Join-Path $SampleSourceRoot 'include\RaceBearSDK.h') (Join-Path $sampleTarget 'include\RaceBearSDK.h') -Force
-    foreach ($configuration in @('Debug', 'Release')) {
-        $binaryTarget = Join-Path $sampleTarget "bin\x64\$configuration"
-        New-Item -ItemType Directory -Path $binaryTarget -Force | Out-Null
-        Copy-Item (Join-Path $SampleSourceRoot "bin\x64\$configuration\RaceBearSDK.dll") $binaryTarget -Force
-        Copy-Item (Join-Path $SampleSourceRoot "bin\x64\$configuration\RaceBearSDK.lib") $binaryTarget -Force
-    }
-    foreach ($file in @(
-        'RaceBearMotionStudio.sln',
-        'RaceBearMotionStudio.vcxproj',
-        'RaceBearMotionStudio.vcxproj.filters',
-        'README.md',
-        'SDK_COVERAGE.md',
-        'SDK_GAPS.md'
-    )) {
-        Copy-Item (Join-Path $SampleSourceRoot $file) $sampleTarget -Force
-    }
-}
-
 function Assert-NoPrivateSdkSource {
     $forbiddenPaths = @(
         (Join-Path $publishRoot 'src'),
@@ -153,7 +112,6 @@ try {
     }
 
     Copy-SdkPackage
-    Copy-FrontendSample
     Assert-NoPrivateSdkSource
 
     if (Test-Path -LiteralPath $archivePath) {

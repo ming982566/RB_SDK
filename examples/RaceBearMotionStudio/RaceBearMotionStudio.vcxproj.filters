@@ -36,6 +36,6 @@
     <ClInclude Include="src\SdkRuntime.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="src\Ui.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="src\pages\Pages.h"><Filter>头文件\页面</Filter></ClInclude>
-    <ClInclude Include="include\RaceBearSDK.h"><Filter>SDK</Filter></ClInclude>
+    <ClInclude Include="..\..\include\RaceBearSDK.h"><Filter>SDK</Filter></ClInclude>
   </ItemGroup>
 </Project>
