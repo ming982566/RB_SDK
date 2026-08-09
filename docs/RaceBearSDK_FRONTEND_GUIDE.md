@@ -10,16 +10,17 @@
 
 ### AI 辅助开发入口
 
-SDK 源稿中的 `tools/skills/racebear-frontend-panel` 是面向 Codex 等 AI 编码代理的
-前端接入 Skill。它把本文的页面流程与公开头、API 手册、仪表专题和工作区规则
-组合成可执行的开发顺序，并提供实现前检查、稳定键与索引约束、句柄关闭顺序和
-验收清单。
+SDK 源稿中的 `tools/skills/racebear-frontend-panel` 是面向支持 Skill 或可复用指令
+的 AI 编码工具的前端接入包。它把本文的页面流程与公开头、API 手册、仪表专题和
+工程规则组合成可执行的开发顺序，并提供实现前检查、稳定键与索引约束、句柄关闭
+顺序和验收清单。
 
-安装时将整个目录复制到
-`%USERPROFILE%\.codex\skills\racebear-frontend-panel`，随后可使用：
+使用时，应按照所用 AI 编码工具的 Skill 或可复用规则导入方式加载整个目录。
+不同工具的安装位置和调用方式不同，本文不指定固定路径或命令。导入后可直接提出
+具体任务，例如：
 
 ```text
-Use $racebear-frontend-panel to build a RaceBear SDK frontend panel for this application.
+使用随 SDK 提供的 RaceBear 前端 Skill，为当前应用实现 RaceBear SDK 控制面板。
 ```
 
 Skill 不替代本文，也不固定前端框架。AI 仍必须以当前

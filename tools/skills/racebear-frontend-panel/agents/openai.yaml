@@ -1,4 +1,0 @@
-interface:
-  display_name: "RaceBear 前端面板接入"
-  short_description: "使用 RaceBear SDK 构建和排查完整前端控制面板"
-  default_prompt: "Use $racebear-frontend-panel to build a RaceBear SDK frontend panel with correct lifecycle, configuration, dashboard output, and validation."

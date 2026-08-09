@@ -10,7 +10,7 @@ Use the public SDK contract to build a complete, maintainable frontend without c
 ## Start With The Contract
 
 1. Locate the SDK root that contains `include/RaceBearSDK.h` and `docs/RaceBearSDK_FRONTEND_GUIDE.md`.
-2. Read the target repository's instructions before editing, including its root and project-specific `AGENTS.md` files when present.
+2. Read the target repository's root and project-specific instructions before editing, regardless of the filenames or conventions used by the host tool.
 3. Treat `include/RaceBearSDK.h` as the signature and ABI authority.
 4. Treat `docs/RaceBearSDK_FRONTEND_GUIDE.md` as the page workflow and configuration ownership authority.
 5. Use `docs/RaceBearSDK_API.md` for field definitions, units, call examples, deployment, and failure behavior.

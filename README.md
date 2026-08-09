@@ -16,8 +16,8 @@ source code.
   lights, warnings, tire state, pedals, text, images, arcs, and bars.
 - Added the RaceBear Starter package and retained the four built-in dashboard
   styles: AIM MXS, BOSCH DDU8, SimpleDash, and Ford GT.
-- Added the reusable `racebear-frontend-panel` Codex Skill for AI-assisted
-  frontend integration, review, and debugging.
+- Added the reusable, tool-neutral `racebear-frontend-panel` AI coding Skill
+  for frontend integration, review, and debugging.
 
 The DLL reports runtime version `0.5.0-vs2019-x64`.
 
@@ -35,7 +35,7 @@ The DLL reports runtime version `0.5.0-vs2019-x64`.
 | `examples/qt` | Qt 5/Qt 6 integration guide |
 | `examples/RaceBearMotionStudio` | Native VS2019 Windows frontend example |
 | `tools/DashboardDesigner` | Local browser dashboard editor |
-| `tools/skills/racebear-frontend-panel` | Codex frontend integration Skill |
+| `tools/skills/racebear-frontend-panel` | Tool-neutral AI frontend integration Skill |
 
 Private SDK implementation, internal tests, internal references, and the SDK
 Visual Studio project are intentionally excluded.
@@ -112,17 +112,16 @@ control functions.
 
 ## AI-Assisted Development
 
-Copy the complete Skill directory to:
+Supply the complete Skill directory to the AI coding tool using that tool's
+own Skill or reusable-instruction import mechanism. Installation locations,
+invocation syntax, rule filenames, and optional interface metadata vary by
+tool, so this SDK does not prescribe them.
+
+After importing it, give the agent a concrete task:
 
 ```text
-%USERPROFILE%\.codex\skills\racebear-frontend-panel
-```
-
-Then invoke it with a concrete task:
-
-```text
-$racebear-frontend-panel add RaceBear game selection, license state,
-configuration pages, and dashboard output to this Qt application.
+Add RaceBear game selection, license state, configuration pages, and dashboard
+output to this Qt application using the provided RaceBear frontend Skill.
 ```
 
 The Skill guides an AI coding agent through ABI checks, lifecycle ownership,
