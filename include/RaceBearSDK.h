@@ -5,7 +5,7 @@
 //
 // Developer contract:
 // 1. Include this header and link RaceBearSDK.lib, then ship RaceBearSDK.dll with the host app.
-// 2. Call RB_Runtime_SetAppDataName() first if the host app does not want to use the default Racebear config directory.
+// 2. Call RB_Runtime_SetAppDataName() first if the host app does not want to use the default SimRacebear config directory.
 // 3. Call RB_Runtime_Initialize() once before using runtime/config/output APIs.
 // 4. Call RB_Runtime_StartLoop() to let the SDK drive backend calculations internally.
 // 5. Call RB_Runtime_Shutdown() once before process exit. Shutdown automatically stops the runtime loop.
@@ -86,7 +86,8 @@ enum RB_Limits
 	RB_MOTION_EFFECT_COUNT = 5,      // 运动增强效果数量。
 	RB_MOTION_ROUTE_COUNT = 6,       // 每个运动增强效果最大输出路由数。
 	RB_HAPTIC_EFFECT_COUNT = 7,      // 震动效果数量。
-	RB_SEATBELT_OUTPUT_COUNT = 2     // 安全带输出通道数。
+	RB_SEATBELT_OUTPUT_COUNT = 2,    // 安全带输出通道数。
+	RB_MAX_DASHBOARD_PACKAGES = 128 // 客户仪表目录最大返回数量。
 };
 
 // 自定义游戏遥测传输方式。MMF仅支持同机Windows进程，UDP支持跨进程和跨主机。
@@ -245,6 +246,158 @@ struct RB_CanState
 	int FirmwareUpdateErrorCode;                 // 固件升级错误码。
 	char FirmwareUpdateStatusText[RB_TEXT_MEDIUM]; // 固件升级状态文本。
 	RB_CanMotorState Motors[RB_MAX_CAN_MOTORS];  // CAN 电机状态数组。
+};
+
+// RB_CAN 输出与物理卡的稳定绑定状态。新结构通过 Size 字段独立版本化，不改变旧结构布局。
+enum RB_CanBindingStatus
+{
+	RB_CAN_BINDING_UNBOUND = 0,                  // 尚未绑定 UID 和逻辑索引。
+	RB_CAN_BINDING_READY = 1,                    // UID、逻辑索引和协议均匹配。
+	RB_CAN_BINDING_OFFLINE = 2,                  // 已有稳定绑定，但物理卡当前离线。
+	RB_CAN_BINDING_CONFLICT = 3,                 // UID 或逻辑索引发生重复/不匹配。
+	RB_CAN_BINDING_IAP = 4,                      // 物理卡当前处于 IAP 模式。
+	RB_CAN_BINDING_ERROR = 5                     // 身份协议或底层访问失败。
+};
+
+// 一张当前枚举到的 RB_CAN 卡身份快照。
+struct RB_CanDeviceInfo
+{
+	unsigned int Size;                           // 调用前设为 sizeof(RB_CanDeviceInfo)。
+	int CatalogIndex;                            // 本次目录索引，仅用于继续读取目录。
+	int EnumerationIndex;                        // 本次目录内唯一运行时访问索引，不能持久化。
+	int LogicalIndex;                            // 卡内持久逻辑索引，0 表示未配置。
+	int ProtocolType;                            // 固件协议身份：1=RB_CAN，2=FM_CAN，3=FC_CAN/RDS_CAN物理卡身份。
+	int IapMode;                                 // 1 表示当前处于 IAP。
+	int IdentityValid;                           // 1 表示身份报文有效。
+	int DuplicateLogicalIndex;                   // 1 表示检测到重复逻辑索引。
+	unsigned int FirmwareVersion;                // APP 或 IAP 固件版本。
+	unsigned int Capabilities;                   // 固件能力位。
+	unsigned int ConfigGeneration;               // 索引持久记录代数。
+	char Uid[RB_TEXT_SMALL];                     // 24 位大写十六进制 MCU UID。
+	char StatusText[RB_TEXT_MEDIUM];             // 设备身份或冲突状态文本。
+};
+
+// 一个 OUT_n 与物理 RB_CAN 卡的运行时绑定快照。
+struct RB_CanOutputBindingState
+{
+	unsigned int Size;                           // 调用前设为 sizeof(RB_CanOutputBindingState)。
+	int RuntimeInstanceIndex;                    // 对应 Output_List/OUT_n。
+	int BindingStatus;                           // RB_CanBindingStatus 中的值。
+	int EnumerationIndex;                        // 当前实际打开句柄的运行时访问索引。
+	int LogicalIndex;                            // 当前绑定的持久逻辑索引。
+	int ProtocolType;                            // 当前绑定卡协议类型。
+	unsigned int FirmwareVersion;                // 当前绑定卡固件版本。
+	unsigned int Capabilities;                   // 当前绑定卡能力位。
+	int DeviceOpened;                            // 1 表示 WinUSB 设备已打开。
+	int Ready;                                   // 1 表示该卡和所属电机可接收位置输出。
+	int EStopLatched;                            // 1 表示全局急停仍锁存。
+	int EStopConfirmed;                          // 1 表示本卡已确认最近一次急停命令。
+	int EStopCommandStatus;                      // 固件急停状态或底层 WUC 错误码。
+	char Uid[RB_TEXT_SMALL];                     // 当前绑定卡 MCU UID。
+	char StatusText[RB_TEXT_MEDIUM];             // 绑定或运行状态文本。
+};
+
+enum RB_CanRuntimeStatus
+{
+	RB_CAN_RUNTIME_STARTING = 0,
+	RB_CAN_RUNTIME_READY = 1,
+	RB_CAN_RUNTIME_RUNNING = 2,
+	RB_CAN_RUNTIME_DEGRADED = 3,
+	RB_CAN_RUNTIME_RECOVERING = 4,
+	RB_CAN_RUNTIME_SAFE_LOCKED = 5,
+	RB_CAN_RUNTIME_MAINTENANCE = 6
+};
+
+enum RB_CanFaultReason
+{
+	RB_CAN_FAULT_NONE = 0,
+	RB_CAN_FAULT_DEVICE_OFFLINE = 1,
+	RB_CAN_FAULT_IDENTITY_CONFLICT = 2,
+	RB_CAN_FAULT_USB_TRANSPORT = 3,
+	RB_CAN_FAULT_BUS_OFF = 4,
+	RB_CAN_FAULT_NODE_OFFLINE = 5,
+	RB_CAN_FAULT_DRIVE = 6,
+	RB_CAN_FAULT_ESTOP = 7,
+	RB_CAN_FAULT_RECOVERY_BUDGET = 8,
+	RB_CAN_FAULT_FIRMWARE_MAINTENANCE = 9,
+	RB_CAN_FAULT_CONFIGURATION = 10
+};
+
+// 无人值守宿主使用的版本化健康快照；新增字段时通过 Size 建立新版本。
+struct RB_CanOutputHealthState
+{
+	unsigned int Size;
+	int RuntimeStatus;
+	int FaultReason;
+	unsigned long long SessionGeneration;
+	unsigned long long RecoveryGeneration;
+	unsigned int RetryCount;
+	unsigned int RetryBudget;
+	unsigned int NextRetryDelayMs;
+	int DeviceConnected;
+	int DeviceOpened;
+	int Armed;
+	int OutputActive;
+	int RequiresHumanIntervention;
+	unsigned int LastSuccessfulReadAgeMs;
+	unsigned int LastSuccessfulWriteAgeMs;
+	unsigned int UsbWriteFailures;
+	unsigned int RealtimeBatchesSubmitted;
+	unsigned int RealtimeBatchesReplaced;
+	unsigned int RealtimeBatchesWritten;
+	unsigned int MaxReliableQueueDepth;
+	unsigned int RealtimeLatencyP50Ms;
+	unsigned int RealtimeLatencyP95Ms;
+	unsigned int RealtimeLatencyP99Ms;
+	unsigned int RealtimeLatencyMaxMs;
+	unsigned int CanTxOverflows;
+	unsigned int CanRxOverflows;
+	unsigned int UsbTxOverflows;
+	unsigned int UsbRxOverflows;
+	unsigned int UsbRxResyncs;
+	unsigned int ReliableAccepted;
+	unsigned int ReliableDeduplicated;
+	unsigned int ReliableRejected;
+	unsigned int FirmwareRealtimeReplaced;
+	unsigned int CanTxQueueDepth;
+	unsigned int CanTxQueueMaxDepth;
+	unsigned int MotionCommandAgeMs;
+	unsigned int BusOffCount;
+	int BusOffActive;
+	char StatusText[RB_TEXT_MEDIUM];
+	unsigned int ReservedLegacyPadding;
+	unsigned int CurrentSafetyQueueDepth;
+	unsigned int CurrentControlQueueDepth;
+	unsigned int CurrentReliableQueueDepth;
+	unsigned int MaxSafetyQueueDepth;
+	unsigned int MaxControlQueueDepth;
+	unsigned int CanTxAccepted;
+	unsigned int ControlAccepted;
+	unsigned int ControlDeduplicated;
+	unsigned int ControlRejected;
+	unsigned int ReservedHealthV2Padding;         // 固定旧 336 字节 ABI 前缀中的尾部对齐空间。
+	int UsbDiagnosticsSupported;                 // 当前 APP 是否声明 USB 链路 V4 诊断能力。
+	int UsbDiagnosticsAvailable;                 // 当前会话是否已收到至少一份有效 V4 诊断。
+	unsigned int UsbDiagnosticsAgeMs;            // 最近 V4 诊断年龄；不可用时为 UINT_MAX。
+	unsigned int AppUsbIrqCount;                 // APP USB 中断累计次数。
+	unsigned int AppUsbOutCount;                 // APP 收到 USB OUT 包的累计次数。
+	unsigned int AppUsbResetCount;               // APP 观察到的 USB Reset 累计次数。
+	unsigned int AppUsbConfiguredCount;          // APP 进入 Configured 状态的累计次数。
+	unsigned int AppUsbSuspendCount;             // APP USB Suspend 累计次数。
+	unsigned int AppUsbResumeCount;              // APP USB Resume 累计次数。
+	unsigned int AppUsbHardwareErrorCount;       // APP USB 硬件 ERR 累计次数。
+	unsigned int AppUsbHardwareOverrunCount;     // APP USB DOVR 累计次数。
+	unsigned int AppUsbOutRearmMaxUs;            // APP OUT 端点重新挂接最大耗时，微秒。
+	unsigned int AppUsbRxRingDepth;              // APP 当前 USB RX 环形缓冲深度。
+	unsigned int AppUsbRxRingMaxDepth;           // APP USB RX 环形缓冲历史最大深度。
+	unsigned int LastUsbWriteError;              // 最近一次实际 USB OUT 失败的 Win32 错误码。
+	unsigned int LastUsbAbortPipeError;          // 最近一次 AbortPipe 失败的 Win32 错误码，0 表示成功。
+	unsigned int LastUsbResetPipeError;          // 最近一次 ResetPipe 失败的 Win32 错误码，0 表示成功。
+	unsigned int AppCpuUsagePercent;             // APP 主循环 CPU 使用率百分比。
+	unsigned int CanTxErrorCount;                // 最近 CAN 错误事件中的发送错误计数 TEC。
+	unsigned int CanRxErrorCount;                // 最近 CAN 错误事件中的接收错误计数 REC。
+	unsigned int LastCanErrorCode;               // 最近 CAN 错误事件中的控制器错误码 LEC。
+	unsigned int ReservedHealthV5Padding;        // 固定 424 字节 ABI 并保留后续扩展位置。
 };
 
 // 风感模拟运行状态。
@@ -617,6 +770,126 @@ struct RB_SerialTimeoutConfig
 	unsigned int WriteTotalTimeoutConstant;        // 写总超时常量，毫秒。
 };
 
+// VOCORE 输入画面的像素排列。设备端统一使用 RGB565，SDK 会在发送线程中完成必要转换。
+enum RB_VoCorePixelFormat
+{
+	RB_VOCORE_PIXEL_RGB565_LE = 1,                 // 每像素 2 字节，小端 RGB565。
+	RB_VOCORE_PIXEL_RGB888 = 2,                    // 每像素 3 字节，依次为 R、G、B。
+	RB_VOCORE_PIXEL_BGRA8888 = 3,                  // 每像素 4 字节，依次为 B、G、R、A；A 被忽略。
+	RB_VOCORE_PIXEL_RGBA8888 = 4                   // 每像素 4 字节，依次为 R、G、B、A；A 被忽略。
+};
+
+// SDK内置仪表模板。模板同时包含竖屏和横屏布局。
+enum RB_DashboardTemplate
+{
+	RB_DASHBOARD_TEMPLATE_GT = 0,                  // AIM MXS风格布局。
+	RB_DASHBOARD_TEMPLATE_VIRTUAL_RING = 1,        // BOSCH DDU8风格布局。
+	RB_DASHBOARD_TEMPLATE_M_STRIP = 2,             // SimpleDash风格布局。
+	RB_DASHBOARD_TEMPLATE_FORD_GT = 3              // Ford GT风格布局。
+};
+
+// VOCORE 屏幕目录项。DeviceId 用于打开设备，在一次运行期间保持稳定。
+struct RB_VoCoreDeviceInfo
+{
+	int Size;                                      // 调用前设为 sizeof(RB_VoCoreDeviceInfo)。
+	int Version;                                   // 结构体版本，当前为 1。
+	char DeviceId[RB_TEXT_SMALL];                  // 设备唯一 ID；固件无法提供 ID 时退化为 USB 端口路径。
+	char Model[RB_TEXT_MEDIUM];                    // 型号，例如 "VoCore 6.8-inch"。
+	char UsbPath[RB_TEXT_MEDIUM];                  // USB 总线和端口路径，用于诊断。
+	unsigned int ScreenCode;                       // VOCORE 固件上报的屏幕型号代码。
+	unsigned int FirmwareVersion;                  // VOCORE 固件版本代码。
+	int Width;                                     // 屏幕原生宽度，单位为像素。
+	int Height;                                    // 屏幕原生高度，单位为像素。
+	int Supports24Bit;                             // 1=固件支持 24 bit 输入，0=仅确认支持 16 bit。
+};
+
+// 已打开 VOCORE 屏幕的运行状态和发送统计。
+struct RB_VoCoreState
+{
+	int Size;                                      // 调用前设为 sizeof(RB_VoCoreState)。
+	int Version;                                   // 结构体版本，当前为 1。
+	int DevicePresent;                             // 1=设备仍在 USB 总线上，0=已拔出或尚未找到。
+	int Open;                                      // 1=USB 接口已打开，0=未连接。
+	int Reconnecting;                              // 1=自动重连线程正在等待设备恢复。
+	int Width;                                     // 当前设备原生宽度，单位为像素。
+	int Height;                                    // 当前设备原生高度，单位为像素。
+	int Brightness;                                // 当前目标亮度，范围 0-255。
+	int PendingFrame;                              // 1=存在尚未发送的最新画面。
+	int LastError;                                 // 最近一次 libusb 错误码；0 表示无错误。
+	double ActualFps;                              // 最近统计窗口内实际发送到设备的 FPS。
+	unsigned long long SubmittedFrames;            // 前端累计提交帧数。
+	unsigned long long SentFrames;                 // 成功发送帧数。
+	unsigned long long DroppedFrames;              // 被更新画面覆盖或发送失败后丢弃的帧数。
+	char LastErrorText[RB_TEXT_LARGE];             // UTF-8 错误说明。
+};
+
+// VOCORE 屏幕句柄。由 RB_VoCore_Open 创建，由 RB_VoCore_Close 释放。
+typedef void* RB_VoCoreHandle;
+
+// 浏览器仪表输出配置。服务端异步编码最新帧，并通过局域网 MJPEG 页面输出。
+struct RB_DashboardWebConfig
+{
+	int Size;                                      // 调用前设为 sizeof(RB_DashboardWebConfig)。
+	int Version;                                   // 结构体版本，当前为 1。
+	int Port;                                      // HTTP 监听端口，建议使用 24738。
+	int AllowRemote;                               // 1=局域网设备可访问，0=仅本机浏览器。
+	int JpegQuality;                               // JPEG 质量，范围 30-100。
+	int MaxFps;                                    // 最大编码帧率，范围 1-60。
+};
+
+struct RB_DashboardWebState
+{
+	int Size;                                      // 调用前设为 sizeof(RB_DashboardWebState)。
+	int Version;                                   // 结构体版本，当前为 1。
+	int Open;                                      // 1=HTTP 服务正在监听。
+	int Port;                                      // 实际监听端口。
+	int ClientCount;                               // 当前正在观看视频流的浏览器数量。
+	int PendingFrame;                              // 1=存在等待编码的最新帧。
+	double ActualFps;                              // 最近统计窗口内实际 JPEG 编码帧率。
+	unsigned long long SubmittedFrames;            // 调用方累计提交帧数。
+	unsigned long long EncodedFrames;              // 成功编码帧数。
+	unsigned long long DroppedFrames;              // 编码前被更新帧覆盖的数量。
+	char Url[RB_TEXT_LARGE];                       // 本机或局域网可访问 URL。
+	char LastErrorText[RB_TEXT_LARGE];             // UTF-8 错误说明。
+};
+
+typedef void* RB_DashboardWebHandle;
+
+// 客户自定义仪表目录项。模板 ID 是配置持久化和打开模板的稳定标识。
+struct RB_DashboardPackageInfo
+{
+	unsigned int Size;                              // 调用前设为 sizeof(RB_DashboardPackageInfo)。
+	int Version;                                    // 结构体版本，当前为 1。
+	char PackageId[RB_TEXT_SMALL];                  // 稳定模板 ID。
+	char Name[RB_TEXT_MEDIUM];                      // 显示名称。
+	char Author[RB_TEXT_MEDIUM];                    // 作者。
+	char Description[RB_TEXT_LARGE];                // 模板说明或加载错误。
+	int FormatVersion;                              // .rbdash 格式版本，当前支持 1。
+	int DesignWidth;                                // 设计画布宽度。
+	int DesignHeight;                               // 设计画布高度。
+	int PageCount;                                  // 页面数量。
+	int ElementCount;                               // 全部页面元素数量。
+	int BuiltIn;                                    // 1=SDK 随附模板，0=用户模板。
+	int Valid;                                      // 1=可加载，0=模板损坏或不兼容。
+	char FilePath[RB_TEXT_LARGE];                   // UTF-8 文件路径，仅用于诊断和编辑器定位。
+};
+
+// 已打开客户仪表模板的运行状态。
+struct RB_DashboardPackageState
+{
+	unsigned int Size;                              // 调用前设为 sizeof(RB_DashboardPackageState)。
+	int Version;                                    // 结构体版本，当前为 1。
+	int Open;                                       // 1=模板句柄有效。
+	int CurrentPage;                                // 当前页面索引。
+	int PageCount;                                  // 页面数量。
+	int ElementCount;                               // 当前页面元素数量。
+	double LastRenderTimeMs;                        // 最近一帧渲染耗时。
+	unsigned long long RenderedFrames;              // 累计成功渲染帧数。
+	char LastErrorText[RB_TEXT_LARGE];              // 最近加载或渲染错误。
+};
+
+typedef void* RB_DashboardPackageHandle;
+
 // 游戏安装信息。用于首页启动/停止游戏和安装路径显示。
 struct RB_GameInstallInfo
 {
@@ -742,7 +1015,7 @@ struct RB_OutputConfig
 {
 	int Size;                                      // 结构体字节数，由 SDK 写入。
 	int Version;                                   // 结构体版本，当前为 1。
-	int CANindex;                                  // CAN 设备零基索引；非 CAN 输出保留读取值，当前单设备通常为 0。
+	int CANindex;                                  // RB_CAN 卡内逻辑索引，范围1-255；-1或0表示尚未绑定。
 	int ConnectionSpeed;                           // CAN 连接/软启动速度参数；非 CAN 输出保留读取值。
 	int ParkPositionPercent;                       // CAN 停车位置，0-100%。
 	int AutoConnect;                               // 1=允许自动连接，0=仅手动连接。
@@ -954,7 +1227,7 @@ struct RB_SystemConfig
 RB_API const char* RB_Runtime_GetVersion();
 
 /**
- * @brief 设置配置目录使用的应用名称，省略调用时默认为 "Racebear"。
+ * @brief 设置配置目录使用的应用名称，省略调用时默认为 "SimRacebear"。
  * @param name UTF-8、NUL 结尾的单个合法路径段；不能为空，也不能包含 Windows 路径非法字符。
  * @return RB_OK 表示设置成功；RB_INVALID_ARGUMENT 表示名称无效；RB_ERROR 表示内部失败。
  * @note 必须在 RB_Runtime_Initialize() 之前调用。
@@ -1047,6 +1320,12 @@ RB_API int RB_Runtime_DoCalculations();
  * @return RB_OK 表示读取成功；RB_INVALID_ARGUMENT 表示 state 为空；RB_ERROR 表示内部失败。
  */
 RB_API int RB_State_Read(RB_RuntimeState* state);
+
+/** 读取指定 RB_CAN 输出的机器可读健康与恢复状态。 */
+RB_API int RB_Can_GetOutputHealthState(int outputIndex, RB_CanOutputHealthState* state);
+
+/** 人工排除故障后显式清除指定输出的恢复熔断器并启动一次受控恢复。 */
+RB_API int RB_Can_RequestOutputRecovery(int outputIndex);
 
 /**
  * @brief 打开 SDK 内置资源监视器窗口；重复调用会激活已经打开的窗口。
@@ -1445,7 +1724,7 @@ RB_API int RB_Output_GetInstanceKey(int instanceIndex, char* buffer, int bufferS
 
 /**
  * @brief 添加输出实例。
- * @param outputKind "Serial"、"UDP"、"MMF" 或 "CAN"。
+ * @param outputKind "Serial"、"UDP"、"MMF"、"RB_CAN"、"FM_CAN"、"FC_CAN"、"RDS_CAN"、"Sim-FAN" 或 "Vibration"。
  * @return 成功时返回新实例的零基索引；失败返回负数错误码。
  */
 RB_API int RB_Output_AddInstance(const char* outputKind);
@@ -1778,6 +2057,139 @@ RB_API int RB_Command_Run(const char* command, const char* argsJson, char* resul
  * @return RB_OK 表示读取完成；RB_INVALID_ARGUMENT 表示缓冲区无效；RB_BUFFER_TOO_SMALL 表示容量不足；RB_ERROR 表示内部失败。
  */
 RB_API int RB_Log_Read(char* buffer, int bufferSize);
+
+
+// VOCORE USB 仪表屏。画面发送在独立线程中执行，不阻塞 SDK 后端 Loop。
+
+/**
+ * @brief 枚举当前可访问的 VOCORE USB 屏幕数量。
+ * @return 大于或等于 0 表示设备数量；libusb 运行库不可用或枚举失败时返回 RB_ERROR。
+ * @note SDK 目录必须同时存在 VS2019 x64 版 libusb-1.0.dll，设备需安装 VOCORE 官方 LibUSBK 驱动。
+ */
+RB_API int RB_VoCore_GetDeviceCount();
+
+/**
+ * @brief 按当前枚举索引读取 VOCORE 屏幕信息。
+ * @param index 设备索引，范围为 0 到 RB_VoCore_GetDeviceCount()-1。
+ * @param info 调用方结构体；调用前必须将 Size 设为 sizeof(RB_VoCoreDeviceInfo)。
+ * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示参数或索引无效；RB_ERROR 表示设备无法访问。
+ */
+RB_API int RB_VoCore_GetDeviceInfo(int index, RB_VoCoreDeviceInfo* info);
+
+/**
+ * @brief 打开一块 VOCORE 屏幕并启动独立发送线程。
+ * @param deviceId RB_VoCoreDeviceInfo.DeviceId；传 nullptr 或空字符串时打开第一块可用屏幕。
+ * @param autoReconnect 1=拔插或 USB 错误后每 1000ms 自动重连，0=连接丢失后保持断开。
+ * @param handle 接收新句柄的指针；成功后由调用方负责调用 RB_VoCore_Close()。
+ * @return RB_OK 表示线程已启动；RB_INVALID_ARGUMENT 表示 handle 为空；RB_ERROR 表示设备打开失败且未启用自动重连。
+ */
+RB_API int RB_VoCore_Open(const char* deviceId, int autoReconnect, RB_VoCoreHandle* handle);
+
+/**
+ * @brief 停止发送线程、释放 USB 接口并销毁 VOCORE 句柄。
+ * @param handle RB_VoCore_Open() 返回的句柄；nullptr 会被忽略。
+ * @note 调用后句柄立即失效；不得与同一句柄的其他接口并发调用。
+ */
+RB_API void RB_VoCore_Close(RB_VoCoreHandle handle);
+
+/**
+ * @brief 异步提交一帧完整画面，尚未发送的旧帧会被最新帧覆盖。
+ * @param handle 已打开的 VOCORE 句柄。
+ * @param pixels 指向输入像素首字节，函数返回前会完成复制，调用方随后可复用该内存。
+ * @param dataSize pixels 可读总字节数，至少为 stride*height。
+ * @param width 输入画面宽度。旋转 0/180 时等于屏幕宽度，旋转 90/270 时等于屏幕高度。
+ * @param height 输入画面高度。旋转 0/180 时等于屏幕高度，旋转 90/270 时等于屏幕宽度。
+ * @param stride 每行字节数，允许包含行尾填充。
+ * @param pixelFormat RB_VoCorePixelFormat 中的值。
+ * @param rotation 顺时针旋转角度，只允许 0、90、180、270。
+ * @return RB_OK 表示画面已进入最新帧队列；RB_INVALID_ARGUMENT 表示尺寸、格式或句柄无效；RB_LICENSE_REQUIRED 表示授权输出已锁定。
+ */
+RB_API int RB_VoCore_SubmitFrame(RB_VoCoreHandle handle, const void* pixels, int dataSize,
+	int width, int height, int stride, int pixelFormat, int rotation);
+
+/**
+ * @brief 设置 VOCORE 背光亮度。
+ * @param handle 已打开的 VOCORE 句柄。
+ * @param brightness 亮度，范围 0-255；命令由发送线程异步执行。
+ * @return RB_OK 表示设置已排队；RB_INVALID_ARGUMENT 表示句柄或亮度无效。
+ */
+RB_API int RB_VoCore_SetBrightness(RB_VoCoreHandle handle, int brightness);
+
+/**
+ * @brief 运行时启用或关闭设备自动重连。
+ * @param handle 已打开的 VOCORE 句柄。
+ * @param enabled 1=启用，0=关闭。
+ * @return RB_OK 表示设置完成；RB_INVALID_ARGUMENT 表示句柄无效。
+ */
+RB_API int RB_VoCore_SetAutoReconnect(RB_VoCoreHandle handle, int enabled);
+
+/**
+ * @brief 读取 VOCORE 连接状态、实际 FPS 和帧统计。
+ * @param handle 已打开的 VOCORE 句柄。
+ * @param state 调用方结构体；调用前必须将 Size 设为 sizeof(RB_VoCoreState)。
+ * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示句柄、结构体或 Size 无效。
+ */
+RB_API int RB_VoCore_GetState(RB_VoCoreHandle handle, RB_VoCoreState* state);
+
+/** @brief 启动浏览器仪表 HTTP 服务。 */
+RB_API int RB_DashboardWeb_Open(const RB_DashboardWebConfig* config, RB_DashboardWebHandle* handle);
+
+/** @brief 停止浏览器仪表服务并释放所有客户端连接。 */
+RB_API void RB_DashboardWeb_Close(RB_DashboardWebHandle handle);
+
+/** @brief 异步提交一帧 BGRA8888 画面；尚未编码的旧帧会被覆盖。 */
+RB_API int RB_DashboardWeb_SubmitFrame(RB_DashboardWebHandle handle, const void* pixels, int dataSize,
+	int width, int height, int stride, int pixelFormat, int rotation);
+
+/** @brief 读取 Web 服务、客户端和编码统计。 */
+RB_API int RB_DashboardWeb_GetState(RB_DashboardWebHandle handle, RB_DashboardWebState* state);
+
+/**
+ * @brief 使用SDK内置模板生成一帧BGRA8888仪表画面。
+ * @param state RB_State_Read()读取到的当前运行态。
+ * @param pixels 接收画面的调用方缓冲区，容量至少为stride*height字节。
+ * @param width 输出画面宽度；竖屏通常为480，横屏通常为854。
+ * @param height 输出画面高度；竖屏通常为854，横屏通常为480。
+ * @param stride 每行字节数，不能小于width*4。
+ * @param templateIndex RB_DashboardTemplate中的模板值。
+ * @return RB_OK表示生成成功；RB_INVALID_ARGUMENT表示参数、尺寸或模板无效；RB_ERROR表示GDI资源创建失败。
+ * @note 本函数只生成画面，不执行USB发送；生成结果可直接交给RB_VoCore_SubmitFrame()。
+ */
+RB_API int RB_Dashboard_RenderFrame(const RB_RuntimeState* state, void* pixels, int width, int height, int stride, int templateIndex);
+
+/** @brief 重新扫描内置和用户 .rbdash 模板；返回模板数量或负数错误码。 */
+RB_API int RB_Dashboard_RefreshPackages();
+
+/** @brief 返回最近一次扫描得到的客户仪表模板数量。 */
+RB_API int RB_Dashboard_GetPackageCount();
+
+/** @brief 按目录索引读取客户仪表模板信息。 */
+RB_API int RB_Dashboard_GetPackageInfo(int index, RB_DashboardPackageInfo* info);
+
+/** @brief 按稳定模板 ID 打开客户仪表并创建缓存渲染句柄。 */
+RB_API int RB_Dashboard_OpenPackage(const char* packageId, RB_DashboardPackageHandle* handle);
+
+/** @brief 关闭客户仪表句柄并释放图片、字体和绑定缓存。 */
+RB_API void RB_Dashboard_ClosePackage(RB_DashboardPackageHandle handle);
+
+/** @brief 设置客户仪表当前页面。 */
+RB_API int RB_Dashboard_SetPackagePage(RB_DashboardPackageHandle handle, int pageIndex);
+
+/** @brief 使用客户仪表模板生成一帧 BGRA8888 画面。 */
+RB_API int RB_Dashboard_RenderPackageFrame(RB_DashboardPackageHandle handle, const RB_RuntimeState* state,
+	void* pixels, int width, int height, int stride);
+
+/** @brief 读取客户仪表句柄状态和渲染统计。 */
+RB_API int RB_Dashboard_GetPackageState(RB_DashboardPackageHandle handle, RB_DashboardPackageState* state);
+
+/** @brief 将外部 .rbdash 文件导入当前 AppDataName 的用户仪表目录。 */
+RB_API int RB_Dashboard_ImportPackage(const char* sourcePath, char* packageIdBuffer, int packageIdBufferSize);
+
+/** @brief 删除当前 AppDataName 用户目录中的指定模板；内置模板不能删除。 */
+RB_API int RB_Dashboard_DeletePackage(const char* packageId);
+
+/** @brief 返回当前 AppDataName 的用户仪表目录 UTF-8 路径。 */
+RB_API int RB_Dashboard_GetUserPackageDirectory(char* buffer, int bufferSize);
 
 
 

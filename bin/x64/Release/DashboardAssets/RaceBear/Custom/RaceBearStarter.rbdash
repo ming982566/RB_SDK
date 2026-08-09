@@ -1,0 +1,27 @@
+{
+  "formatVersion": 1,
+  "id": "racebear.starter",
+  "name": "RaceBear Starter",
+  "author": "RaceBear",
+  "description": "Editable starter dashboard for RaceBear Dashboard Designer.",
+  "designWidth": 854,
+  "designHeight": 480,
+  "backgroundColor": "#FF101318",
+  "assets": {},
+  "pages": [
+    {
+      "name": "Main",
+      "elements": [
+        { "type": "rect", "x": 22, "y": 20, "width": 810, "height": 440, "color": "#FF171C23", "borderColor": "#FF394452", "lineWidth": 2 },
+        { "type": "text", "x": 42, "y": 38, "width": 300, "height": 42, "text": "RACEBEAR", "fontSize": 27, "bold": true, "align": "left", "color": "#FFF2F5F7" },
+        { "type": "text", "x": 510, "y": 38, "width": 280, "height": 42, "binding": "rb.dashboard.game", "fontSize": 18, "align": "right", "color": "#FF94A3B8" },
+        { "type": "gauge", "x": 48, "y": 104, "width": 230, "height": 230, "binding": "rb.dashboard.speed_kmh", "minimum": 0, "maximum": 300, "format": "integer", "suffix": " km/h", "fontSize": 22, "bold": true, "color": "#FF2FD7A0", "backgroundColor": "#FF11161C", "borderColor": "#FF3B4653", "needleColor": "#FFF2F5F7", "lineWidth": 10, "startAngle": 135, "endAngle": 405, "tickCount": 10 },
+        { "type": "text", "x": 327, "y": 104, "width": 200, "height": 200, "binding": "rb.vehicle.gear", "format": "gear", "fontSize": 142, "bold": true, "color": "#FFFFFFFF" },
+        { "type": "text", "x": 327, "y": 288, "width": 200, "height": 38, "text": "GEAR", "fontSize": 16, "color": "#FF94A3B8" },
+        { "type": "gauge", "x": 576, "y": 104, "width": 230, "height": 230, "binding": "rb.vehicle.engine.rpm", "minimum": 0, "maximum": 9000, "format": "integer", "suffix": " RPM", "fontSize": 20, "bold": true, "color": "#FF2FD7A0", "backgroundColor": "#FF11161C", "borderColor": "#FF3B4653", "needleColor": "#FFF2F5F7", "lineWidth": 10, "startAngle": 135, "endAngle": 405, "tickCount": 9, "zones": [ { "minimum": 7000, "color": "#FFFFC857" }, { "minimum": 8200, "color": "#FFFF5A5F" } ] },
+        { "type": "bar", "x": 70, "y": 384, "width": 714, "height": 24, "binding": "rb.vehicle.engine.rpm", "minimum": 0, "maximum": 9000, "color": "#FF2FD7A0", "backgroundColor": "#FF252C35", "zones": [ { "minimum": 7000, "color": "#FFFFC857" }, { "minimum": 8200, "color": "#FFFF5A5F" } ] },
+        { "type": "text", "x": 70, "y": 416, "width": 714, "height": 26, "binding": "rb.vehicle.engine.rpm", "format": "integer", "suffix": " RPM", "fontSize": 17, "color": "#FF94A3B8" }
+      ]
+    }
+  ]
+}

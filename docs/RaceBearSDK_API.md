@@ -16,10 +16,12 @@
 | `include/RaceBearSDK.h`           | 唯一公开 C/C++ 头文件，包含函数、结构体、枚举和字段说明 |
 | `bin/x64/Release/RaceBearSDK.lib` | Visual C++ 导入库，链接阶段使用                         |
 | `bin/x64/Release/RaceBearSDK.dll` | SDK 运行库，部署时放在宿主 EXE 同目录                   |
+| `bin/x64/Release/libusb-1.0.dll`  | VOCORE USB 屏幕运行库；使用 VOCORE 时放在宿主 EXE 同目录 |
+| `bin/x64/Release/DashboardAssets/RaceBear` | Ford GT 仪表图片和字体资源；保持目录结构部署到 DLL 同级 |
 | `RaceBearSDK_API.md`              | 本接入手册                                              |
 | `RaceBearSDK_FRONTEND_GUIDE.md`   | 完整第三方前端的页面设计与调用流程                      |
 
-目标电脑需要安装 Microsoft Visual C++ 2015-2022 Redistributable x64。`RaceBearSDK.dll` 的其它依赖均为 Windows 系统组件。
+目标电脑需要安装 Microsoft Visual C++ 2015-2022 Redistributable x64。不使用 VOCORE 时，`RaceBearSDK.dll` 不会强制加载 `libusb-1.0.dll`。Ford GT 模板需要 `DashboardAssets/RaceBear`，缺少时其它纯绘制模板仍可使用；除这些可选运行库和资源外，其它依赖均为 Windows 系统组件。
 
 不要混用不同版本 SDK 包中的 `.h`、`.lib` 和 `.dll`。三者必须来自同一次发布。
 
@@ -40,7 +42,7 @@ SDK 目录提供了四套现成示例：
 2. 在“C/C++ -> 常规 -> 附加包含目录”中加入 SDK 的 `include` 目录。
 3. 在“链接器 -> 常规 -> 附加库目录”中加入 SDK 的 `bin/x64/Release` 目录。
 4. 在“链接器 -> 输入 -> 附加依赖项”中加入 `RaceBearSDK.lib`。
-5. 编译后将 `RaceBearSDK.dll` 复制到宿主程序 EXE 所在目录。
+5. 编译后将 `RaceBearSDK.dll` 复制到宿主程序 EXE 所在目录；使用 VOCORE 时同时复制 `libusb-1.0.dll`。
 
 CMake 项目可以使用下面的最小配置：
 
@@ -58,6 +60,9 @@ target_link_libraries(MyMotionApp PRIVATE
 add_custom_command(TARGET MyMotionApp POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "D:/SDK/RaceBearSDK/bin/x64/Release/RaceBearSDK.dll"
+        "$<TARGET_FILE_DIR:MyMotionApp>"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "D:/SDK/RaceBearSDK/bin/x64/Release/libusb-1.0.dll"
         "$<TARGET_FILE_DIR:MyMotionApp>"
 )
 ```
@@ -149,13 +154,19 @@ SDK 0.4.6 将授权限制统一收口到 SDK。未授权或试用到期后，SDK
 
 SDK 0.4.7 从公共遥测目录隐藏历史 SimTools 专用兼容槽位，但保留内部槽位和原始索引，避免旧配置及后续遥测索引错位。目录数组行号不再等同于遥测索引，调用方必须读取每项的 `Index`。
 
+SDK 0.4.8 新增 VOCORE USB 仪表屏后端。设备通信使用随 SDK 发布的 `libusb-1.0.dll` 和 VOCORE 官方 LibUSBK 驱动；画面由前端绘制，SDK 负责像素转换、USB 发送、最新帧覆盖和断线重连。
+
+SDK 0.4.9 将 SimRacebear 使用的仪表模板迁入 SDK，当前提供 AIM MXS、BOSCH DDU8、SimpleDash 和 Ford GT 四套模板，并新增 `RB_Dashboard_RenderFrame()`。同版本还提供浏览器 MJPEG 仪表服务、VOCORE 运行时自动重连开关、CAN 输出健康/人工恢复接口，以及 `RB-A7H` 七轴平台。调用方仍可自行绘制并直接使用 `RB_VoCore_SubmitFrame()`，也可以使用 SDK 模板生成 BGRA8888 画面。
+
+SDK 0.5.0 新增客户自定义仪表包。`.rbdash` V1 是 UTF-8 无 BOM JSON 单文件，图片以 PNG/JPEG Data URI 内嵌；模板只能绑定 SDK 认可的稳定 `rb.*` 数据键，不执行脚本，也不能访问文件系统、网络、进程或控制接口。随附的 `tools/DashboardDesigner/index.html` 可直接在浏览器中制作和导出模板。
+
 宿主程序不需要为 SDK 调用 `CoInitializeEx()` 或 `CoUninitialize()`。SDK 在自己的线程中管理 COM 生命周期。
 
 ## 4. 应用目录名和配置位置
 
 `RB_Runtime_SetAppDataName()` 用于隔离不同产品的数据。例如传入 `MyMotionApp` 后，SDK 会在当前用户目录下使用该名称保存配置和授权。
 
-首次使用全新名称时，SDK 会自动创建平台默认配置、`_Default` 动态配置及后续功能配置文件。第三方产品不应为了取得默认参数而共用 `%APPDATA%\Racebear`，也不要复制 SimRacebear 用户目录作为模板。
+首次使用全新名称时，SDK 会自动创建平台默认配置、`_Default` 动态配置及后续功能配置文件。第三方产品不应为了取得默认参数而共用 `%APPDATA%\SimRacebear`，也不要复制 SimRacebear 用户目录作为模板。
 
 应用目录名要求：
 
@@ -165,7 +176,7 @@ SDK 0.4.7 从公共遥测目录隐藏历史 SimTools 专用兼容槽位，但保
 - 不能包含 `\ / : * ? " < > |` 等 Windows 路径非法字符。
 - 必须在 `RB_Runtime_Initialize()` 之前调用。
 
-未调用时默认使用 `Racebear`。主要配置保存在 `%APPDATA%\<应用目录名>\configV2`，授权数据保存在 `%APPDATA%\<应用目录名>\license`，运行日志和部分用户文件保存在 `Documents\<应用目录名>`。第三方软件应使用稳定且不会随版本变化的产品名。
+未调用时默认使用 `SimRacebear`。主要配置保存在 `%APPDATA%\<应用目录名>\configV2`，授权数据保存在 `%APPDATA%\<应用目录名>\license`，运行日志和部分用户文件保存在 `Documents\<应用目录名>`。第三方软件应使用稳定且不会随版本变化的产品名。
 
 ## 5. 前端只需要理解五个核心入口
 
@@ -215,7 +226,7 @@ if (rc == RB_OK) {
 | `state.Rig`        | 当前平台、轴数量和 6DOF 分层输出                     |
 | `state.Function`   | 风感、安全带、震动等功能摘要                         |
 | `state.Output`     | 输出数量、连接状态和发送间隔                         |
-| `state.Can`        | CAN 状态摘要；完整设备管理当前不作为第三方公共能力   |
+| `state.Can`        | CAN 全局状态摘要；单输出健康与恢复状态使用 `RB_Can_GetOutputHealthState()` |
 | `state.Wind`       | 风感当前输入和各通道输出                             |
 | `state.Seatbelt`   | 安全带张紧输入、左右输出和测试状态                   |
 | `state.LastAction` | 最近一次后端动作说明                                 |
@@ -284,6 +295,7 @@ bool ReadSdkJson(const char* key, std::string& result)
 | `config.platform`      | 当前平台结构配置       | 平台参数页面         |
 | `config.output`        | 全部输出实例配置       | 输出设置页面         |
 | `game.catalog`         | 游戏目录               | 游戏列表和搜索       |
+| `dashboard.catalog`    | 内置仪表模板目录       | USB屏、窗口和网页输出 |
 | `telemetry.catalog`    | 遥测值目录             | 数据源选择框         |
 | `output.catalog`       | 输出实例和可输出 Key   | 输出页面和命令编辑器 |
 | `motionEffect.catalog` | 运动增强效果目录       | 运动增强页面         |
@@ -1120,6 +1132,40 @@ if (saveRc == RB_OK) {
 
 保存和应用不会自动代表“用户要求立即连接”。是否重新连接应由用户操作或该实例的 `AutoConnect` 策略决定。
 
+### 8.1.7 CAN 输出健康与人工恢复
+
+标准 SDK 不公开电机参数维护、固件更新、底层 SDO/PDO 或急停控制细节，但公开了无人值守宿主需要的单输出健康快照和人工恢复入口。`outputIndex` 使用输出实例目录中的索引，刷新或增删输出后必须重新取得。
+
+```cpp
+RB_CanOutputHealthState health{};
+health.Size = sizeof(health);
+if (RB_Can_GetOutputHealthState(outputIndex, &health) == RB_OK) {
+    // RuntimeStatus 和 FaultReason 用于状态机判断。
+    // RequiresHumanIntervention=1 时不要自动无限重试。
+    // StatusText、USB/CAN 计数和延迟字段用于诊断页与日志。
+}
+```
+
+`RB_CanOutputHealthState` 使用 `Size` 做 ABI 版本协商。新代码固定传 `sizeof(RB_CanOutputHealthState)`；SDK 会保留旧结构前缀兼容，但第三方新实现不应写死历史字节数。常用状态：
+
+| 字段 | 说明 |
+| ---- | ---- |
+| `RuntimeStatus` | `RB_CanRuntimeStatus`：启动、就绪、运行、降级、恢复、安全锁定或维护中 |
+| `FaultReason` | `RB_CanFaultReason`：设备离线、身份冲突、USB、Bus-Off、节点、驱动、急停等原因 |
+| `RetryCount` / `RetryBudget` / `NextRetryDelayMs` | 当前恢复轮次、预算和下次重试延迟 |
+| `RequiresHumanIntervention` | `1` 表示必须先排除物理、身份、固件或安全条件 |
+| `LastSuccessfulReadAgeMs` / `LastSuccessfulWriteAgeMs` | 最近成功读写距今时间 |
+| `RealtimeLatencyP50Ms` / `P95Ms` / `P99Ms` | 实时位置链路延迟分位数 |
+| `StatusText` | 适合日志和诊断页的 UTF-8 状态文本 |
+
+只有在用户已确认物理急停释放、设备身份正确、固件维护结束且机械条件安全后，才允许调用：
+
+```cpp
+const int rc = RB_Can_RequestOutputRecovery(outputIndex);
+```
+
+`RB_OK` 表示 SDK 接受本次受控恢复请求，不表示输出已经恢复运行；前端随后继续轮询健康快照。`RB_ERROR` 表示当前输出不存在、不是可恢复状态或安全条件仍不满足。不要在 UI 定时器中持续调用该函数，也不要用它绕过急停和人工检查。
+
 结构体接口的通用规则：
 
 1. 先读现有结构体，再修改需要的字段，最后保存或应用。
@@ -1129,7 +1175,7 @@ if (saveRc == RB_OK) {
 
 ## 8.2 平台目录和平台参数
 
-第三方前端不得写死平台下拉框。平台目录索引是零基索引，只用于调用当前 SDK；`RB_PlatformConfig::Type` 是平台类型编号，当前为 1-11，两者不能混用。
+第三方前端不得写死平台下拉框。平台目录索引是零基索引，只用于调用当前 SDK；`RB_PlatformConfig::Type` 是平台类型编号，当前为 1-12，两者不能混用。
 
 ```cpp
 const int platformCount = RB_Platform_GetCount();
@@ -1154,6 +1200,7 @@ for (int platformIndex = 0; platformIndex < platformCount; ++platformIndex) {
 | 8 | RB-A6T | 9 | 6 | Surge、Heave、Yaw、Roll、Pitch |
 | 9 | RB-A6V | 10 | 6 | Surge、Heave、Yaw、Roll、Pitch |
 | 10 | RB-A6L | 11 | 6 | Sway、Surge、Heave、Yaw、Roll、Pitch |
+| 11 | RB-A7H | 12 | 7 | Sway、Surge、Heave、Yaw、Roll、Pitch |
 
 前端仍应调用 `RB_Platform_IsDofSupported()` 动态决定是否显示 DOF，而不是依赖上表。
 
@@ -1197,6 +1244,7 @@ for (int number = 8; number <= 10; ++number) {
 | RB-A6T | L1 上框宽度；L2 上框长度；L3 Yaw 连接距离；L4 Yaw 外壳固定端 Y；L5 Yaw 杆端 Y；L6 Yaw 杆端 X；L7 Surge 外壳固定端 Y | L8 上层 A1-A4 总行程；L9 Surge 轴 A5 总行程；L10 Yaw 轴 A6 总行程 |
 | RB-A6V | L1 下层杆端宽度；L2 下层外壳固定端宽度；L3 下层旋转中心偏移；L4 上框宽度；L5 上框长度；L6-L7 未使用 | L8 上层 A1-A4 总行程；L9 下层 A5-A6 总行程；L10 未使用 |
 | RB-A6L | L1 上平台相邻点距离；L2 上平台对角点距离；L3 下平台相邻点距离；L4 下平台对角点距离；L5 执行器中间长度；L6 Yaw 中心 Y 偏移，正值向前；L7 旋转中心 Z 高度，正值向上 | L8 A1-A6 总行程；L9-L10 未使用 |
+| RB-A7H | L1 上框宽度；L2 上框长度；L3 A6 到 Yaw 中心距离；L4 A7 到 Yaw 中心距离；L5-L7 未使用 | L8 上层 A1-A4 总行程；L9 Surge 轴 A5 总行程；L10 对置轴 A6/A7 共同总行程 |
 
 ### 8.2.3 保存和应用平台参数
 
@@ -1233,7 +1281,7 @@ if (RB_Output_GetCatalog(&catalog) == RB_OK) {
 
 | Key | 来源 | 含义 |
 | --- | ---- | ---- |
-| `A1`-`A6` | 当前平台 | 当前平台实际存在的执行器位输出；轴数不足时高编号不会出现 |
+| `A1`-`A7` | 当前平台 | 当前平台实际存在的执行器位输出；轴数不足时高编号不会出现 |
 | `Wind1`-`Wind4` | 风感模拟 | 四路风感位输出 |
 | `SeatbeltLeft`、`SeatbeltRight` | 安全带模拟 | 左右安全带张紧器位输出 |
 | `Haptic1`-`Haptic7` | 震动模拟 | 七路震动效果位输出 |
@@ -1493,6 +1541,142 @@ const int rc = RB_Command_Run(
 
 前端应优先判断 `state.License.OutputAllowed`，并对 `RB_LICENSE_REQUIRED` 提示用户激活或等待授权恢复。不要把锁定状态下的 0 当作真实车辆或平台数据。
 
+### 10.1 仪表渲染与 VOCORE USB 屏幕
+
+仪表渲染和 VOCORE 设备发送是两个独立能力。前端通过 `RB_State_Read()` 取得运行态，调用 `RB_Dashboard_RenderFrame()` 生成 BGRA8888 画面；生成的画面既可以交给 `RB_VoCore_SubmitFrame()`，也可以作为窗口纹理、视频编码输入、网络屏帧或网页 Canvas 数据源。前端不需要实现仪表绘制算法。
+
+运行依赖：
+
+- `RaceBearSDK.dll` 同目录必须有 SDK 随附的 VS2019 x64 `libusb-1.0.dll`。
+- VOCORE 设备应安装官方 LibUSBK 驱动，硬件 VID/PID 为 `C872:1004`。
+- 每块屏幕使用一个独立 `RB_VoCoreHandle`；多屏时分别打开、提交和关闭。
+
+枚举和打开：
+
+```cpp
+RB_VoCoreHandle screen = nullptr;
+const int count = RB_VoCore_GetDeviceCount();
+if (count > 0) {
+    RB_VoCoreDeviceInfo info{};
+    info.Size = sizeof(info);
+    if (RB_VoCore_GetDeviceInfo(0, &info) == RB_OK) {
+        // 自动重连开启后，拔出设备不会销毁句柄；SDK 每 1000ms 尝试恢复。
+        RB_VoCore_Open(info.DeviceId, 1, &screen);
+    }
+}
+```
+
+如果程序启动时屏幕可能尚未插入，也可以调用 `RB_VoCore_Open(nullptr, 1, &screen)`。自动重连为 1 时，即使当前没有设备，也会创建等待连接的句柄；前端通过 `RB_VoCore_GetState()` 显示“等待设备”。
+
+生成并提交SDK内置仪表画面：
+
+```cpp
+RB_RuntimeState runtime{};
+RB_State_Read(&runtime);
+
+std::vector<unsigned char> pixels(static_cast<size_t>(stride) * height);
+const int renderRc = RB_Dashboard_RenderFrame(
+    &runtime, pixels.data(), width, height, stride,
+    RB_DASHBOARD_TEMPLATE_GT);
+
+const int rc = renderRc == RB_OK ? RB_VoCore_SubmitFrame(
+    screen,
+    pixels.data(),
+    stride * height,
+    width,
+    height,
+    stride,
+    RB_VOCORE_PIXEL_BGRA8888,
+    0) : renderRc; // 顺时针旋转角度：0、90、180 或 270
+
+if (rc == RB_LICENSE_REQUIRED) {
+    // 未授权或试用到期：仪表输出与其它硬件输出一样被锁定。
+}
+```
+
+旋转 `0/180` 时输入画面为 `设备Width × 设备Height`；旋转 `90/270` 时输入画面为 `设备Height × 设备Width`。支持的输入格式包括 RGB565 小端、RGB888、BGRA8888 和 RGBA8888。SDK 发送线程统一转换为 RGB565，以降低 USB 带宽占用。
+
+内置模板：
+
+- `RB_DASHBOARD_TEMPLATE_GT`：AIM MXS 风格布局。
+- `RB_DASHBOARD_TEMPLATE_VIRTUAL_RING`：BOSCH DDU8 风格布局。
+- `RB_DASHBOARD_TEMPLATE_M_STRIP`：SimpleDash 风格布局。
+- `RB_DASHBOARD_TEMPLATE_FORD_GT`：Ford GT 风格布局。
+
+内部场景以 `854×480` 为设计基准，`RB_Dashboard_RenderFrame()` 会按调用方给出的任意画布尺寸等比缩放并保留完整内容。渲染模块不依赖 VOCORE；方向只在具体输出适配器中处理，例如 VOCORE 使用 `RB_VoCore_SubmitFrame()` 的 `rotation` 参数。
+
+仪表运行资源位于 DLL 同级的 `DashboardAssets/RaceBear`。当前仅 Ford GT 模板需要外部图片和字体资源，其余模板由渲染器直接绘制。
+
+客户仪表使用另一组句柄 API，并与旧的 `RB_Dashboard_RenderFrame()` 并存。启动或用户刷新时调用 `RB_Dashboard_RefreshPackages()`，再用 `RB_Dashboard_GetPackageCount()` 和 `RB_Dashboard_GetPackageInfo()` 枚举有效模板。配置必须保存 `PackageId`，不能保存目录索引。
+
+```cpp
+RB_Dashboard_RefreshPackages();
+RB_DashboardPackageHandle package = nullptr;
+if (RB_Dashboard_OpenPackage("racebear.starter", &package) == RB_OK) {
+    RB_Dashboard_RenderPackageFrame(package, &state, pixels.data(), width, height, stride);
+    RB_Dashboard_ClosePackage(package);
+}
+```
+
+内置客户模板目录为 DLL 同级 `DashboardAssets/RaceBear/Custom`。用户模板目录通过 `RB_Dashboard_GetUserPackageDirectory()` 查询，通常位于 `Documents/<AppDataName>/Dashboards`。使用 `RB_Dashboard_ImportPackage()` 导入时 SDK 会重新解析并校验；`RB_Dashboard_DeletePackage()` 只允许删除用户目录中已扫描到的模板。
+
+V1 支持 `text`、`rect`、`ellipse`、`line`、`bar`、`image` 和 SDK 原生动态 `gauge`。`gauge` 根据绑定数值绘制圆弧、刻度、颜色区间和旋转指针，可用于车速、转速、油量、水温、涡轮压力和方向角度。每个模板最多 16 页、每页 512 个元素、单文件 16 MiB。图片只接受 PNG/JPEG Data URI，模板不支持 JavaScript、Lua、DLL 插件或任意表达式。完整格式见 SDK 开发文档 `src/Core/docs/11-custom-dashboard.md`。
+
+网页或网络屏继续使用 `RB_Dashboard_RenderFrame()` 生成的同一张 BGRA 帧。`RB_DashboardWeb_Open()` 会启动轻量 HTTP 服务，浏览器打开状态中的 `Url` 即可观看 MJPEG 仪表；`RB_DashboardWeb_SubmitFrame()` 在独立线程编码 JPEG，尚未编码的旧帧由新帧覆盖，不会因为慢客户端形成延迟队列。
+
+```cpp
+RB_DashboardWebConfig webConfig{};
+webConfig.Size = sizeof(webConfig);
+webConfig.Version = 1;
+webConfig.Port = 24738;
+webConfig.AllowRemote = 1; // 允许同一局域网的手机、平板和电脑访问
+webConfig.JpegQuality = 85;
+webConfig.MaxFps = 30;
+
+RB_DashboardWebHandle web = nullptr;
+if (RB_DashboardWeb_Open(&webConfig, &web) == RB_OK) {
+    RB_DashboardWeb_SubmitFrame(web, pixels.data(), static_cast<int>(pixels.size()),
+        width, height, stride, RB_VOCORE_PIXEL_BGRA8888, rotation);
+
+    RB_DashboardWebState webState{};
+    webState.Size = sizeof(webState);
+    if (RB_DashboardWeb_GetState(web, &webState) == RB_OK) {
+        // webState.Url、ClientCount、ActualFps 和 DroppedFrames 可用于状态页。
+    }
+}
+```
+
+默认页面只展示仪表画面，不提供远程控制。`AllowRemote=1` 会监听所有本地网络接口，首次使用时 Windows 防火墙可能要求允许专用网络访问；不需要局域网访问时应设为 0。
+
+输出端可以通过 `RB_Data_ReadJson("dashboard.catalog", ...)` 读取模板目录。返回包包含 `designWidth`、`designHeight`、`pixelFormat`，以及每个模板稳定的 `index` 和显示名称，调用方不应自己写死模板数量。
+
+刷新策略：
+
+- 仪表渲染使用独立的 16ms 或 33ms 定时器，不要使用 `RB_Runtime_StartLoop()` 的 1-2ms 后端计算周期驱动画面。
+- 第一版建议默认 30 FPS，实机确认稳定后再提供 60 FPS 选项。
+- `RB_VoCore_SubmitFrame()` 和 `RB_DashboardWeb_SubmitFrame()` 都只保留最新帧，不会形成延迟队列。
+- 不要等待 `PendingFrame` 变成 0 才画下一帧，按目标 FPS 正常提交即可。
+
+状态和退出：
+
+```cpp
+RB_VoCoreState state{};
+state.Size = sizeof(state);
+if (RB_VoCore_GetState(screen, &state) == RB_OK) {
+    // state.Open、Reconnecting、ActualFps、DroppedFrames 可直接用于设备状态页。
+}
+
+RB_VoCore_SetBrightness(screen, 220); // 0-255
+RB_VoCore_SetAutoReconnect(screen, 0); // 运行时可切换；0=关闭，1=启用
+RB_VoCore_Close(screen);
+screen = nullptr;
+
+RB_DashboardWeb_Close(web);
+web = nullptr;
+```
+
+应在 `RB_Runtime_Shutdown()` 前关闭 VOCORE 和 Web 句柄。即使前端遗漏，`RB_Runtime_Shutdown()` 也会停止全部仪表输出线程。触摸输入和可视化仪表编辑器不属于当前后端范围。
+
 ## 11. 串口接入
 
 串口能力独立于运动运行态，可以用于前端串口列表、设备配置和自定义硬件通信。
@@ -1618,7 +1802,7 @@ void DrainSdkLogs()
 | 安全带 | `RB_Seatbelt_ReadConfig()`、`state.Seatbelt` | 编辑、测试、保存和应用 |
 | 震动 | `RB_Haptic_ReadProfile()`、运行摘要 | 编辑效果、输出通道、保存和应用 |
 | 输出 | `RB_Output_GetCatalog()`、`RB_OutputConfig` | 增删实例、编辑参数、Key 模板、连接和断开 |
-| 设备/CAN | `state.Can` 状态摘要 | 可选只读显示；完整设备管理当前不要求第三方实现 |
+| 设备/CAN | `state.Can`、`RB_Can_GetOutputHealthState()` | 显示全局摘要和单输出健康；人工恢复必须由用户明确触发 |
 | 日志 | `RB_Log_Read()` | 显示、持久化和清理日志 |
 | 自定义游戏 | 自定义游戏状态 | 注册 MMF/UDP 游戏、提交协议和注销 |
 | 功能插件 | `RB_Plugin_GetCatalog()` | 刷新目录、启动后台运行态和可启动插件前端 |
@@ -1728,6 +1912,15 @@ void DrainSdkLogs()
 | `RB_Output_GetInstanceKey()` | 只需要实例稳定 Key 时使用。 |
 | `RB_Output_ConnectAll()` / `RB_Output_DisconnectAll()` | 用户明确要求操作所有实例；正常退出优先使用安全请求接口。 |
 | `RB_Output_IsInstanceRuntimeActive()` / `RB_Output_IsAnyRuntimeActive()` | 区分“连接已建立”和“周期输出运行态已启动”。 |
+| `RB_VoCore_GetDeviceCount()` / `RB_VoCore_GetDeviceInfo()` | 模拟设备页面刷新 VOCORE 屏幕目录。 |
+| `RB_VoCore_Open()` / `RB_VoCore_Close()` | 创建或销毁每块屏幕的独立发送线程。 |
+| `RB_VoCore_SubmitFrame()` | 把前端完成绘制的最新仪表位图交给 USB 后端。 |
+| `RB_VoCore_SetAutoReconnect()` | 运行时启用或关闭指定屏幕句柄的自动重连。 |
+| `RB_VoCore_GetState()` | 显示连接、重连、实际 FPS 和丢帧统计。 |
+| `RB_DashboardWeb_Open()` / `RB_DashboardWeb_Close()` | 创建或销毁浏览器 MJPEG 仪表服务。 |
+| `RB_DashboardWeb_SubmitFrame()` / `RB_DashboardWeb_GetState()` | 提交最新仪表帧并读取 URL、客户端和编码统计。 |
+| `RB_Can_GetOutputHealthState()` | 读取指定输出的 CAN 状态机、故障、恢复和链路诊断。 |
+| `RB_Can_RequestOutputRecovery()` | 人工排障完成后请求一次受控恢复；不得周期自动调用。 |
 
 ### 17.4 串口高级接口
 
@@ -1758,6 +1951,7 @@ void DrainSdkLogs()
 
 - `include/RaceBearSDK.h`
 - 当前构建配置对应的 `bin/x64/Debug` 或 `bin/x64/Release` DLL/LIB
+- 使用 VOCORE 时同步替换同目录的 `libusb-1.0.dll`
 - `RaceBearSDK_API.md` 和 `RaceBearSDK_FRONTEND_GUIDE.md`
 
 不要只替换 DLL 而保留旧头文件或导入库。升级后至少完成以下验证：

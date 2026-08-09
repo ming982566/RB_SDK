@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RaceBear Dashboard Designer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="brand"><strong>RaceBear Dashboard Designer</strong><span id="documentName">My Dashboard</span></div>
+    <div class="commands">
+      <label class="button">打开<input id="openFile" type="file" accept=".rbdash,application/json"></label>
+      <button id="newFile">新建</button>
+      <button id="exportFile" class="primary">导出 .rbdash</button>
+    </div>
+  </header>
+  <div class="export-hint"><strong>导出目录</strong><code>%USERPROFILE%\Documents\SimRacebear\Dashboards</code><span>放入后回到仪表页面点击“刷新”。</span></div>
+  <main>
+    <aside class="left-sidebar">
+      <div class="sidebar-tabs">
+        <button data-left-panel="library" class="active">组件库</button>
+        <button data-left-panel="layers">图层 <span id="layerCountBadge">0</span></button>
+      </div>
+      <section id="libraryPanel" class="sidebar-panel">
+        <div class="library-filter">
+          <input id="componentSearch" type="search" placeholder="搜索组件">
+          <select id="componentCategory">
+            <option value="all">全部分类</option>
+            <option value="basic">基础元素</option>
+            <option value="readout">数字与信息</option>
+            <option value="gauge">指针仪表</option>
+            <option value="status">状态与告警</option>
+            <option value="bundle">成套布局</option>
+          </select>
+        </div>
+        <div id="componentLibrary" class="component-library">
+          <div id="toolButtons"></div>
+          <div id="presetButtons"></div>
+        </div>
+      </section>
+      <section id="layersPanel" class="sidebar-panel" hidden>
+        <div class="layer-toolbar">
+          <span id="selectionSummary">未选择</span>
+          <div class="iconbar">
+            <button id="selectAllLayers" title="全选">全部</button>
+            <button id="duplicateLayer" title="复制选中元素">⧉</button>
+            <button id="layerUp" title="上移一层">↑</button>
+            <button id="layerDown" title="下移一层">↓</button>
+          </div>
+        </div>
+        <div id="layers"></div>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <div class="pagebar">
+        <div id="pages"></div>
+        <button id="addPage" title="添加页面">＋</button>
+        <button id="deletePage" title="删除页面">−</button>
+      </div>
+      <div class="arrangebar">
+        <div class="selection-state"><strong id="selectionCount">未选择</strong><span id="hiddenSelectionHint"></span></div>
+        <div class="arrange-tools">
+          <button data-arrange="left" title="左对齐">左</button>
+          <button data-arrange="hcenter" title="水平居中">中</button>
+          <button data-arrange="right" title="右对齐">右</button>
+          <span class="divider"></span>
+          <button data-arrange="top" title="顶对齐">顶</button>
+          <button data-arrange="vcenter" title="垂直居中">中</button>
+          <button data-arrange="bottom" title="底对齐">底</button>
+          <span class="divider"></span>
+          <button data-arrange="distributeH" title="水平等距分布">横向分布</button>
+          <button data-arrange="distributeV" title="垂直等距分布">纵向分布</button>
+          <button data-arrange="sameWidth" title="统一宽度">等宽</button>
+          <button data-arrange="sameHeight" title="统一高度">等高</button>
+        </div>
+        <label class="zoom-control">缩放 <input id="zoom" type="range" min="30" max="120" value="80"><span id="zoomValue">80%</span></label>
+      </div>
+      <div class="stage"><canvas id="canvas" width="854" height="480"></canvas></div>
+      <div class="simulator">
+        <strong>模拟数据</strong>
+        <label>速度 <input data-sim="rb.dashboard.speed_kmh" type="range" min="0" max="350" value="186"></label>
+        <label>转速 <input data-sim="rb.vehicle.engine.rpm" type="range" min="0" max="10000" value="7340"></label>
+        <label>挡位 <input data-sim="rb.vehicle.gear" type="range" min="-1" max="8" value="4"></label>
+        <label>油门 <input data-sim="rb.vehicle.throttle" type="range" min="0" max="1" step="0.01" value="0.82"></label>
+        <label>刹车 <input data-sim="rb.vehicle.brake" type="range" min="0" max="1" step="0.01" value="0.18"></label>
+        <label><input id="showHiddenElements" type="checkbox" checked> 显示条件隐藏元素</label>
+      </div>
+    </section>
+
+    <aside class="properties">
+      <div class="propertytabs"><button data-panel="element" class="active">选择</button><button data-panel="document">仪表</button></div>
+      <div id="elementPanel"><div id="elementProperties"><p>选择一个或多个元素进行编辑。</p></div></div>
+      <div id="documentPanel" hidden><div id="documentProperties"></div></div>
+    </aside>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

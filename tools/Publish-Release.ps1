@@ -3,7 +3,7 @@ param(
     [ValidatePattern('^\d+\.\d+\.\d+$')]
     [string]$Version,
 
-    [string]$SdkSourceRoot = 'D:\AI_Workspace\RaceBear_SDK',
+    [string]$SdkSourceRoot = '',
     [string]$Repository = 'ming982566/RB_SDK',
     [switch]$SkipBuild
 )
@@ -12,6 +12,9 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $publishRoot = Split-Path -Parent $PSScriptRoot
+if ([string]::IsNullOrWhiteSpace($SdkSourceRoot)) {
+    $SdkSourceRoot = Join-Path (Split-Path -Parent $publishRoot) 'RaceBear_SDK'
+}
 $msbuild = 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\amd64\MSBuild.exe'
 $project = Join-Path $SdkSourceRoot 'RaceBearSDK.vcxproj'
 $tag = "v$Version"
@@ -41,7 +44,10 @@ function Copy-SdkPackage {
         (Join-Path $publishRoot 'bin\x64\Debug'),
         (Join-Path $publishRoot 'bin\x64\Release'),
         (Join-Path $publishRoot 'include'),
-        (Join-Path $publishRoot 'examples')
+        (Join-Path $publishRoot 'docs'),
+        (Join-Path $publishRoot 'examples'),
+        (Join-Path $publishRoot 'tools\DashboardDesigner'),
+        (Join-Path $publishRoot 'tools\skills')
     )
     foreach ($directory in $directories) {
         New-Item -ItemType Directory -Path $directory -Force | Out-Null
@@ -49,11 +55,25 @@ function Copy-SdkPackage {
 
     Copy-Item (Join-Path $debugSource 'RaceBearSDK.dll') (Join-Path $publishRoot 'bin\x64\Debug') -Force
     Copy-Item (Join-Path $debugSource 'RaceBearSDK.lib') (Join-Path $publishRoot 'bin\x64\Debug') -Force
+    Copy-Item (Join-Path $debugSource 'libusb-1.0.dll') (Join-Path $publishRoot 'bin\x64\Debug') -Force
     Copy-Item (Join-Path $releaseSource 'RaceBearSDK.dll') (Join-Path $publishRoot 'bin\x64\Release') -Force
     Copy-Item (Join-Path $releaseSource 'RaceBearSDK.lib') (Join-Path $publishRoot 'bin\x64\Release') -Force
+    Copy-Item (Join-Path $releaseSource 'libusb-1.0.dll') (Join-Path $publishRoot 'bin\x64\Release') -Force
+
+    foreach ($configuration in @('Debug', 'Release')) {
+        $assetSource = Join-Path $SdkSourceRoot "bin\x64\$configuration\DashboardAssets\RaceBear"
+        $assetTarget = Join-Path $publishRoot "bin\x64\$configuration\DashboardAssets\RaceBear"
+        if (Test-Path -LiteralPath $assetTarget) {
+            Remove-Item -LiteralPath $assetTarget -Recurse -Force
+        }
+        New-Item -ItemType Directory -Path (Split-Path -Parent $assetTarget) -Force | Out-Null
+        Copy-Item -LiteralPath $assetSource -Destination $assetTarget -Recurse -Force
+    }
+
     Copy-Item (Join-Path $SdkSourceRoot 'include\RaceBearSDK.h') (Join-Path $publishRoot 'include\RaceBearSDK.h') -Force
-    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_API.md') (Join-Path $publishRoot 'RaceBearSDK_API.md') -Force
-    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_FRONTEND_GUIDE.md') (Join-Path $publishRoot 'RaceBearSDK_FRONTEND_GUIDE.md') -Force
+    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_API.md') (Join-Path $publishRoot 'docs\RaceBearSDK_API.md') -Force
+    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_FRONTEND_GUIDE.md') (Join-Path $publishRoot 'docs\RaceBearSDK_FRONTEND_GUIDE.md') -Force
+    Copy-Item (Join-Path $SdkSourceRoot 'examples\README.md') (Join-Path $publishRoot 'examples\README.md') -Force
     # SDK language examples are flat source directories. Copy only files so local
     # CMake builds and Python caches can never enter the distribution package.
     foreach ($exampleName in @('cpp', 'python', 'qt')) {
@@ -65,6 +85,31 @@ function Copy-SdkPackage {
         New-Item -ItemType Directory -Path $exampleTarget -Force | Out-Null
         Get-ChildItem -LiteralPath $exampleSource -File | Copy-Item -Destination $exampleTarget -Force
     }
+
+    foreach ($generatedExamplePath in @(
+        (Join-Path $publishRoot 'examples\RaceBearMotionStudio\bin-app'),
+        (Join-Path $publishRoot 'examples\RaceBearMotionStudio\obj-app'),
+        (Join-Path $publishRoot 'examples\RaceBearMotionStudio\tests')
+    )) {
+        if (Test-Path -LiteralPath $generatedExamplePath) {
+            Remove-Item -LiteralPath $generatedExamplePath -Recurse -Force
+        }
+    }
+
+    $designerTarget = Join-Path $publishRoot 'tools\DashboardDesigner'
+    if (Test-Path -LiteralPath $designerTarget) {
+        Remove-Item -LiteralPath $designerTarget -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $designerTarget -Force | Out-Null
+    Get-ChildItem -LiteralPath (Join-Path $SdkSourceRoot 'tools\DashboardDesigner') -File |
+        Copy-Item -Destination $designerTarget -Force
+
+    $skillTarget = Join-Path $publishRoot 'tools\skills\racebear-frontend-panel'
+    if (Test-Path -LiteralPath $skillTarget) {
+        Remove-Item -LiteralPath $skillTarget -Recurse -Force
+    }
+    Copy-Item -LiteralPath (Join-Path $SdkSourceRoot 'tools\skills\racebear-frontend-panel') `
+        -Destination $skillTarget -Recurse -Force
 }
 
 function Assert-NoPrivateSdkSource {
@@ -124,9 +169,9 @@ try {
     $packageItems = @(
         (Join-Path $publishRoot 'bin'),
         (Join-Path $publishRoot 'include'),
+        (Join-Path $publishRoot 'docs'),
         (Join-Path $publishRoot 'examples'),
-        (Join-Path $publishRoot 'RaceBearSDK_API.md'),
-        (Join-Path $publishRoot 'RaceBearSDK_FRONTEND_GUIDE.md'),
+        (Join-Path $publishRoot 'tools'),
         (Join-Path $publishRoot 'README.md'),
         (Join-Path $publishRoot 'LICENSE')
     )

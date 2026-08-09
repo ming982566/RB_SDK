@@ -1,12 +1,11 @@
 # RaceBear Motion Studio
 
-Native Windows x64 motion-simulation frontend for RaceBear SDK 0.4.7. It uses Win32/Common Controls, C++17 and the SDK-owned 2 ms runtime loop. No real output is connected automatically.
+Native Windows x64 motion-simulation frontend for RaceBear SDK 0.5.0. It uses Win32/Common Controls, C++17 and the SDK-owned 2 ms runtime loop. No real output is connected automatically.
 
 ## Build with Visual Studio 2019
 
 Open `RaceBearMotionStudio.sln`, select `x64` and build the required Debug or
-Release configuration. The solution contains only the sample application;
-test source files remain under `tests` and do not clutter the main solution.
+Release configuration. The solution contains only the sample application.
 
 Run:
 
@@ -28,4 +27,4 @@ sample directory. Application data is isolated under the SDK app-data name
 - Connected output instances must be disconnected before connection settings can be saved or applied.
 - Closing the app stops UI timers/callbacks, requests safe output disconnect, then shuts down the SDK.
 
-See [RaceBearSDK_FRONTEND_GUIDE.md](../../RaceBearSDK_FRONTEND_GUIDE.md) for the complete frontend workflow and [RaceBearSDK_API.md](../../RaceBearSDK_API.md) for API and parameter details.
+See [RaceBearSDK_FRONTEND_GUIDE.md](../../docs/RaceBearSDK_FRONTEND_GUIDE.md) for the complete frontend workflow and [RaceBearSDK_API.md](../../docs/RaceBearSDK_API.md) for API and parameter details.

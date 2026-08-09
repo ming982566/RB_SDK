@@ -8,6 +8,24 @@
 `include/RaceBearSDK.h` 为准；完整参数表和协议说明见
 `RaceBearSDK_API.md`。本文重点说明如何把这些接口正确组合成可用软件。
 
+### AI 辅助开发入口
+
+SDK 源稿中的 `tools/skills/racebear-frontend-panel` 是面向 Codex 等 AI 编码代理的
+前端接入 Skill。它把本文的页面流程与公开头、API 手册、仪表专题和工作区规则
+组合成可执行的开发顺序，并提供实现前检查、稳定键与索引约束、句柄关闭顺序和
+验收清单。
+
+安装时将整个目录复制到
+`%USERPROFILE%\.codex\skills\racebear-frontend-panel`，随后可使用：
+
+```text
+Use $racebear-frontend-panel to build a RaceBear SDK frontend panel for this application.
+```
+
+Skill 不替代本文，也不固定前端框架。AI 仍必须以当前
+`include/RaceBearSDK.h` 的签名和结构体布局为准，只读取本次功能相关章节，并沿用
+目标工程已经存在的 UI、状态管理和本地调用方式。
+
 ## 1. 前端与 SDK 的职责边界
 
 SDK 负责：
@@ -466,9 +484,25 @@ RB_Wind_SaveConfig(&wind);
 6. 调用 Apply 更新运行态。
 7. 只有用户要求连接或 AutoConnect 策略允许时才重新连接。
 
-输出 Key 必须从最新目录读取。`A1-A6` 是实际轴位输出，`Wind1-Wind4`、
+输出 Key 必须从最新目录读取。当前平台可返回 `A1-A7` 轴位输出，实际数量以
+`RB_Output_GetCatalog()` 为准；`Wind1-Wind4`、
 `SeatbeltLeft/Right`、`Haptic1-Haptic7` 是功能输出，六个大写 DOF Key 是
 平台处理后的六自由度值。Key 区分大小写。
+
+CAN 输出页面除 `state.Can` 全局摘要外，还应按输出实例读取健康快照：
+
+```cpp
+RB_CanOutputHealthState health{};
+health.Size = sizeof(health);
+if (RB_Can_GetOutputHealthState(outputIndex, &health) == RB_OK) {
+    // 显示 RuntimeStatus、FaultReason、RequiresHumanIntervention 和 StatusText。
+}
+```
+
+“恢复”按钮只能由用户在排除急停、断线、身份冲突、固件维护和机械故障后点击，
+调用 `RB_Can_RequestOutputRecovery(outputIndex)`。返回 `RB_OK` 仅表示恢复请求已
+接受，页面继续轮询健康快照直到进入就绪/运行或再次报告故障。不得用 UI 定时器
+重复触发恢复。
 
 ## 14. 自定义游戏和外部数据源
 
@@ -491,7 +525,47 @@ RB_Wind_SaveConfig(&wind);
 线协议使用 `RB_Telemetry_FindFieldIdByKey()` 返回的 FieldId，不能使用运行时索引。
 完整 MMF/UDP 包结构见 `RaceBearSDK_API.md`。
 
-## 15. 串口页面
+## 15. 仪表和屏幕页面
+
+仪表渲染、VOCORE USB 屏幕和浏览器 Web 服务是三层独立能力：
+
+- `RB_Dashboard_RenderFrame()` 使用 SDK 模板生成 BGRA8888 画面。
+- `RB_Dashboard_RenderPackageFrame()` 使用客户 `.rbdash` 模板生成相同像素格式的画面。
+- `RB_VoCore_SubmitFrame()` 把画面交给指定 USB 屏幕句柄。
+- `RB_DashboardWeb_SubmitFrame()` 把同一画面交给 MJPEG 服务。
+
+使用 Ford GT 模板时，发布包必须把 `DashboardAssets/RaceBear` 保持原目录结构部署到
+`RaceBearSDK.dll` 同级目录；其它模板不依赖该外部资源目录。
+
+模板下拉框可以先放四个 `RB_DashboardTemplate` 内置项，再追加
+`RB_DashboardPackageInfo::Valid == 1` 的客户模板。持久化时内置项保存
+`TemplateIndex`，客户模板保存稳定 `PackageId`；目录刷新后重新按 ID 定位，禁止保存
+目录索引。客户模板句柄在选择变化或退出时关闭，VOCORE 和 Web 可以复用同一句柄
+分别渲染目标尺寸。
+
+每块 VOCORE 屏幕独立枚举、打开、提交、读取状态和关闭。运行时可以用
+`RB_VoCore_SetAutoReconnect(handle, enabled)` 切换自动重连；拔出设备后不要销毁
+仍需等待重连的句柄。状态页读取 `RB_VoCore_GetState()` 的连接、重连、实际 FPS、
+提交/发送/丢帧和错误字段。
+
+Web 服务必须保存 `RB_DashboardWebHandle`，定时读取状态并在退出前关闭：
+
+```cpp
+RB_DashboardWebState state{};
+state.Size = sizeof(state);
+if (RB_DashboardWeb_GetState(web, &state) == RB_OK) {
+    // 显示 state.Url、ClientCount、ActualFps、DroppedFrames 和 LastErrorText。
+}
+
+RB_DashboardWeb_Close(web);
+web = nullptr;
+```
+
+仪表刷新使用独立 16-33 ms 定时器。VOCORE 和 Web 提交都采用最新帧覆盖，不要
+等待 `PendingFrame` 清零后才生成下一帧。所有屏幕和 Web 句柄应在
+`RB_Runtime_Shutdown()` 前关闭。
+
+## 16. 串口页面
 
 基本流程：枚举、创建、初始化、注册回调、打开、读写、断开回调、关闭、销毁。
 
@@ -540,7 +614,7 @@ RB_Serial_Destroy(handle);
 串口回调可能在 SDK 工作线程触发。回调中只复制数据或设置线程安全标志，不得直接
 操作 UI 控件。窗口销毁前必须先断开回调，再销毁句柄。
 
-## 16. 插件、日志和诊断
+## 17. 插件、日志和诊断
 
 插件目录需要先刷新：
 
@@ -565,7 +639,7 @@ while (RB_Log_Read(line, sizeof(line)) == RB_OK && line[0] != '\0') {
 
 SDK 资源监视器可通过 `RB_Debug_OpenMonitor()` 打开，只用于诊断，不替代宿主前端。
 
-## 17. 命令和 JSON 的使用边界
+## 18. 命令和 JSON 的使用边界
 
 动作使用 `RB_Command_Run()`；结构化配置优先使用类型化结构体接口。无参数命令
 仍传入 `{}`。命令结果必须同时检查返回码和 JSON 内容。
@@ -573,7 +647,7 @@ SDK 资源监视器可通过 `RB_Debug_OpenMonitor()` 打开，只用于诊断�
 `RB_Data_ReadJson/WriteJson` 适用于脚本、迁移工具和高级编辑器。普通配置页面
 不应要求最终用户编辑 JSON，也不能写入局部 JSON 片段覆盖完整配置。
 
-## 18. 最低页面验收清单
+## 19. 最低页面验收清单
 
 一个可发布前端至少满足：
 
@@ -583,6 +657,8 @@ SDK 资源监视器可通过 `RB_Debug_OpenMonitor()` 打开，只用于诊断�
 - 平台目录、参数、选择、保存、应用和受限手动测试可用。
 - 动态滤波按自由度候选目录增删通道，并保存每通道参数。
 - 运动增强使用自己的配置目录，并支持每效果多路由参数。
+- CAN 输出显示机器可读健康状态，人工恢复需要明确按钮和安全提示。
+- 仪表模板可渲染到 VOCORE 或 Web，句柄状态、自动重连和退出关闭完整。
 - 震动按当前动态配置名称读写独立结构体。
 - 风感、安全带支持读取、应用、保存、测试和离页归零。
 - 输出支持实例增删、完整参数、Key 模板、连接和断开。
