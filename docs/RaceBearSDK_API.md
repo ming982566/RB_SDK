@@ -191,6 +191,7 @@ SDK 0.5.0 新增客户自定义仪表包。`.rbdash` V1 是 UTF-8 无 BOM JSON �
 | `RB_Log_Read()`       | 从运行日志队列弹出一条日志    | 日志定时器中循环读取           |
 
 所有 `char*`、`const char*` 和固定 `char[]` 都使用 UTF-8。所有布尔状态使用 `int`：`0` 表示假，非 `0` 表示真。
+高频状态定时器只能读取运行态或 SDK 已加载的内存目录，不应重复调用完整配置读取接口。
 
 通用返回值：
 
@@ -981,6 +982,11 @@ RB_Seatbelt_SetTestOutput(0, 0.0, 0.0);
 ### 8.1.6 输出参数
 
 每个输出实例对应一个 `RB_OutputConfig`。`instanceIndex` 是当前输出实例列表的零基索引，范围由 `RB_Output_GetInstanceCount()` 决定。先读取再修改，能够保留当前输出类型不认识或当前页面未显示的字段。
+
+SDK 初始化时加载一次输出实例目录。`RB_Output_GetInstanceCount()`、`RB_Output_GetInstanceKey()`
+和 `RB_Output_GetCatalog()` 查询内存目录，不会在每次调用时重新读取 `OutPutV2.json`。
+添加或删除实例后目录立即更新；`RB_Data_WriteJson("config.output", ...)` 完整替换输出配置后会
+显式重载目录。直接在 SDK 外部编辑文件不会触发隐式轮询，宿主应使用 SDK 写入接口或重新初始化。
 
 ```cpp
 const int instanceIndex = 0; // 由输出列表中用户选择的实例得到。

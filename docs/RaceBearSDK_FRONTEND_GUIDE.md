@@ -76,6 +76,7 @@ int StartBackend()
 - UI 定时器只读取状态，推荐 30-60 Hz。
 - 日志定时器推荐 100-500 ms 排空一次。
 - 游戏、平台、效果和输出目录只在页面打开或用户刷新时读取。
+- 输出实例数量、实例 key 和输出目录快照由 SDK 内存目录提供，可以用于界面状态同步；不要用高频定时器重复读取完整输出配置。
 
 退出顺序：
 
@@ -465,6 +466,11 @@ RB_Wind_SaveConfig(&wind);
 ## 13. 输出页面
 
 先调用 `RB_Output_EnsureDefaultConfig()`，再读取 `RB_Output_GetCatalog()`。
+SDK 初始化时会加载输出实例目录。`RB_Output_GetInstanceCount()`、
+`RB_Output_GetInstanceKey()` 和 `RB_Output_GetCatalog()` 后续读取内存目录，不会为每次查询
+重新打开输出配置文件。新增、删除和类型化保存由 SDK 同步内存状态；通过
+`RB_Data_WriteJson("config.output", ...)` 替换完整文档后，SDK 会明确重载输出目录。
+外部程序直接修改配置文件不会被 UI 定时器自动发现，应通过 SDK 写入接口或重新初始化。
 
 目录提供：
 
