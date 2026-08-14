@@ -73,6 +73,7 @@ function Copy-SdkPackage {
     Copy-Item (Join-Path $SdkSourceRoot 'include\RaceBearSDK.h') (Join-Path $publishRoot 'include\RaceBearSDK.h') -Force
     Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_API.md') (Join-Path $publishRoot 'docs\RaceBearSDK_API.md') -Force
     Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_FRONTEND_GUIDE.md') (Join-Path $publishRoot 'docs\RaceBearSDK_FRONTEND_GUIDE.md') -Force
+    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_RB_CAN_GUIDE.md') (Join-Path $publishRoot 'docs\RaceBearSDK_RB_CAN_GUIDE.md') -Force
     Copy-Item (Join-Path $SdkSourceRoot 'examples\README.md') (Join-Path $publishRoot 'examples\README.md') -Force
     # SDK language examples are flat source directories. Copy only files so local
     # CMake builds and Python caches can never enter the distribution package.

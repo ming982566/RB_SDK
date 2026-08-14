@@ -160,6 +160,8 @@ SDK 0.4.9 将 SimRacebear 使用的仪表模板迁入 SDK，当前提供 AIM MXS
 
 SDK 0.5.0 新增客户自定义仪表包。`.rbdash` V1 是 UTF-8 无 BOM JSON 单文件，图片以 PNG/JPEG Data URI 内嵌；模板只能绑定 SDK 认可的稳定 `rb.*` 数据键，不执行脚本，也不能访问文件系统、网络、进程或控制接口。随附的 `tools/DashboardDesigner/index.html` 可直接在浏览器中制作和导出模板。
 
+当前 0.5.0 交付进一步公开 `RB_CAN` 的 CANAPP 设备发现、逻辑索引设置、稳定 UID 绑定、绑定状态和单输出电机状态。完整调用顺序和安全限制见 `RaceBearSDK_RB_CAN_GUIDE.md`。其它 CAN 电机协议、参数维护、固件升级和底层总线控制暂不纳入第三方合同。
+
 宿主程序不需要为 SDK 调用 `CoInitializeEx()` 或 `CoUninitialize()`。SDK 在自己的线程中管理 COM 生命周期。
 
 ## 4. 应用目录名和配置位置
@@ -1140,7 +1142,9 @@ if (saveRc == RB_OK) {
 
 ### 8.1.7 CAN 输出健康与人工恢复
 
-标准 SDK 不公开电机参数维护、固件更新、底层 SDO/PDO 或急停控制细节，但公开了无人值守宿主需要的单输出健康快照和人工恢复入口。`outputIndex` 使用输出实例目录中的索引，刷新或增删输出后必须重新取得。
+标准 SDK 当前公开 `RB_CAN` 的设备发现、逻辑索引、稳定 UID 绑定、绑定状态、单输出电机状态、健康快照和人工恢复。完整设备接入流程见 `RaceBearSDK_RB_CAN_GUIDE.md`。`outputIndex` 使用输出实例目录中的索引，增删输出后必须重新取得；设备目录索引只在一次 `RB_Can_RefreshDevices()` 快照内有效。
+
+`FM_CAN`、`FC_CAN`、`RDS_CAN` 的第三方接入，以及电机参数维护、固件更新、底层 SDO/PDO 和急停控制细节暂不公开。
 
 ```cpp
 RB_CanOutputHealthState health{};

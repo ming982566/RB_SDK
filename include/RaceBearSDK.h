@@ -1321,10 +1321,87 @@ RB_API int RB_Runtime_DoCalculations();
  */
 RB_API int RB_State_Read(RB_RuntimeState* state);
 
-/** 读取指定 RB_CAN 输出的机器可读健康与恢复状态。 */
+/**
+ * @brief 重新枚举当前连接的 RaceBear CANAPP 设备并刷新设备目录。
+ * @return 成功时返回当前目录数量；失败返回负数。
+ * @note 本阶段第三方只接入 ProtocolType=1 的 RB_CAN 设备。刷新后旧 CatalogIndex 和 EnumerationIndex 全部失效。
+ */
+RB_API int RB_Can_RefreshDevices();
+
+/**
+ * @brief 返回最近一次 RB_Can_RefreshDevices() 建立的设备目录数量。
+ * @return 大于等于 0 的设备数量；失败返回负数。
+ * @note 本函数不重新扫描 USB。设备热插拔后应先显式刷新。
+ */
+RB_API int RB_Can_GetDeviceCount();
+
+/**
+ * @brief 读取最近一次设备目录中的一张 CANAPP 身份快照。
+ * @param catalogIndex 最近一次刷新返回目录中的零基索引。
+ * @param info 接收设备信息；调用前必须把 Size 设为 sizeof(RB_CanDeviceInfo)。
+ * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示参数或结构大小无效；RB_ERROR 表示目录项已失效或读取失败。
+ * @note CatalogIndex 和 EnumerationIndex 只能用于当前目录快照，持久绑定必须保存 Uid。
+ */
+RB_API int RB_Can_GetDeviceInfo(int catalogIndex, RB_CanDeviceInfo* info);
+
+/**
+ * @brief 按稳定 MCU UID 设置一张 RB_CAN 设备的卡内逻辑索引。
+ * @param uid RB_CanDeviceInfo::Uid 返回的 24 位大写十六进制 UID。
+ * @param logicalIndex 新逻辑索引，范围 1-255，并且必须与其它在线设备唯一。
+ * @return 0 表示写入并读回成功；负数表示设备离线、索引冲突、输出运行中或底层访问失败。
+ * @note 这是明确的设备维护动作。调用前必须断开相关输出，禁止在 UI 定时器或自动重试循环中调用。
+ */
+RB_API int RB_Can_SetDeviceLogicalIndex(const char* uid, int logicalIndex);
+
+/**
+ * @brief 将一个 RB_CAN 输出实例稳定绑定到指定 UID 和逻辑索引。
+ * @param outputIndex 当前输出目录中的零基索引；对应实例的 OutputKind 必须为 RB_CAN。
+ * @param uid 最近一次设备目录返回的稳定 UID。
+ * @param logicalIndex 要写入设备并保存到输出配置的逻辑索引，范围 1-255。
+ * @return 0 表示设备索引和输出绑定均已持久化；负数表示身份、协议、冲突、安全状态或写入失败。
+ * @note 绑定完成后应重新刷新设备目录并读取 RB_Can_GetOutputBindingState() 确认，不要直接修改运行时枚举索引。
+ */
+RB_API int RB_Can_BindOutputDevice(int outputIndex, const char* uid, int logicalIndex);
+
+/**
+ * @brief 读取一个 RB_CAN 输出与物理 CANAPP 的稳定绑定状态。
+ * @param outputIndex 当前输出目录中的零基索引。
+ * @param state 接收绑定状态；调用前必须把 Size 设为 sizeof(RB_CanOutputBindingState)。
+ * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示参数或结构大小无效；RB_ERROR 表示输出不存在或不是有效 CAN 输出。
+ */
+RB_API int RB_Can_GetOutputBindingState(int outputIndex, RB_CanOutputBindingState* state);
+
+/**
+ * @brief 返回指定 RB_CAN 输出当前管理的电机数量。
+ * @param outputIndex 当前输出目录中的零基索引。
+ * @return 大于等于 0 的电机数量；参数无效或状态不可用时返回负数。
+ * @note 电机目录属于该输出当前会话，重连或重新绑定后应重新取得数量。
+ */
+RB_API int RB_Can_GetOutputMotorCount(int outputIndex);
+
+/**
+ * @brief 读取指定 RB_CAN 输出中的一个电机状态。
+ * @param outputIndex 当前输出目录中的零基索引。
+ * @param motorIndex 该输出当前电机目录中的零基索引。
+ * @param state 接收电机状态的结构体指针。
+ * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示索引或指针无效；RB_ERROR 表示状态读取失败。
+ */
+RB_API int RB_Can_GetOutputMotorState(int outputIndex, int motorIndex, RB_CanMotorState* state);
+
+/**
+ * @brief 读取指定 RB_CAN 输出的机器可读健康与恢复状态。
+ * @param outputIndex 当前输出目录中的零基索引。
+ * @param state 接收健康快照；调用前把 Size 设为 sizeof(RB_CanOutputHealthState)。
+ * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示参数或结构大小无效；RB_ERROR 表示读取失败。
+ */
 RB_API int RB_Can_GetOutputHealthState(int outputIndex, RB_CanOutputHealthState* state);
 
-/** 人工排除故障后显式清除指定输出的恢复熔断器并启动一次受控恢复。 */
+/**
+ * @brief 人工排除故障后显式清除指定输出的恢复限制并启动一次受控恢复。
+ * @param outputIndex 当前输出目录中的零基索引。
+ * @return RB_OK 表示恢复请求已接受；RB_INVALID_ARGUMENT 表示索引无效；RB_ERROR 表示安全条件或当前状态不允许恢复。
+ * @note 仅由用户明确触发。返回成功不表示已经恢复运行，随后继续轮询健康快照。
+ */
 RB_API int RB_Can_RequestOutputRecovery(int outputIndex);
 
 /**

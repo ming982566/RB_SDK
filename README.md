@@ -6,6 +6,9 @@ source code.
 
 ## 0.5.0
 
+- Added the public RB_CAN device-management workflow: CANAPP discovery,
+  logical-index assignment, stable UID binding, binding and motor state,
+  health diagnostics, and user-triggered recovery.
 - Added customer dashboard packages (`.rbdash` V1) with stable `rb.*` data
   bindings, package discovery, validation, page selection, and BGRA8888
   rendering.
@@ -30,6 +33,7 @@ The DLL reports runtime version `0.5.0-vs2019-x64`.
 | `bin/x64/Release` | Matching Release DLL, import library, optional VOCORE dependency, and dashboard assets |
 | `docs/RaceBearSDK_FRONTEND_GUIDE.md` | Page-by-page frontend workflow and configuration ownership rules |
 | `docs/RaceBearSDK_API.md` | API reference, structures, units, deployment, and examples |
+| `docs/RaceBearSDK_RB_CAN_GUIDE.md` | RB_CAN discovery, logical-index assignment, stable UID binding, diagnostics, and recovery |
 | `examples/cpp` | Standard C++17 and CMake example |
 | `examples/python` | Dependency-free Python `ctypes` binding and example |
 | `examples/qt` | Qt 5/Qt 6 integration guide |
@@ -138,4 +142,5 @@ validation. The current public header and documentation remain authoritative.
 
 See `docs/RaceBearSDK_FRONTEND_GUIDE.md` first, then use
 `docs/RaceBearSDK_API.md` for detailed signatures, ranges, units, and failure
-behavior.
+behavior. Frontends that manage RB_CAN hardware must also follow
+`docs/RaceBearSDK_RB_CAN_GUIDE.md`.

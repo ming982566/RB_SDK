@@ -6,7 +6,8 @@
 
 字段定义、固定数组容量和每个导出函数的参数说明以
 `include/RaceBearSDK.h` 为准；完整参数表和协议说明见
-`RaceBearSDK_API.md`。本文重点说明如何把这些接口正确组合成可用软件。
+`RaceBearSDK_API.md`。实现 RB_CAN 设备页时还必须阅读
+`RaceBearSDK_RB_CAN_GUIDE.md`。本文重点说明如何把这些接口正确组合成可用软件。
 
 ### AI 辅助开发入口
 
@@ -497,6 +498,10 @@ SDK 初始化时会加载输出实例目录。`RB_Output_GetInstanceCount()`、
 平台处理后的六自由度值。Key 区分大小写。
 
 CAN 输出页面除 `state.Can` 全局摘要外，还应按输出实例读取健康快照：
+
+完整 RB_CAN 页面不能只填写 `CANindex`。设备刷新、UID 选择、重复索引修复、稳定绑定、
+单输出电机状态和安全恢复必须按 `RaceBearSDK_RB_CAN_GUIDE.md` 实现。当前第三方范围只覆盖
+`ProtocolType == 1` 的 `RB_CAN`；其它 CAN 协议暂不展示为可管理设备。
 
 ```cpp
 RB_CanOutputHealthState health{};

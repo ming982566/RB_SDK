@@ -14,6 +14,7 @@ Load only the sections needed for the requested page. Confirm every exact signat
 | Haptics | `RB_Haptic_*` | Section 11 |
 | Wind and seatbelt | `RB_Wind_*`, `RB_Seatbelt_*` | Section 12 |
 | Output instances | `RB_Output_*` | Section 13 |
+| RB_CAN devices and binding | `RB_Can_RefreshDevices`, `RB_Can_GetDeviceInfo`, `RB_Can_BindOutputDevice`, binding/motor/health APIs | Section 13 and `docs/RaceBearSDK_RB_CAN_GUIDE.md` |
 | Custom games and external sources | `RB_Game_RegisterCustom`, `RB_ExternalSource_*`, telemetry FieldId APIs | Section 14 |
 | Dashboards and screens | `RB_Dashboard_*`, `RB_VoCore_*`, `RB_DashboardWeb_*` | Section 15 and `references/dashboard-output.md` |
 | Serial | `RB_Serial_*` | Section 16 |
@@ -28,6 +29,7 @@ Load only the sections needed for the requested page. Confirm every exact signat
 - Show SDK error results beside the action that caused them. Do not replace all failures with a generic toast.
 - Use typed numeric controls with documented ranges and units. Do not expose raw structure memory, reserved fields, or runtime indexes.
 - Keep read, apply, save, connect, test, and delete as distinct user actions when their semantics differ.
+- In an RB_CAN page, restore selection by stable UID after every device refresh. Keep duplicate-index devices selectable so the user can assign one target UID a new unique index without unplugging the other device.
 
 ## Framework Adapter Shape
 

@@ -1,6 +1,6 @@
 ---
 name: racebear-frontend-panel
-description: Build, extend, review, or debug frontend control panels that integrate the RaceBear SDK public C ABI. Use for React, web, Qt, C#, C++, Python, or other host applications that need RaceBear runtime initialization, state dashboards, game and telemetry selection, license UI, platform and motion configuration, haptics, wind, seatbelt, output management, public CAN health and recovery diagnostics, serial tools, custom dashboards, VOCORE screens, browser dashboard output, deployment, or shutdown handling. Also use when porting SimRacebear behavior to another frontend or diagnosing stale indexes, unstable keys, blocked UI threads, leaked handles, config round-trip failures, missing DashboardAssets, or SDK threads that do not exit.
+description: Build, extend, review, or debug frontend control panels that integrate the RaceBear SDK public C ABI. Use for React, web, Qt, C#, C++, Python, or other host applications that need RaceBear runtime initialization, state dashboards, game and telemetry selection, license UI, platform and motion configuration, haptics, wind, seatbelt, output management, RB_CAN discovery and stable device binding, public CAN health and recovery diagnostics, serial tools, custom dashboards, VOCORE screens, browser dashboard output, deployment, or shutdown handling. Also use when porting SimRacebear behavior to another frontend or diagnosing stale indexes, unstable keys, duplicate CAN logical indexes, blocked UI threads, leaked handles, config round-trip failures, missing DashboardAssets, or SDK threads that do not exit.
 ---
 
 # RaceBear Frontend Panel
@@ -14,7 +14,8 @@ Use the public SDK contract to build a complete, maintainable frontend without c
 3. Treat `include/RaceBearSDK.h` as the signature and ABI authority.
 4. Treat `docs/RaceBearSDK_FRONTEND_GUIDE.md` as the page workflow and configuration ownership authority.
 5. Use `docs/RaceBearSDK_API.md` for field definitions, units, call examples, deployment, and failure behavior.
-6. Verify that the public header, import library, DLL, runtime dependencies, and resources belong to the same SDK build and configuration.
+6. For RB_CAN device discovery, logical-index assignment, UID binding, motor state, diagnostics, or recovery, read `docs/RaceBearSDK_RB_CAN_GUIDE.md`.
+7. Verify that the public header, import library, DLL, runtime dependencies, and resources belong to the same SDK build and configuration.
 
 ## Define The Requested Surface
 
@@ -59,6 +60,7 @@ Read [references/dashboard-output.md](references/dashboard-output.md) whenever t
 
 - Never include SDK internal headers or instantiate internal backend classes from a third-party frontend.
 - Never persist runtime telemetry indexes, catalog row numbers, device enumeration indexes, or refreshed plugin indexes.
+- Persist an RB_CAN device by `Uid` and its unique logical index; never persist `CatalogIndex` or `EnumerationIndex`.
 - Never reuse an index from a different configuration catalog, even when displayed names match.
 - Never run a second motion calculation loop from a UI timer.
 - Never bypass `state.License.OutputAllowed` or retry `RB_LICENSE_REQUIRED` in a loop.
