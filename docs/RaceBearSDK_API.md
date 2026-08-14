@@ -1,9 +1,9 @@
 # RaceBear SDK API 手册与参数参考
 
-> 第三方开发完整前端时，请先阅读 `RaceBearSDK_FRONTEND_GUIDE.md`。该文档按页面
+> 开发完整前端时，请先阅读 `RaceBearSDK_FRONTEND_GUIDE.md`。该文档按页面
 > 说明正确调用顺序和配置所有权；本手册主要作为字段、协议和 API 细节参考。
 
-本文面向需要使用 RaceBear SDK 开发 Windows 前端的第三方开发者。按照本文完成配置后，前端可以读取遥测和运动状态、管理配置、控制游戏及输出、显示授权状态，并使用 SDK 提供的串口能力。
+本文面向使用 RaceBear SDK 开发 Windows 前端的应用开发者。按照本文完成配置后，前端可以读取遥测和运动状态、管理配置、控制游戏及输出、显示授权状态，并使用 SDK 提供的串口能力。
 
 当前 SDK 版本可通过 `RB_Runtime_GetVersion()` 获取。SDK 使用 Visual Studio 2019、`v142`、x64 构建，只支持 Windows x64 进程。
 
@@ -19,11 +19,11 @@
 | `bin/x64/Release/libusb-1.0.dll`  | VOCORE USB 屏幕运行库；使用 VOCORE 时放在宿主 EXE 同目录 |
 | `bin/x64/Release/DashboardAssets/RaceBear` | Ford GT 仪表图片和字体资源；保持目录结构部署到 DLL 同级 |
 | `RaceBearSDK_API.md`              | 本接入手册                                              |
-| `RaceBearSDK_FRONTEND_GUIDE.md`   | 完整第三方前端的页面设计与调用流程                      |
+| `RaceBearSDK_FRONTEND_GUIDE.md`   | 完整前端的页面设计与调用流程                            |
 
 目标电脑需要安装 Microsoft Visual C++ 2015-2022 Redistributable x64。不使用 VOCORE 时，`RaceBearSDK.dll` 不会强制加载 `libusb-1.0.dll`。Ford GT 模板需要 `DashboardAssets/RaceBear`，缺少时其它纯绘制模板仍可使用；除这些可选运行库和资源外，其它依赖均为 Windows 系统组件。
 
-不要混用不同版本 SDK 包中的 `.h`、`.lib` 和 `.dll`。三者必须来自同一次发布。
+请使用同一次发布、同一构建配置中的 `.h`、`.lib` 和 `.dll`，以确保 ABI 和运行库匹配。
 
 SDK 目录提供了四套现成示例：
 
@@ -80,7 +80,7 @@ add_custom_command(TARGET MyMotionApp POST_BUILD
 
 int main()
 {
-    // 第三方软件应使用自己的产品目录名。必须在初始化前设置。
+    // 使用稳定的产品目录名，并在初始化前设置。
     if (RB_Runtime_SetAppDataName("MyMotionApp") != RB_OK) {
         std::puts("Invalid application data name.");
         return 1;
@@ -119,7 +119,7 @@ int main()
 正常调用顺序固定为：
 
 ```text
-RB_Runtime_SetAppDataName()   可选，但第三方软件建议设置
+RB_Runtime_SetAppDataName()   可选，集成应用建议设置
 RB_Runtime_Initialize()       必须
 RB_Runtime_StartLoop()        常规前端必须
 读取状态、配置、目录和日志
@@ -146,7 +146,7 @@ SDK 0.4.2 将本参数从 Hz 改为 ms。旧代码中的 `RB_Runtime_StartLoop(1
 
 SDK 0.4.3 补齐动态滤波、输出实例、运动增强、震动、风感和安全带的结构体配置流程，并支持全新 `AppDataName` 自动生成默认运行配置。常规前端不再需要直接编辑配置 JSON。
 
-SDK 0.4.4 公开游戏安装与遥测源配置、功能插件目录、平台数值诊断和手动测试接口，并在结构体 Save/Apply 入口增加基础参数校验。CAN 和 LAN 的完整设备管理仍不属于当前第三方公开范围。
+SDK 0.4.4 公开游戏安装与遥测源配置、功能插件目录、平台数值诊断和手动测试接口，并在结构体 Save/Apply 入口增加基础参数校验。该版本的公开范围尚未包含完整的 CAN 和 LAN 设备管理。
 
 SDK 0.4.5 修复 CAN 实时位置的 USB 发送队列：未发送的位置批次采用最新值覆盖，短时 USB 阻塞恢复后不会补发过期轨迹；同时修复动态配置回读时丢弃公共遥测目录所创建输入通道的问题。该版本不改变公开 ABI。
 
@@ -160,7 +160,7 @@ SDK 0.4.9 将 SimRacebear 使用的仪表模板迁入 SDK，当前提供 AIM MXS
 
 SDK 0.5.0 新增客户自定义仪表包。`.rbdash` V1 是 UTF-8 无 BOM JSON 单文件，图片以 PNG/JPEG Data URI 内嵌；模板只能绑定 SDK 认可的稳定 `rb.*` 数据键，不执行脚本，也不能访问文件系统、网络、进程或控制接口。随附的 `tools/DashboardDesigner/index.html` 可直接在浏览器中制作和导出模板。
 
-当前 0.5.0 交付进一步公开 `RB_CAN` 的 CANAPP 设备发现、逻辑索引设置、稳定 UID 绑定、绑定状态和单输出电机状态。完整调用顺序和安全限制见 `RaceBearSDK_RB_CAN_GUIDE.md`。其它 CAN 电机协议、参数维护、固件升级和底层总线控制暂不纳入第三方合同。
+当前 0.5.0 交付进一步公开 `RB_CAN` 的 CANAPP 设备发现、逻辑索引设置、稳定 UID 绑定、绑定状态和单输出电机状态。完整调用顺序和安全要求见 `RaceBearSDK_RB_CAN_GUIDE.md`。其它 CAN 电机协议、参数维护、固件升级和底层总线控制暂未纳入公开 API。
 
 宿主程序不需要为 SDK 调用 `CoInitializeEx()` 或 `CoUninitialize()`。SDK 在自己的线程中管理 COM 生命周期。
 
@@ -168,7 +168,7 @@ SDK 0.5.0 新增客户自定义仪表包。`.rbdash` V1 是 UTF-8 无 BOM JSON �
 
 `RB_Runtime_SetAppDataName()` 用于隔离不同产品的数据。例如传入 `MyMotionApp` 后，SDK 会在当前用户目录下使用该名称保存配置和授权。
 
-首次使用全新名称时，SDK 会自动创建平台默认配置、`_Default` 动态配置及后续功能配置文件。第三方产品不应为了取得默认参数而共用 `%APPDATA%\SimRacebear`，也不要复制 SimRacebear 用户目录作为模板。
+首次使用全新名称时，SDK 会自动创建平台默认配置、`_Default` 动态配置及后续功能配置文件。为产品选择独立且稳定的名称即可获得完整默认配置，并与 SimRacebear 用户数据保持隔离。
 
 应用目录名要求：
 
@@ -178,7 +178,7 @@ SDK 0.5.0 新增客户自定义仪表包。`.rbdash` V1 是 UTF-8 无 BOM JSON �
 - 不能包含 `\ / : * ? " < > |` 等 Windows 路径非法字符。
 - 必须在 `RB_Runtime_Initialize()` 之前调用。
 
-未调用时默认使用 `SimRacebear`。主要配置保存在 `%APPDATA%\<应用目录名>\configV2`，授权数据保存在 `%APPDATA%\<应用目录名>\license`，运行日志和部分用户文件保存在 `Documents\<应用目录名>`。第三方软件应使用稳定且不会随版本变化的产品名。
+未调用时默认使用 `SimRacebear`。主要配置保存在 `%APPDATA%\<应用目录名>\configV2`，授权数据保存在 `%APPDATA%\<应用目录名>\license`，运行日志和部分用户文件保存在 `Documents\<应用目录名>`。集成应用建议使用稳定且不会随版本变化的产品名。
 
 ## 5. 前端只需要理解五个核心入口
 
@@ -334,7 +334,7 @@ if (ReadSdkJson("game.catalog", gamesJson)) {
 }
 ```
 
-第三方前端应保存和传递 `gameKey`，不要让用户手写完整游戏名。`gameName` 只用于显示，`catalogIndex` 只适合当前目录快照内使用。
+前端保存和传递 `gameKey`，并使用 SDK 目录填充游戏选择。`gameName` 用于显示，`catalogIndex` 适用于当前目录快照。
 
 也可以直接使用结构体接口读取游戏目录：
 
@@ -360,9 +360,9 @@ if (rc == RB_OK) {
 }
 ```
 
-### 接入第三方自研游戏
+### 接入自研游戏
 
-自研游戏不需要实现SDK内部Source类。调用方先读取`RB_TelemetryCatalog`，配置和代码只保存`RB_TelemetryCatalogItem::Key`；启动时通过`RB_Telemetry_FindIndexByKey()`解析当前进程索引。索引可能随SDK版本调整，禁止写入配置或网络协议。公共目录会跳过内部保留和历史兼容槽位，所以`Items[i].Index`不保证等于数组行号`i`，调用数值接口时必须使用返回的`Index`。
+自研游戏可以直接通过公开的遥测目录和 External Source API 接入。调用方先读取 `RB_TelemetryCatalog`，配置和代码保存 `RB_TelemetryCatalogItem::Key`；启动时通过 `RB_Telemetry_FindIndexByKey()` 解析当前进程索引。运行时索引可能随 SDK 版本调整，因此配置和网络协议使用稳定 Key。公共目录会跳过兼容槽位，所以 `Items[i].Index` 不保证等于数组行号 `i`，数值接口使用每项返回的 `Index`。
 
 常用RaceBear key和单位示例：
 
@@ -653,10 +653,10 @@ if (rc != RB_OK) {
 
 动态输入和滤波字段：
 
-前端不能把完整遥测目录直接作为动态通道效果列表。应按当前目标 DOF
+前端按当前目标 DOF
 调用 `RB_Dynamic_GetInputCandidateCatalog()`，显示返回的 `Items[i].Key`，
 并使用同一项的 `InputType`、`TelemetryIndex` 和 `Key` 创建输入。已经存在于
-当前 DOF 的 Key 不得重复添加。
+当前 DOF 中的每个 Key 保持唯一。
 
 ```cpp
 RB_DynamicInputCandidateCatalog candidates{};
@@ -860,7 +860,7 @@ if (RB_MotionEffect_GetDefaultConfig(0, &config) == RB_OK) {
 `RB_MotionEffect_DeleteProfile(name)`。
 
 `RB_Dynamic_DeleteProfileByIndex()` 为兼容当前产品配置链，会同时清理与动态配置同名
-的运动增强和震动节点。第三方只想删除运动增强方案时不得调用它。
+的运动增强和震动节点。仅删除运动增强方案时，请使用 `RB_MotionEffect_DeleteProfile()`。
 
 ### 8.1.3 震动效果参数
 
@@ -1144,7 +1144,7 @@ if (saveRc == RB_OK) {
 
 标准 SDK 当前公开 `RB_CAN` 的设备发现、逻辑索引、稳定 UID 绑定、绑定状态、单输出电机状态、健康快照和人工恢复。完整设备接入流程见 `RaceBearSDK_RB_CAN_GUIDE.md`。`outputIndex` 使用输出实例目录中的索引，增删输出后必须重新取得；设备目录索引只在一次 `RB_Can_RefreshDevices()` 快照内有效。
 
-`FM_CAN`、`FC_CAN`、`RDS_CAN` 的第三方接入，以及电机参数维护、固件更新、底层 SDO/PDO 和急停控制细节暂不公开。
+当前公开 CAN 工作流聚焦 `RB_CAN`。`FM_CAN`、`FC_CAN`、`RDS_CAN`、电机参数维护、固件更新、底层 SDO/PDO 和急停控制暂未提供公开接入 API。
 
 ```cpp
 RB_CanOutputHealthState health{};
@@ -1156,7 +1156,7 @@ if (RB_Can_GetOutputHealthState(outputIndex, &health) == RB_OK) {
 }
 ```
 
-`RB_CanOutputHealthState` 使用 `Size` 做 ABI 版本协商。新代码固定传 `sizeof(RB_CanOutputHealthState)`；SDK 会保留旧结构前缀兼容，但第三方新实现不应写死历史字节数。常用状态：
+`RB_CanOutputHealthState` 使用 `Size` 做 ABI 版本协商。新代码传入 `sizeof(RB_CanOutputHealthState)`；SDK 会保留旧结构前缀兼容，因此新实现无需依赖历史字节数。常用状态：
 
 | 字段 | 说明 |
 | ---- | ---- |
@@ -1185,7 +1185,7 @@ const int rc = RB_Can_RequestOutputRecovery(outputIndex);
 
 ## 8.2 平台目录和平台参数
 
-第三方前端不得写死平台下拉框。平台目录索引是零基索引，只用于调用当前 SDK；`RB_PlatformConfig::Type` 是平台类型编号，当前为 1-12，两者不能混用。
+平台下拉框应由 SDK 平台目录动态填充。平台目录索引是零基索引，只用于调用当前 SDK；`RB_PlatformConfig::Type` 是平台类型编号，当前为 1-12，两者含义不同。
 
 ```cpp
 const int platformCount = RB_Platform_GetCount();
@@ -1308,7 +1308,7 @@ Key 区分大小写，必须使用目录返回的原文。不要把遥测目录�
 - 执行器和功能 Key 按其位宽输出；普通输出位宽由 `RB_OutputConfig::OutBit` 控制。
 - 六个基础 DOF 是处理后的平台姿态值，不是执行器位值；线性 DOF 使用平台长度单位，旋转 DOF 使用平台角度单位。
 
-完整输出页面至少应实现：读取实例目录、读取实例配置、编辑参数、断开、保存、应用、重新连接，以及从 Key 目录双击插入占位符。只实现全部连接和全部断开不能算完整输出配置页面。
+一个实用的输出配置页面应覆盖：读取实例目录、读取实例配置、编辑参数、断开、保存、应用、重新连接，以及从 Key 目录插入占位符。全局连接和断开适合作为快捷操作，与实例级配置能力配合使用。
 
 ## 8.4 游戏安装和遥测源配置
 
@@ -1374,7 +1374,7 @@ const int sideConfigReady = RB_Game_CheckCurrentSideConfig(&config);
 
 ## 8.5 功能插件
 
-插件列表使用一个目录包读取，第三方不需要逐字段调用 getter：
+插件列表通过一个目录包读取，无需逐字段调用 getter：
 
 ```cpp
 if (RB_Plugin_Refresh() < 0) {
@@ -1487,7 +1487,7 @@ if (rc == RB_OK) {
 
 ## 10. 授权接入
 
-授权完全由 SDK 管理。第三方前端不生成机器码、不读写授权文件，也不需要直接调用授权服务器。
+授权由 SDK 统一管理。前端读取 `RB_RuntimeState::License` 并使用公开命令提交激活、反激活和检查操作。
 
 前端只需要读取：
 
@@ -1786,7 +1786,7 @@ void DrainSdkLogs()
 
 正确退出顺序：
 
-1. 禁止新的 UI 命令和配置写入。
+1. 先让 UI 停止提交新的命令和配置写入。
 2. 停止宿主自己的状态、日志和设备定时器。
 3. 断开宿主创建的串口回调并销毁串口对象。
 4. 等待宿主工作线程退出，确保没有线程继续调用 SDK。
@@ -1795,11 +1795,11 @@ void DrainSdkLogs()
 
 不要在 DLL 卸载、全局静态对象析构或仍有工作线程运行时才调用 `RB_Runtime_Shutdown()`。明确的主程序退出流程最可靠。
 
-## 14. 完整前端最低功能矩阵
+## 14. 前端功能覆盖参考
 
-能成功初始化 SDK 不代表前端已经完整。面向最终用户的软件至少应覆盖下表；不需要某项硬件时可以隐藏对应页面，但不能用仅修改提示文字的空按钮代替 SDK 调用。
+下表给出面向最终用户的软件常见功能覆盖范围。应用可以按实际硬件和产品定位选择页面；已呈现的操作应连接到对应 SDK 能力，并清楚显示执行结果。
 
-| 页面或服务 | 必须读取 | 必须支持的写入或动作 |
+| 页面或服务 | 建议读取 | 对应写入或动作 |
 | ---------- | -------- | -------------------- |
 | 全局运行态 | `RB_State_Read()` | 启动、暂停、恢复和停止 SDK 内部循环 |
 | 授权 | `state.License` | `license.activate`、`license.deactivate`、`license.check` |
@@ -1872,13 +1872,13 @@ void DrainSdkLogs()
 
 不需要。SDK 只锁定真实输出，前端仍可显示状态、编辑配置和执行激活操作。
 
-### 第三方前端如何绘制平台或曲线
+### 前端如何绘制平台或曲线
 
 公开 SDK 不绑定任何 UI 框架。调用方从 `RB_RuntimeState` 和 JSON 数据包读取状态后，使用自己的绘图库实现界面。炫彩、MFC、Qt、WinUI、Unity 等前端可以采用各自的绘制方式。
 
 ## 16. 发布前检查
 
-第三方应用发布前至少完成以下验证：
+应用发布前建议完成以下验证：
 
 1. Release 包中的 `.h`、`.lib`、`.dll` 来自同一 SDK 版本。
 2. 目标程序和所有插件均为 x64。
@@ -1930,7 +1930,7 @@ void DrainSdkLogs()
 | `RB_DashboardWeb_Open()` / `RB_DashboardWeb_Close()` | 创建或销毁浏览器 MJPEG 仪表服务。 |
 | `RB_DashboardWeb_SubmitFrame()` / `RB_DashboardWeb_GetState()` | 提交最新仪表帧并读取 URL、客户端和编码统计。 |
 | `RB_Can_GetOutputHealthState()` | 读取指定输出的 CAN 状态机、故障、恢复和链路诊断。 |
-| `RB_Can_RequestOutputRecovery()` | 人工排障完成后请求一次受控恢复；不得周期自动调用。 |
+| `RB_Can_RequestOutputRecovery()` | 人工排障完成后请求一次受控恢复；由用户明确触发单次请求。 |
 
 ### 17.4 串口高级接口
 
@@ -1957,7 +1957,7 @@ void DrainSdkLogs()
 
 ## 18. 升级 SDK 依赖检查清单
 
-第三方应用升级 RaceBear SDK 时，应从同一个 Release 同步替换以下依赖：
+应用升级 RaceBear SDK 时，请从同一个 Release 同步替换以下依赖：
 
 - `include/RaceBearSDK.h`
 - 当前构建配置对应的 `bin/x64/Debug` 或 `bin/x64/Release` DLL/LIB

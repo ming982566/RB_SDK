@@ -1,6 +1,6 @@
 # RaceBear SDK 示例
 
-这些示例只依赖公开的 `include/RaceBearSDK.h` 和 `bin/x64/Release/RaceBearSDK.dll`，用于给第三方前端验证最小接入流程。
+这些示例使用公开的 `include/RaceBearSDK.h` 和 `bin/x64/Release/RaceBearSDK.dll`，帮助应用开发者验证基础接入流程。
 
 | 目录 | 适用开发方式 | 是否可直接运行 |
 | --- | --- | --- |
@@ -12,7 +12,7 @@
 
 所有示例都遵循相同顺序：设置应用目录名、初始化 SDK、启动内部计算循环、读取状态或执行命令、停止前端调用、关闭 SDK。
 
-关键约束：
+接入要点：
 
 - SDK 当前只提供 Windows x64 版本，C++ 示例按 VS2019/v142 验证。
 - 示例使用独立 `appDataName`，避免覆盖正式产品的配置和授权文件。

@@ -55,7 +55,7 @@ enum RB_LicenseProblem
 	RB_LICENSE_PROBLEM_PARSE_FAILED = 9         // 授权内容解析失败。
 };
 
-// 内置配置文件类型。配置读写走 JSON，便于第三方前端保存完整参数。
+// 内置配置文件类型。配置读写走 JSON，便于宿主前端保存完整参数。
 enum RB_ConfigType
 {
 	RB_CONFIG_TELEMETRY = 1,    // 游戏遥测配置。
@@ -264,7 +264,7 @@ struct RB_CanDeviceInfo
 {
 	unsigned int Size;                           // 调用前设为 sizeof(RB_CanDeviceInfo)。
 	int CatalogIndex;                            // 本次目录索引，仅用于继续读取目录。
-	int EnumerationIndex;                        // 本次目录内唯一运行时访问索引，不能持久化。
+	int EnumerationIndex;                        // 本次目录内唯一运行时访问索引，仅用于当前快照。
 	int LogicalIndex;                            // 卡内持久逻辑索引，0 表示未配置。
 	int ProtocolType;                            // 固件协议身份：1=RB_CAN，2=FM_CAN，3=FC_CAN/RDS_CAN物理卡身份。
 	int IapMode;                                 // 1 表示当前处于 IAP。
@@ -1062,7 +1062,7 @@ struct RB_DynamicInputEffect
 	RB_FilterEffect Filter;                        // 该输入对应滤波参数。
 };
 
-// 单个目标 DOF 可添加的输入通道效果。候选由 SDK 维护，前端不得自行列出全部遥测字段。
+// 单个目标 DOF 可添加的输入通道效果。候选由 SDK 维护，前端使用此目录填充选择项。
 struct RB_DynamicInputCandidateItem
 {
 	char Key[RB_TEXT_SMALL];                       // 通道效果 key，同时用于用户界面显示。
@@ -1349,7 +1349,7 @@ RB_API int RB_Can_GetDeviceInfo(int catalogIndex, RB_CanDeviceInfo* info);
  * @param uid RB_CanDeviceInfo::Uid 返回的 24 位大写十六进制 UID。
  * @param logicalIndex 新逻辑索引，范围 1-255，并且必须与其它在线设备唯一。
  * @return 0 表示写入并读回成功；负数表示设备离线、索引冲突、输出运行中或底层访问失败。
- * @note 这是明确的设备维护动作。调用前必须断开相关输出，禁止在 UI 定时器或自动重试循环中调用。
+ * @note 这是明确的设备维护动作。请先断开相关输出，并由用户操作触发单次调用。
  */
 RB_API int RB_Can_SetDeviceLogicalIndex(const char* uid, int logicalIndex);
 
@@ -1443,7 +1443,7 @@ RB_API int RB_Game_SelectByKey(const char* gameKey);
  * @brief 按RaceBear稳定遥测key解析当前SDK运行时索引。
  * @param telemetryKey 来自RB_TelemetryCatalogItem::Key的UTF-8字符串。
  * @return 成功返回0到目录数量减1的索引；key不存在或参数无效时返回RB_INVALID_ARGUMENT。
- * @note 返回索引只用于当前进程调用，不得写入配置文件；持久化必须保存telemetryKey。
+ * @note 返回索引用于当前进程调用；持久化时保存 telemetryKey。
  */
 RB_API int RB_Telemetry_FindIndexByKey(const char* telemetryKey);
 
@@ -1729,7 +1729,7 @@ RB_API double RB_ManualPose_GetDrive(int dofIndex);
  * @param instanceIndex 输出实例零基索引，范围 [0, RB_Output_GetInstanceCount())。
  * @param config 接收完整配置的结构体指针；调用前零初始化。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示索引或指针无效；RB_ERROR 表示读取失败。
- * @note 编辑页面必须先读取完整结构体，再修改目标字段，不能从空结构体直接保存。
+ * @note 编辑页面先读取完整结构体，再修改目标字段并保存，以保留未展示字段。
  */
 RB_API int RB_Output_ReadInstanceConfigByIndex(int instanceIndex, RB_OutputConfig* config);
 
@@ -1924,7 +1924,7 @@ RB_API int RB_Dynamic_GetProfileName(int profileIndex, char* buffer, int bufferS
  * @param dofIndex 目标 DOF：0=Sway、1=Surge、2=Heave、3=Yaw、4=Roll、5=Pitch、6=SwayToRoll、7=SurgeToPitch。
  * @param catalog 接收候选目录；调用前零初始化。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示索引或指针无效；RB_ERROR 表示目录读取失败。
- * @note 前端应显示 Items[].Key，只允许添加目录中的候选，并通过 Key 防止同一 DOF 重复添加。
+ * @note 前端显示 Items[].Key，使用目录候选，并通过 Key 保持同一 DOF 中的输入唯一。
  */
 RB_API int RB_Dynamic_GetInputCandidateCatalog(int dofIndex, RB_DynamicInputCandidateCatalog* catalog);
 

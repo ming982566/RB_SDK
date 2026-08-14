@@ -1,7 +1,7 @@
 """RaceBear SDK 的零依赖 Python ctypes 封装。
 
-本文件只映射公开 RaceBearSDK.h，不依赖 SDK 私有源码。ctypes 结构体字段顺序、
-数组长度和基础类型必须与同一版本头文件完全一致，否则 DLL 写入状态时会发生字段错位。
+本文件通过公开 RaceBearSDK.h 映射 C ABI。ctypes 结构体字段顺序、数组长度和
+基础类型与同一版本头文件配套，确保 DLL 写入状态时字段位置一致。
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ RB_CUSTOM_PROTOCOL_VERSION = 1
 
 # 不要给这些结构体添加 _pack_ = 1。SDK 由 VS2019 按默认对齐方式构建，
 # 当前 x64 ABI 下 RB_RuntimeState=4776 字节、RB_SerialPortInfo=2048 字节。
-# 如果升级 SDK 后尺寸变化，必须按新 RaceBearSDK.h 同步下面全部字段。
+# 如果升级 SDK 后尺寸变化，请按新 RaceBearSDK.h 同步下面全部字段。
 
 class RB_LicenseSnapshot(ctypes.Structure):
     """授权状态快照；RemainingSeconds 用于限时授权和本地试用倒计时。"""
@@ -715,7 +715,7 @@ class RaceBearSDK:
         if hasattr(os, "add_dll_directory"):
             self._dll_directory = os.add_dll_directory(str(self.dll_path.parent))
 
-        # 公开导出使用 extern "C" C ABI；x64 Python 必须使用相同位数加载。
+        # 公开导出使用 extern "C" C ABI；请使用 x64 Python 加载 x64 SDK。
         self._dll = ctypes.CDLL(str(self.dll_path))
         self._initialized = False
         self._bind_functions()
@@ -724,7 +724,7 @@ class RaceBearSDK:
         """为 ctypes 声明准确参数和返回类型。
 
         ctypes 默认把未声明返回值当作 c_int，指针或 64 位值会因此被截断，
-        所以每个被示例使用的函数都必须明确设置 argtypes/restype。
+        因此为示例使用的每个函数明确设置 argtypes/restype。
         """
         # 版本和生命周期接口。
         self._dll.RB_Runtime_GetVersion.argtypes = []
@@ -918,14 +918,14 @@ class RaceBearSDK:
     def initialize(self, app_data_name: str, interval_ms: int = 2) -> None:
         """设置独立应用目录、初始化 SDK 并启动内部计算循环。
 
-        app_data_name 必须是目录名而不是完整路径。任一步失败都会抛出
+        app_data_name 使用目录名而不是完整路径。任一步失败都会抛出
         RaceBearError；计算循环启动失败时会先自动关闭已初始化的 SDK。
         interval_ms 单位为毫秒；默认值2表示目标周期约2ms。
         """
         if self._initialized:
             raise RuntimeError("RaceBear SDK is already initialized.")
 
-        # 应用目录名必须先于 Initialize 设置，初始化后不允许切换。
+        # 应用目录名在 Initialize 前设置，并在本次运行期间保持不变。
         rc = self._dll.RB_Runtime_SetAppDataName(app_data_name.encode("utf-8"))
         if rc != RB_OK:
             raise RaceBearError("RB_Runtime_SetAppDataName", rc)
@@ -1286,7 +1286,7 @@ class RaceBearSDK:
         return buffer.value.decode("utf-8", errors="replace")
 
     def telemetry_index(self, key: str) -> int:
-        """按RaceBear稳定key解析当前进程索引；调用方不得持久化返回值。"""
+        """按 RaceBear 稳定 key 解析当前进程索引；持久化时保存 key。"""
         index = self._dll.RB_Telemetry_FindIndexByKey(key.encode("utf-8"))
         if index < 0:
             raise RaceBearError(f"RB_Telemetry_FindIndexByKey({key})", index)

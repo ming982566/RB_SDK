@@ -1,6 +1,6 @@
 # Qt C++ 接入示例
 
-本目录只提供接入代码和项目配置，不要求 RaceBear SDK 开发机安装 Qt。建议第三方使用 Qt 5/Qt 6 的 MSVC 2019 x64 Kit，以便直接链接 SDK 提供的 `RaceBearSDK.lib`。
+本目录提供接入代码和项目配置，RaceBear SDK 本身不依赖 Qt。Qt 应用建议使用 Qt 5/Qt 6 的 MSVC 2019 x64 Kit，以便直接链接 SDK 提供的 `RaceBearSDK.lib`。
 
 ## 1. CMake 配置
 
@@ -11,7 +11,7 @@ project(MyRaceBearQtApp LANGUAGES CXX)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_CXX_STANDARD 17)
 
-# 同时兼容 Qt 5 和 Qt 6，但必须选择 MSVC x64 Kit。
+# 同时兼容 Qt 5 和 Qt 6；选择 MSVC x64 Kit 与 SDK 构建格式匹配。
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Widgets)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets)
 
@@ -23,7 +23,7 @@ add_executable(MyRaceBearQtApp
     RaceBearBackend.h
 )
 
-# Qt 前端只包含公开头，不引用 SDK 的 src 或 SimRacebear 适配层。
+# Qt 前端通过公开头接入 SDK。
 target_include_directories(MyRaceBearQtApp PRIVATE
     "${RACEBEAR_SDK_ROOT}/include"
 )
@@ -34,10 +34,10 @@ target_link_libraries(MyRaceBearQtApp PRIVATE
     "${RACEBEAR_SDK_ROOT}/bin/x64/Release/RaceBearSDK.lib"
 )
 
-# 示例包含 UTF-8 无 BOM 中文注释，VS2019 必须显式使用 UTF-8 源码编码。
+# 示例包含 UTF-8 无 BOM 中文注释，因此为 VS2019 显式启用 UTF-8 源码编码。
 target_compile_options(MyRaceBearQtApp PRIVATE /utf-8)
 
-# DLL 必须部署到 Qt EXE 同目录，否则程序启动时无法解析导入函数。
+# 将 DLL 部署到 Qt EXE 同目录，以便程序启动时解析导入函数。
 add_custom_command(TARGET MyRaceBearQtApp POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${RACEBEAR_SDK_ROOT}/bin/x64/Release/RaceBearSDK.dll"
@@ -145,7 +145,7 @@ bool RaceBearBackend::initialize(
         return true;
     }
 
-    // SDK 所有 char* 文本均为 UTF-8，不能直接传 QString 内部 UTF-16 数据。
+    // SDK 的 char* 文本使用 UTF-8，这里先把 QString 转为 UTF-8。
     const QByteArray appNameUtf8 = appDataName.toUtf8();
     if (RB_Runtime_SetAppDataName(appNameUtf8.constData()) != RB_OK) {
         emit sdkError(QStringLiteral("无效的应用目录名"));
@@ -159,7 +159,7 @@ bool RaceBearBackend::initialize(
     initialized_ = true;
 
     // intervalMs 是计算周期间隔，单位毫秒。
-    // SDK 内部循环负责后端计算；Qt 定时器只读取结果，不能重复驱动计算。
+    // SDK 自有循环负责后端计算；Qt 定时器只读取结果。
     if (RB_Runtime_StartLoop(intervalMs) != RB_OK) {
         shutdown();
         emit sdkError(QStringLiteral("RaceBear SDK 计算循环启动失败"));
@@ -228,7 +228,7 @@ QJsonObject RaceBearBackend::readJson(const char* key, bool* ok) const
             return {};
         }
 
-        // 使用 Qt JSON 解析器，不能用字符串截取读取字段。
+        // 使用 Qt JSON 解析器读取字段并保留完整 JSON 语义。
         QJsonParseError error{};
         const QJsonDocument document = QJsonDocument::fromJson(
             QByteArray(buffer.data()), &error);
@@ -341,7 +341,7 @@ wind.MasterGainPercent = masterGainSlider_->value();
 RB_Wind_ApplyConfigToCurrentFunction(&wind);
 RB_Wind_SaveConfig(&wind);
 
-// 测试按钮松开、页面关闭和程序退出前都必须关闭测试输出。
+// 测试按钮松开、页面关闭和程序退出前关闭测试输出。
 RB_Wind_SetTestOutput(1, 50.0);
 RB_Wind_SetTestOutput(0, 0.0);
 ```
@@ -383,7 +383,7 @@ win32-msvc* {
 
 ## 5. Qt MinGW
 
-MinGW 不能直接链接 MSVC 格式的 `RaceBearSDK.lib`。有两个选择：
+MinGW 与 `RaceBearSDK.lib` 的 MSVC 导入库格式不同，可以选择：
 
 1. 推荐改用 Qt MSVC 2019 x64 Kit。
 2. 使用 `QLibrary` 加载 `RaceBearSDK.dll`，并通过 `resolve()` 获取 `extern "C"` 导出函数。
@@ -397,7 +397,7 @@ if (!library.load()) {
     return;
 }
 
-// QLibrary::resolve 返回无类型地址，函数指针签名必须与公开头完全一致。
+// QLibrary::resolve 返回无类型地址，按公开头声明准确填写函数指针签名。
 using InitializeFn = int (*)();
 using ShutdownFn = void (*)();
 
@@ -411,19 +411,19 @@ if (initialize == nullptr || shutdown == nullptr) {
 }
 ```
 
-使用动态加载时，仍需按 `RaceBearSDK.h` 定义全部结构体和函数指针。不要在 SDK 仍运行时卸载 `QLibrary`。
+使用动态加载时，按 `RaceBearSDK.h` 定义结构体和函数指针，并在 SDK 关闭后再卸载 `QLibrary`。
 
 ## 6. PySide/PyQt
 
-PySide/PyQt 应直接复用 `examples/python/racebear_sdk.py`，然后使用 Qt `QTimer` 调用 `read_state()`。不要在工作线程或 SDK 回调中直接修改 Qt 控件，应发送 Qt Signal 回到主线程。
+PySide/PyQt 可以复用 `examples/python/racebear_sdk.py`，然后使用 Qt `QTimer` 调用 `read_state()`。工作线程或 SDK 回调通过 Qt Signal 把结果转发到主线程更新控件。
 
 ## 7. Qt 接入注意事项
 
-- Qt、宿主程序和 RaceBear SDK 必须全部为 x64。
+- Qt、宿主程序和 RaceBear SDK 使用一致的 x64 架构。
 - 推荐使用 MSVC 2019 x64 Kit。
 - SDK 文本通过 `QString::fromUtf8()` 转换。
 - 常规配置页面使用结构体接口；只有目录、脚本和高级工具才读取 JSON。
-- 必须生成 JSON 参数时使用 `QJsonDocument` 和 `QJsonObject`，不要拼接字符串。
+- 生成 JSON 参数时使用 `QJsonDocument` 和 `QJsonObject`，由 Qt 处理转义和编码。
 - SDK 内部循环由 `RB_Runtime_StartLoop()` 驱动，Qt `QTimer` 只负责刷新 UI。
 - 窗口退出前先停止所有 Qt 定时器和线程，再调用 `RB_Runtime_Shutdown()`。
-- SDK 或串口回调不保证位于 Qt 主线程，必须通过信号槽转发。
+- SDK 或串口回调可能位于工作线程，通过信号槽转发到 Qt 主线程。

@@ -739,7 +739,7 @@ public:
       Report(RB_OK, L"保存并回读");
     } else if (id == 624) {
       if (!allowed_) {
-        Status(L"授权锁定，禁止真实测试输出", true);
+        Status(L"当前授权状态不支持真实测试输出", true);
         return;
       }
       Report(RB_Wind_SetTestOutput(1, ui::Double(GetDlgItem(hwnd_, 623))),
@@ -950,7 +950,7 @@ public:
       Report(RB_OK, L"保存并回读");
     } else if (id == 745) {
       if (!allowed_) {
-        Status(L"授权锁定，禁止真实测试输出", true);
+        Status(L"当前授权状态不支持真实测试输出", true);
         return;
       }
       Report(RB_Seatbelt_SetTestOutput(

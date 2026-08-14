@@ -1,8 +1,8 @@
 # RaceBear SDK RB_CAN 接入指南
 
-本文说明第三方 Windows x64 前端如何通过 RaceBear SDK 管理 `RB_CAN` 输出和 RaceBear CANAPP 设备。接口以 `include/RaceBearSDK.h` 为准。
+本文说明 Windows x64 前端如何通过 RaceBear SDK 管理 `RB_CAN` 输出和 RaceBear CANAPP 设备。接口以 `include/RaceBearSDK.h` 为准。
 
-当前公开范围只覆盖 `ProtocolType == 1` 的 `RB_CAN`：
+当前公开工作流覆盖 `ProtocolType == 1` 的 `RB_CAN`：
 
 - 设备发现和身份读取；
 - 逻辑索引设置；
@@ -10,21 +10,21 @@
 - 绑定、运行、电机和健康状态；
 - 用户确认安全后的受控恢复。
 
-本文不适用于 `FM_CAN`、`FC_CAN` 或 `RDS_CAN`。电机参数维护、固件升级、底层 SDO/PDO 和急停控制不属于当前第三方公开接口。
+`FM_CAN`、`FC_CAN`、`RDS_CAN`、电机参数维护、固件升级、底层 SDO/PDO 和急停控制暂未提供公开接入 API，因此不在本文流程内。
 
 ## 1. 四种索引和一个稳定身份
 
-RB_CAN 页面必须区分以下标识：
+RB_CAN 页面会使用以下几类标识：
 
 | 标识 | 用途 | 能否持久化 |
 |---|---|---|
 | `outputIndex` | 当前 `RB_Output` 目录中的 `OUT_n` 零基索引 | 否，增删输出后重新取得 |
 | `CatalogIndex` | 最近一次 CAN 设备刷新中的目录行号 | 否，下次刷新后失效 |
-| `EnumerationIndex` | SDK 当前设备快照中的运行时访问索引 | 否，禁止保存 |
+| `EnumerationIndex` | SDK 当前设备快照中的运行时访问索引 | 否，仅用于当前快照 |
 | `LogicalIndex` | 写入 CANAPP 的逻辑索引，范围 `1-255` | 是，但多卡必须唯一 |
 | `Uid` | CANAPP MCU 的 24 位大写十六进制 UID | 是，物理设备稳定身份 |
 
-输出配置最终使用 `{Uid, LogicalIndex}` 绑定物理设备。不要只保存 `CatalogIndex`、`EnumerationIndex` 或某次 USB 枚举顺序。
+输出配置使用 `{Uid, LogicalIndex}` 稳定绑定物理设备；`CatalogIndex`、`EnumerationIndex` 和 USB 枚举顺序仅服务当前设备快照。
 
 ## 2. 初始化和线程边界
 
@@ -39,14 +39,14 @@ if (RB_Runtime_StartLoop(2) != RB_OK) {
 }
 ```
 
-- SDK 初始化、输出连接和设备刷新不能与应用退出并发执行。
+- SDK 初始化、输出连接和设备刷新与应用退出按生命周期顺序执行。
 - UI 状态定时器可以读取绑定、健康和电机状态。
-- USB 设备刷新只在进入设备页、用户点击刷新或收到热插拔提示后执行，不要放进高频定时器。
-- 设置索引和绑定是用户明确发起的维护操作，不得自动循环重试。
+- USB 设备刷新适合在进入设备页、用户点击刷新或收到热插拔提示后执行，无需放入高频定时器。
+- 设置索引和绑定由用户明确发起；失败时显示诊断并等待用户决定下一步。
 
 ## 3. 创建或定位 RB_CAN 输出
 
-输出类型必须来自 SDK 目录。不要让用户手写类型文本。
+输出类型选择框由 SDK 目录填充，用户可以直接选择有效类型。
 
 ```cpp
 int rbCanOutputIndex = -1;
@@ -92,7 +92,7 @@ for (int i = 0; i < count; ++i) {
 }
 ```
 
-`RB_Can_GetDeviceCount()` 只返回最近一次刷新得到的数量，不重新扫描 USB。刷新后必须丢弃旧目录项对象和选中行号，再按 UID 恢复选择。
+`RB_Can_GetDeviceCount()` 返回最近一次刷新得到的数量，不重新扫描 USB。刷新后使用新的目录项，并按 UID 恢复选择。
 
 设备只有满足下列条件时才适合绑定：
 
@@ -118,14 +118,14 @@ if (rc == 0) {
 }
 ```
 
-调用前必须确认：
+调用前请确认：
 
 1. 所有可能使用该设备的输出已经断开；
 2. 新索引在当前在线设备中唯一；
 3. 用户按 UID 确认了目标设备；
 4. 当前没有退出、连接或其它维护动作并发执行。
 
-返回 `0` 表示写入并读回成功。负数属于设备维护错误，不能统一解释成 `RB_Result`；前端应显示 SDK 日志和刷新后的 `StatusText`。
+返回 `0` 表示写入并读回成功。负数是设备维护错误码，与 `RB_Result` 的语义不同；前端可结合 SDK 日志和刷新后的 `StatusText` 给出具体提示。
 
 ## 6. 将输出稳定绑定到设备
 
@@ -154,7 +154,7 @@ if (rc == 0) {
 }
 ```
 
-不要通过修改 `RB_OutputConfig::CANindex` 代替 UID 绑定。`CANindex` 是公开兼容字段，完整绑定必须由 `RB_Can_BindOutputDevice()` 完成。
+`RB_OutputConfig::CANindex` 是兼容字段；稳定 UID 绑定通过 `RB_Can_BindOutputDevice()` 完成。
 
 多张设备拥有相同旧逻辑索引时，仍然按以下顺序处理：
 
@@ -164,7 +164,7 @@ if (rc == 0) {
 4. 调用 `RB_Can_BindOutputDevice()`；
 5. 再次刷新并读取绑定状态。
 
-不需要拔掉另一张重复索引的设备，也不能根据设备目录行号猜测目标。
+整个过程无需拔掉另一张重复索引的设备；目标设备始终通过 UID 确认。
 
 ## 7. 绑定状态
 
@@ -242,7 +242,7 @@ if (RB_Can_GetOutputHealthState(rbCanOutputIndex, &health) == RB_OK) {
 }
 ```
 
-`RequiresHumanIntervention != 0` 时，前端不得自动无限重试。只有用户确认以下条件后才能提供恢复按钮：
+`RequiresHumanIntervention != 0` 时，前端停止自动重试并显示诊断。用户确认以下条件后即可使用恢复按钮：
 
 - 物理急停已经释放；
 - 设备 UID、逻辑索引和协议身份正确；
@@ -254,7 +254,7 @@ if (RB_Can_GetOutputHealthState(rbCanOutputIndex, &health) == RB_OK) {
 const int rc = RB_Can_RequestOutputRecovery(rbCanOutputIndex);
 ```
 
-`RB_OK` 只表示 SDK 接受了一次恢复请求。页面继续轮询健康状态，不能在定时器中重复调用恢复接口。
+`RB_OK` 表示 SDK 已接受一次恢复请求。页面继续轮询健康状态，恢复接口等待下一次用户明确操作。
 
 ## 11. 推荐页面状态机
 
@@ -273,7 +273,7 @@ const int rc = RB_Can_RequestOutputRecovery(rbCanOutputIndex);
 ```cpp
 RB_Output_RequestDisconnectAll();
 
-// 使用宿主定时器等待，不能无限阻塞 UI 线程。
+// 使用宿主定时器和有界等待，保持 UI 线程可响应。
 for (int i = 0; i < 300 && !RB_Output_AreAllDisconnected(); ++i) {
     Sleep(10);
 }
@@ -281,7 +281,7 @@ for (int i = 0; i < 300 && !RB_Output_AreAllDisconnected(); ++i) {
 RB_Runtime_Shutdown();
 ```
 
-退出期间停止设备刷新、绑定、恢复和其它新命令。不得通过直接卸载 DLL 或终止工作线程代替 SDK 关闭流程。
+退出期间停止设备刷新、绑定、恢复和其它新命令，再按 SDK 关闭流程完成断开和资源释放。
 
 ## 13. 最低验收清单
 

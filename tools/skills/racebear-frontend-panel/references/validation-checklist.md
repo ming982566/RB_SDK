@@ -23,7 +23,7 @@
 - Create, rename/import where supported, delete, refresh, and relocate selections.
 - For each editable page: read, modify, apply if supported, save, read back, and compare business fields.
 - Verify unrelated fields survive edits and invalid ranges are rejected without corrupting the stored configuration.
-- Verify Dynamic, Motion Effect, Haptic, Platform, and Output indexes are never interchanged.
+- Verify Dynamic, Motion Effect, Haptic, Platform, and Output each retain their own catalog index domain.
 
 ## License And Safety
 

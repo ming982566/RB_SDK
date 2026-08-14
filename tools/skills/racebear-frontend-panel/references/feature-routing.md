@@ -23,11 +23,11 @@ Load only the sections needed for the requested page. Confirm every exact signat
 
 ## Page Design Rules
 
-- Use a dropdown or searchable selector for catalog values. Do not require users to type SDK keys, data bindings, output kinds, profile names, or package IDs when the SDK can enumerate them.
+- Use a dropdown or searchable selector for SDK-enumerated keys, data bindings, output kinds, profile names, and package IDs.
 - Keep the selected stable key/ID in page state. If a catalog refresh removes it, show an unavailable state instead of silently selecting a different entry.
 - Disable commands that are invalid for the current snapshot, but keep disconnect, reset, and recovery actions reachable.
-- Show SDK error results beside the action that caused them. Do not replace all failures with a generic toast.
-- Use typed numeric controls with documented ranges and units. Do not expose raw structure memory, reserved fields, or runtime indexes.
+- Show SDK error results beside the action that caused them so developers and users retain the relevant diagnostic context.
+- Use typed numeric controls with documented ranges and units, while keeping reserved fields and runtime-only indexes in the adapter layer.
 - Keep read, apply, save, connect, test, and delete as distinct user actions when their semantics differ.
 - In an RB_CAN page, restore selection by stable UID after every device refresh. Keep duplicate-index devices selectable so the user can assign one target UID a new unique index without unplugging the other device.
 
@@ -46,7 +46,7 @@ Use the target framework's normal FFI:
 - C/C++: include the public header and link the matching import library.
 - C#: use explicit `DllImport`, fixed-layout structures, fixed buffers or safe marshaling helpers, and retained callback delegates.
 - Qt: keep the C ABI adapter outside widgets and emit queued signals to the UI thread.
-- Web/Electron: call the native SDK through a narrow local/native bridge; do not expose arbitrary SDK calls to untrusted page content.
+- Web/Electron: call the native SDK through a narrow local/native bridge that exposes only the operations needed by trusted page content.
 - Python: use dependency-free `ctypes` where appropriate and keep callback objects alive for the registration lifetime.
 
-Do not introduce a new UI framework or state library solely for the integration when the host already has an established pattern.
+Follow the host application's established UI framework and state-management pattern unless the requested work explicitly calls for a change.

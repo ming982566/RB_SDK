@@ -178,7 +178,7 @@ public:
       Refresh();
     } else if (id == 805) {
       if (!allowed_) {
-        Status(L"授权锁定，禁止连接真实输出", true);
+        Status(L"当前授权状态不支持连接真实输出", true);
         return;
       }
       Report(RB_Output_ConnectInstanceByIndex(idx_), L"连接");
@@ -186,7 +186,7 @@ public:
       Report(RB_Output_DisconnectInstanceByIndex(idx_), L"断开");
     else if (id == 807) {
       if (!allowed_) {
-        Status(L"授权锁定，禁止连接真实输出", true);
+        Status(L"当前授权状态不支持连接真实输出", true);
         return;
       }
       int n = RB_Output_ConnectAll();
@@ -205,7 +205,7 @@ public:
     } else if (id == 851) {
       if (Pull()) {
         if (RB_Output_IsInstanceConnected(idx_)) {
-          Status(L"已连接实例必须先断开", true);
+          Status(L"请先断开已连接实例", true);
           return;
         }
         int rc = RB_Output_SaveInstanceConfigByIndex(idx_, &c_);

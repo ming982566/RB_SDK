@@ -4,7 +4,7 @@
 
 `racebear_sdk.py` 已映射动态滤波、输出、运动增强、震动、风感和安全带结构体。常规设置页面应使用 `read_dynamic_profile()`、`read_output()`、`read_wind()` 等结构体方法，不需要读取或手工编辑配置 JSON。
 
-0.4.5 还提供 `dynamic_input_candidates()`、`game_installations()`、`read_game_config()`、`connect_game_source()`、`plugin_catalog()` 和手动平台测试方法。动态通道必须来自按 DOF 返回的候选目录，不能直接使用完整遥测目录。
+0.4.5 还提供 `dynamic_input_candidates()`、`game_installations()`、`read_game_config()`、`connect_game_source()`、`plugin_catalog()` 和手动平台测试方法。动态通道选择使用按 DOF 返回的候选目录，以获得正确的效果类型和遥测映射。
 
 例如修改风感配置：
 
@@ -15,7 +15,7 @@ wind.InputMaxKmh = 180.0
 wind.MasterGainPercent = 100.0
 sdk.save_wind(wind, apply=True)
 
-# 测试结束必须关闭，否则测试值会继续覆盖实时风感。
+# 测试结束后关闭测试输出，让实时风感重新接管。
 sdk.set_wind_test(True, 50.0)
 sdk.set_wind_test(False)
 ```
@@ -47,6 +47,6 @@ finally:
     sdk.close()
 ```
 
-Python 结构体布局必须与同一版本的 `RaceBearSDK.h` 保持一致。升级 SDK 后，如果 `RB_RuntimeState.Version` 或公开结构体发生变化，需要同步更新 `racebear_sdk.py`。
+Python 结构体布局与同一版本的 `RaceBearSDK.h` 配套。升级 SDK 后，如果 `RB_RuntimeState.Version` 或公开结构体发生变化，请同步更新 `racebear_sdk.py`。
 
 SDK 或串口回调可能在非 Python UI 线程触发。PySide/PyQt 前端应通过线程安全队列或 Qt Signal 把结果转发到主线程，并长期保存 `ctypes` 回调对象，防止被垃圾回收。

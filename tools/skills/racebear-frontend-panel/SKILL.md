@@ -5,7 +5,7 @@ description: Build, extend, review, or debug frontend control panels that integr
 
 # RaceBear Frontend Panel
 
-Use the public SDK contract to build a complete, maintainable frontend without coupling the UI to RaceBear internals.
+Use the public SDK contract to build a complete, maintainable frontend around stable RaceBear interfaces.
 
 ## Start With The Contract
 
@@ -29,7 +29,7 @@ List the requested pages and behaviors before coding. Distinguish:
 - real hardware output and manual tests;
 - dashboard rendering and frame delivery.
 
-Do not implement unrequested pages or invent configuration fields. Prefer the target application's existing architecture, component library, state management, and FFI pattern.
+Keep the implementation scoped to the requested pages and SDK-defined configuration fields. Prefer the target application's existing architecture, component library, state management, and FFI pattern.
 
 Read [references/feature-routing.md](references/feature-routing.md) to map each page to the correct public API family and authoritative documentation section.
 
@@ -52,22 +52,22 @@ Keep these layers independent:
 
 - Render a built-in template or an opened `.rbdash` package to BGRA8888.
 - Submit the latest frame to a VOCORE handle, a Dashboard Web handle, or the host window.
-- Persist a built-in template choice by its documented stable value and a customer package by `PackageId`, never by refreshed catalog index.
+- Persist a built-in template choice by its documented stable value and a customer package by `PackageId`; use refreshed catalog indexes only for the current snapshot.
 
 Read [references/dashboard-output.md](references/dashboard-output.md) whenever the request includes a dashboard designer, `.rbdash`, Ford GT assets, VOCORE, browser output, frame timing, or custom instrument UI.
 
-## Enforce Safety Boundaries
+## Preserve Integration Safeguards
 
-- Never include SDK internal headers or instantiate internal backend classes from a third-party frontend.
-- Never persist runtime telemetry indexes, catalog row numbers, device enumeration indexes, or refreshed plugin indexes.
-- Persist an RB_CAN device by `Uid` and its unique logical index; never persist `CatalogIndex` or `EnumerationIndex`.
-- Never reuse an index from a different configuration catalog, even when displayed names match.
-- Never run a second motion calculation loop from a UI timer.
-- Never bypass `state.License.OutputAllowed` or retry `RB_LICENSE_REQUIRED` in a loop.
-- Never allow a page transition or application exit to leave manual pose, wind, seatbelt, haptic, or output tests active.
-- Never block the UI thread waiting indefinitely for devices, network clients, callbacks, output disconnect, or frame consumption.
-- Never expose raw JSON editing as the normal configuration experience when a typed public API exists.
-- Never claim SimRacebear validation unless the user compiled the required frontend configuration manually.
+- Build the adapter from `include/RaceBearSDK.h` and the documented public exports.
+- Persist stable keys and IDs; treat runtime telemetry indexes, catalog rows, device enumeration indexes, and refreshed plugin indexes as snapshot-local values.
+- Identify an RB_CAN device by `Uid` and its unique logical index. `CatalogIndex` and `EnumerationIndex` remain valid only for the current device snapshot.
+- Keep each configuration catalog's index in its own domain, even when displayed names match.
+- Let the SDK-owned loop perform motion calculations; UI timers read state and update presentation.
+- Gate protected actions with `state.License.OutputAllowed`, and present `RB_LICENSE_REQUIRED` without automatic retry loops.
+- Reset manual pose, wind, seatbelt, haptic, and output tests on page transitions and application exit.
+- Use bounded waits or asynchronous state updates for devices, network clients, callbacks, output disconnect, and frame consumption so the UI remains responsive.
+- Present typed configuration controls when a public typed API is available; reserve raw JSON for advanced tooling.
+- Report SimRacebear validation only after the user has manually built the required frontend configuration.
 
 ## Verify Before Finishing
 

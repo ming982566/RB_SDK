@@ -4,27 +4,27 @@
 
 Use one process-wide SDK owner:
 
-1. Call `RB_Runtime_SetAppDataName("StableProductName")` before initialization. Pass a directory name, not a path, and do not borrow `SimRacebear` for another product.
+1. Call `RB_Runtime_SetAppDataName("StableProductName")` before initialization. Pass a directory name rather than a path so the product receives an independent configuration directory.
 2. Call `RB_Runtime_Initialize()` once.
 3. Call `RB_Runtime_StartLoop(intervalMs)` once. A normal frontend does not periodically call `RB_Runtime_DoCalculations()`.
 4. Read `RB_RuntimeState` through `RB_State_Read()` on a UI refresh timer, normally 30-60 Hz.
 5. Drain logs separately, normally every 100-500 ms. Refresh catalogs only on page entry, explicit refresh, or a known mutation.
 6. On exit, stop producers of SDK calls, zero tests, disconnect outputs with a bounded wait, close handles, and call `RB_Runtime_Shutdown()` once.
 
-Keep the backend loop independent from rendering. A blocked UI must not stop motion calculations, and a slow device must not stall the UI.
+Keep the backend loop independent from rendering so UI delays do not interrupt motion calculations and slow devices do not stall presentation.
 
 ## Binding And ABI
 
-- Load the DLL matching the header and import library version. Do not mix Debug and Release artifacts.
+- Load the DLL that matches the header, import library, and Debug or Release configuration.
 - Match the C calling convention and exact integer, pointer, array, and structure layout.
 - Set versioned structure `Size` fields before calls that require them.
 - Allocate writable output buffers and handle documented buffer-too-small behavior.
 - Copy fixed character arrays into frontend-owned strings before the next mutation or shutdown.
-- Marshal callbacks to the UI thread; never manipulate UI controls directly from SDK or serial callback threads.
+- Marshal callbacks to the UI thread before updating visual controls.
 
 ## State And Catalogs
 
-Use `RB_State_Read()` for the current runtime snapshot. Do not treat it as a replacement for full catalogs or configurations.
+Use `RB_State_Read()` for the current runtime snapshot, and use the owning APIs when a page needs a full catalog or configuration.
 
 For every selector:
 
@@ -48,7 +48,7 @@ Prefer typed public structures for normal UI pages:
 2. Preserve fields the page does not edit, including compatibility fields.
 3. Modify only fields represented by valid controls and SDK-provided candidates.
 4. Validate ranges before calling Apply or Save.
-5. Use Apply for supported runtime preview; do not assume it persists.
+5. Use Apply for supported runtime preview and Save when the change should persist.
 6. Use Save for persistence.
 7. Read back and compare business fields instead of using whole-structure `memcmp`.
 8. Refresh affected catalogs after create, delete, or rename.
@@ -60,7 +60,7 @@ Configuration ownership rules:
 - System, wind, and seatbelt are single global configurations unless the current public guide says otherwise.
 - Game telemetry is stored per stable game key.
 - Platform, Dynamic, Motion Effect, and Output use their own catalogs.
-- Haptic structures are independent, while the current profile name directory is associated with Dynamic. Do not use a Motion Effect index for Haptic.
+- Haptic structures are independent, while the current profile name directory is associated with Dynamic. Resolve Haptic selections from the Dynamic name directory rather than the Motion Effect catalog.
 
 ## Commands And Errors
 
@@ -68,12 +68,12 @@ Configuration ownership rules:
 - Use `RB_Command_Run()` for actions documented as commands and pass `{}` for no-argument commands.
 - Check both the integer return code and any returned command JSON.
 - Surface `RB_INVALID_ARGUMENT` as a validation or stale-selection problem.
-- Treat `RB_ERROR` according to the called API's documented state and diagnostics; do not hide it behind tight-loop retries.
+- Treat `RB_ERROR` according to the called API's documented state and diagnostics, and offer a deliberate retry path where appropriate.
 - When `RB_LICENSE_REQUIRED` is returned, explain that the operation requires output permission and stop automatic retries.
 
 ## Licensing And Tests
 
-Read license presentation state from `RB_RuntimeState::License`. Do not read license files or call the license server directly.
+Read license presentation state from `RB_RuntimeState::License` and submit license actions through the documented command API.
 
 - Keep catalogs, configuration, raw telemetry, activation, disconnect, and reset UI available when permitted by the public contract.
 - Disable protected Apply, connection, and manual-test actions when `License.OutputAllowed == 0`.

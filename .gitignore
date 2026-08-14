@@ -17,7 +17,7 @@ cmake_install.cmake
 *.exp
 *.ilk
 
-# Private SDK implementation must never enter the distribution repository
+# SDK implementation and development-only files are outside this distribution
 /src/
 /tests/
 /InternalReferences/

@@ -12,7 +12,7 @@ Treat rendering and delivery as separate operations:
 4. Read each output handle's state on a slower status timer.
 5. Close every handle before runtime shutdown.
 
-Use a dedicated 16-33 ms render timer for typical dashboards. VOCORE and Web accept latest-frame replacement; do not wait for a pending frame to clear before rendering the next current frame.
+Use a dedicated 16-33 ms render timer for typical dashboards. VOCORE and Web accept latest-frame replacement, so rendering can continue with the newest frame while an earlier frame is pending.
 
 ## Customer Packages
 
@@ -21,7 +21,7 @@ Use a dedicated 16-33 ms render timer for typical dashboards. VOCORE and Web acc
 - Persist `PackageId`, not the package catalog index.
 - Refresh the package catalog after import or delete, then relocate the selection by `PackageId`.
 - Close the previous `RB_DashboardPackageHandle` when selection changes or the page exits.
-- Treat the format as declarative data. Do not add script execution, arbitrary filesystem access, networking, process control, or SDK control calls to a template.
+- Treat the format as declarative visual data, limited to recognized bindings and packaged assets rather than executable or system-control capabilities.
 
 ## Designer
 
@@ -35,14 +35,14 @@ For designer UI work:
 - include common vehicle widgets such as circular needle gauges, digital values, shift lights, warning lamps, gear, lap/time, fuel, temperatures, tire state, pedals, steering, bars, arcs, text, and images;
 - export a valid single-file `.rbdash` and clearly show the SDK import/user package destination described by the current API.
 
-Do not promise pixel-perfect reproduction of a complex production cluster unless the current component model, font/assets, animations, masks, conditional visibility, and test data support it. State format limitations precisely.
+Describe the available component model, fonts/assets, animations, masks, conditional visibility, and test data before committing to pixel-perfect reproduction of a complex production cluster.
 
 ## VOCORE
 
 - Enumerate devices and open by `DeviceId`.
 - Keep one `RB_VoCoreHandle` per screen and close it explicitly.
 - Use `RB_VoCore_SetAutoReconnect()` for the selected policy.
-- Do not destroy a handle merely because a device was unplugged when automatic reconnect should continue.
+- Keep the handle alive across temporary unplug events when automatic reconnect is enabled.
 - Read `RB_VoCore_GetState()` for connection, reconnect, actual FPS, dropped/replaced frames, and last libusb error.
 - Deploy `libusb-1.0.dll` beside the host EXE when VOCORE is used.
 
@@ -55,4 +55,4 @@ Do not promise pixel-perfect reproduction of a complex production cluster unless
 
 ## Assets
 
-Deploy `DashboardAssets/RaceBear` with its directory structure beside `RaceBearSDK.dll` when using Ford GT or bundled customer assets. Missing assets must produce a visible diagnostic; do not silently substitute a misleading complete state.
+Deploy `DashboardAssets/RaceBear` with its directory structure beside `RaceBearSDK.dll` when using Ford GT or bundled customer assets. When assets are missing, show an actionable diagnostic instead of presenting an incomplete render as successful.

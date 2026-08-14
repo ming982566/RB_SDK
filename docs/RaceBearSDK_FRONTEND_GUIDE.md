@@ -1,12 +1,12 @@
-# RaceBear SDK 第三方前端实现指南
+# RaceBear SDK 前端开发指南
 
-本文用于指导第三方开发者从零实现一个完整的 RaceBear 前端。调用方只需要
+本文用于指导应用开发者从零实现一个完整的 RaceBear 前端。集成所需内容包括
 `RaceBearSDK.h`、对应配置的 `RaceBearSDK.lib`、`RaceBearSDK.dll` 和本文，
-不需要阅读 SDK 源码。
+无需了解 SDK 的实现细节。
 
 字段定义、固定数组容量和每个导出函数的参数说明以
 `include/RaceBearSDK.h` 为准；完整参数表和协议说明见
-`RaceBearSDK_API.md`。实现 RB_CAN 设备页时还必须阅读
+`RaceBearSDK_API.md`。实现 RB_CAN 设备页时请同时参考
 `RaceBearSDK_RB_CAN_GUIDE.md`。本文重点说明如何把这些接口正确组合成可用软件。
 
 ### AI 辅助开发入口
@@ -24,7 +24,7 @@ SDK 源稿中的 `tools/skills/racebear-frontend-panel` 是面向支持 Skill �
 使用随 SDK 提供的 RaceBear 前端 Skill，为当前应用实现 RaceBear SDK 控制面板。
 ```
 
-Skill 不替代本文，也不固定前端框架。AI 仍必须以当前
+Skill 不替代本文，也不固定前端框架。AI 应以当前
 `include/RaceBearSDK.h` 的签名和结构体布局为准，只读取本次功能相关章节，并沿用
 目标工程已经存在的 UI、状态管理和本地调用方式。
 
@@ -46,7 +46,7 @@ SDK 负责：
 - 把用户动作转换为 SDK 调用，并显示返回结果。
 - 正确执行测试归零、设备断开和退出顺序。
 
-前端不得自行创建第二套运动计算循环，也不得在多个页面重复初始化 SDK。
+应用只需保留一个进程级 SDK 生命周期，并让 SDK 自有循环负责运动计算。
 
 ## 2. 最小生命周期
 
@@ -73,7 +73,7 @@ int StartBackend()
 正常运行期间：
 
 - SDK 内部循环由 `RB_Runtime_StartLoop()` 驱动。
-- UI 不得周期调用 `RB_Runtime_DoCalculations()`。
+- UI 定时器使用 `RB_State_Read()` 刷新状态，由 SDK 自有循环完成计算。
 - UI 定时器只读取状态，推荐 30-60 Hz。
 - 日志定时器推荐 100-500 ms 排空一次。
 - 游戏、平台、效果和输出目录只在页面打开或用户刷新时读取。
@@ -84,7 +84,7 @@ int StartBackend()
 ```cpp
 void StopBackend()
 {
-    // 先停止宿主定时器和线程，禁止产生新的 SDK 调用。
+    // 先停止宿主定时器和线程，确保关闭期间不再产生新的 SDK 调用。
     RB_ManualPose_ResetDrive();
     RB_ManualPose_SetTestEnabled(0);
     RB_Wind_SetTestOutput(0, 0.0);
@@ -99,10 +99,9 @@ void StopBackend()
 }
 ```
 
-串口回调、宿主线程和 UI 定时器必须在 `RB_Runtime_Shutdown()` 前停止。关闭 SDK
-后不得再调用任何 SDK 函数。
+在 `RB_Runtime_Shutdown()` 前停止串口回调、宿主线程和 UI 定时器，并把该调用作为 SDK 生命周期的终点。
 
-## 3. 必须先理解的配置关系
+## 3. 配置目录与索引关系
 
 不同配置类型不是一套索引，也不能因为名称相同就混用索引。
 
@@ -132,8 +131,8 @@ for (int i = 0; i < count; ++i) {
 }
 ```
 
-不得使用 `RB_Dynamic_GetProfileCount()` 填充运动增强配置选择框。即使两个目录
-当前具有相同名称，它们的数量、顺序和生命周期也可能不同。
+运动增强配置选择框使用 `RB_MotionEffect_GetProfileCount()`。动态滤波目录即使
+显示相同名称，其数量、顺序和生命周期也可能不同。
 
 ### 3.2 震动目录的当前限制
 
@@ -145,7 +144,7 @@ for (int i = 0; i < count; ++i) {
   `RB_Haptic_SaveProfile(name, ...)`。
 - 震动结构体与动态滤波结构体完全独立，只是配置名称目录暂时关联。
 
-前端必须把这个限制明确封装在震动页面中，不能把运动增强也错误地套用同一规则。
+震动页面按上述名称关联方式实现；运动增强继续使用自己的独立目录。
 
 ### 3.3 风感和安全带不是配置目录
 
@@ -231,7 +230,7 @@ RB_Command_Run("license.deactivate", "{}", result, resultSize);
 
 未授权时不要强制关闭宿主程序。配置、目录、原始遥测、状态和激活页面仍可用；SDK 会停止专有计算并安全断开真实输出。
 
-前端必须按下面规则处理锁定状态：
+锁定状态建议按下面规则呈现：
 
 - `state.License.OutputAllowed == 0` 时禁用 Apply、测试启用和连接按钮，但保留保存、复位和断开按钮。
 - `RB_State_Read()` 仍然成功，受保护的最终遥测、6DOF、执行器和附加效果结果为 0。
@@ -260,7 +259,7 @@ RB_Game_GetCatalog(&games);
 RB_Game_SelectByKey(selected.GameKey);
 ```
 
-保存按钮必须先确认当前有非空 `GameKey`，不能把空字符串传给配置接口。
+保存前确认当前已有非空 `GameKey`，并在缺少选择时提示用户。
 
 ### 7.2 游戏配置
 
@@ -277,7 +276,7 @@ if (rc == RB_OK) {
 ```
 
 新的 AppData 目录中某个游戏可能尚无独立配置。此时前端应显示“尚未创建配置”，
-并在用户保存前完整初始化所有可写字段；不得把未初始化内存传给 SDK。
+并在用户保存前完整初始化所有可写字段，确保传入 SDK 的结构体状态明确。
 
 安装扫描使用：
 
@@ -499,8 +498,8 @@ SDK 初始化时会加载输出实例目录。`RB_Output_GetInstanceCount()`、
 
 CAN 输出页面除 `state.Can` 全局摘要外，还应按输出实例读取健康快照：
 
-完整 RB_CAN 页面不能只填写 `CANindex`。设备刷新、UID 选择、重复索引修复、稳定绑定、
-单输出电机状态和安全恢复必须按 `RaceBearSDK_RB_CAN_GUIDE.md` 实现。当前第三方范围只覆盖
+完整 RB_CAN 页面除兼容字段 `CANindex` 外，还应提供设备刷新、UID 选择、重复索引修复、稳定绑定、
+单输出电机状态和安全恢复，具体流程见 `RaceBearSDK_RB_CAN_GUIDE.md`。当前公开范围覆盖
 `ProtocolType == 1` 的 `RB_CAN`；其它 CAN 协议暂不展示为可管理设备。
 
 ```cpp
@@ -513,8 +512,8 @@ if (RB_Can_GetOutputHealthState(outputIndex, &health) == RB_OK) {
 
 “恢复”按钮只能由用户在排除急停、断线、身份冲突、固件维护和机械故障后点击，
 调用 `RB_Can_RequestOutputRecovery(outputIndex)`。返回 `RB_OK` 仅表示恢复请求已
-接受，页面继续轮询健康快照直到进入就绪/运行或再次报告故障。不得用 UI 定时器
-重复触发恢复。
+接受，页面继续轮询健康快照直到进入就绪/运行或再次报告故障。恢复请求由用户明确触发一次，
+UI 定时器只负责读取状态。
 
 ## 14. 自定义游戏和外部数据源
 
@@ -551,8 +550,8 @@ if (RB_Can_GetOutputHealthState(outputIndex, &health) == RB_OK) {
 
 模板下拉框可以先放四个 `RB_DashboardTemplate` 内置项，再追加
 `RB_DashboardPackageInfo::Valid == 1` 的客户模板。持久化时内置项保存
-`TemplateIndex`，客户模板保存稳定 `PackageId`；目录刷新后重新按 ID 定位，禁止保存
-目录索引。客户模板句柄在选择变化或退出时关闭，VOCORE 和 Web 可以复用同一句柄
+`TemplateIndex`，客户模板保存稳定 `PackageId`；目录刷新后重新按 ID 定位，目录索引仅用于当前快照。
+客户模板句柄在选择变化或退出时关闭，VOCORE 和 Web 可以复用同一句柄
 分别渲染目标尺寸。
 
 每块 VOCORE 屏幕独立枚举、打开、提交、读取状态和关闭。运行时可以用
@@ -623,8 +622,8 @@ RB_Serial_Destroy(handle);
 `RB_Serial_ReadSome/ReadAll/ReadLine`。读写函数成功时通常返回字节数，调用方不能
 只用 `result == RB_OK` 判断发送是否成功。
 
-串口回调可能在 SDK 工作线程触发。回调中只复制数据或设置线程安全标志，不得直接
-操作 UI 控件。窗口销毁前必须先断开回调，再销毁句柄。
+串口回调可能在 SDK 工作线程触发。回调中复制数据或设置线程安全标志，再转发到 UI 线程更新控件。
+窗口销毁前先断开回调，再销毁句柄。
 
 ## 17. 插件、日志和诊断
 
@@ -659,9 +658,9 @@ SDK 资源监视器可通过 `RB_Debug_OpenMonitor()` 打开，只用于诊断�
 `RB_Data_ReadJson/WriteJson` 适用于脚本、迁移工具和高级编辑器。普通配置页面
 不应要求最终用户编辑 JSON，也不能写入局部 JSON 片段覆盖完整配置。
 
-## 19. 最低页面验收清单
+## 19. 页面验收参考
 
-一个可发布前端至少满足：
+发布前建议确认：
 
 - SDK 初始化、内部循环、状态刷新和正常退出完整。
 - 授权状态、激活、反激活和手动检查可用。

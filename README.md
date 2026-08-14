@@ -1,8 +1,7 @@
 # RaceBear SDK
 
 RaceBear SDK is a Windows x64 C ABI SDK for building telemetry, motion,
-haptics, output, and dashboard frontends without access to the private backend
-source code.
+haptics, output, and dashboard frontend applications.
 
 ## 0.5.0
 
@@ -41,12 +40,13 @@ The DLL reports runtime version `0.5.0-vs2019-x64`.
 | `tools/DashboardDesigner` | Local browser dashboard editor |
 | `tools/skills/racebear-frontend-panel` | Tool-neutral AI frontend integration Skill |
 
-Private SDK implementation, internal tests, internal references, and the SDK
-Visual Studio project are intentionally excluded.
+The public package is organized around the stable C ABI and includes the
+headers, binaries, resources, documentation, tools, and examples needed for
+application integration.
 
 ## Quick Start
 
-Use files from one configuration. Do not mix Debug and Release DLL/LIB files.
+Use the header, DLL, and LIB from the same Debug or Release configuration.
 
 ```cpp
 #include "RaceBearSDK.h"
@@ -96,8 +96,8 @@ verified 0.5.0 build.
   indexes and catalog row numbers are not persistent identifiers.
 - Prefer typed configuration APIs. Use JSON APIs only for advanced editors and
   migration tools.
-- Read license state from `RB_RuntimeState::License`. Do not access license
-  files or servers directly.
+- Read license state from `RB_RuntimeState::License` and submit license actions
+  through the documented command API.
 - Stop UI timers and callbacks, reset manual tests, request output disconnect,
   close owned handles, and then call `RB_Runtime_Shutdown()` once.
 - Consult the frontend guide before implementing platform, Dynamic, Motion
@@ -110,9 +110,9 @@ Open `tools/DashboardDesigner/index.html` directly, or run
 required.
 
 Exported `.rbdash` files can be imported through the dashboard package API.
-Templates are declarative, bind only to recognized stable `rb.*` keys, and do
-not execute scripts or access the filesystem, network, processes, or SDK
-control functions.
+Templates are declarative and bind to recognized stable `rb.*` keys. The format
+contains visual data only, with no script, filesystem, network, process, or SDK
+control capabilities.
 
 ## AI-Assisted Development
 
@@ -142,5 +142,5 @@ validation. The current public header and documentation remain authoritative.
 
 See `docs/RaceBearSDK_FRONTEND_GUIDE.md` first, then use
 `docs/RaceBearSDK_API.md` for detailed signatures, ranges, units, and failure
-behavior. Frontends that manage RB_CAN hardware must also follow
+behavior. Frontends that manage RB_CAN hardware should also use
 `docs/RaceBearSDK_RB_CAN_GUIDE.md`.
