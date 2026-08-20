@@ -180,3 +180,70 @@ int InspectPluginsAndManualPoseExample()
 	RB_ManualPose_SetTestEnabled(0);
 	return rc;
 }
+
+int ConfigureRgbEffectExample(const char* optionalDeviceUid)
+{
+	RB_RgbEffectProfile profile{};
+	int rc = RB_Rgb_GetDefaultEffectProfile(&profile);
+	if (rc != RB_OK) return rc;
+
+	profile.Enabled = 1;
+	profile.FrameRateHz = 30;
+	profile.MasterBrightnessPercent = 80.0;
+	profile.LayerCount = 3;
+	// 第1路的 LED 1-20 显示 RPM，公开接口使用从0开始的 StartPixel 和数量。
+	profile.Layers[0].Enabled = 1;
+	profile.Layers[0].EffectType = RB_RGB_EFFECT_RPM_BAR;
+	strcpy_s(profile.Layers[0].TelemetryKey, sizeof(profile.Layers[0].TelemetryKey), "rb.vehicle.engine.rpm");
+	profile.Layers[0].OutputMask = 0x01;
+	profile.Layers[0].StartPixel = 0;
+	profile.Layers[0].PixelCount = 20;
+	profile.Layers[0].MinValue = 0.0;
+	profile.Layers[0].MaxValue = 8000.0;
+	profile.Layers[0].ColorA = 0x0000FF00U;
+	profile.Layers[0].ColorB = 0x00FF0000U;
+	profile.Layers[0].FillMode = RB_RGB_FILL_FORWARD;
+	// 换挡闪烁覆盖同一区段，较高优先级使它在触发时覆盖 RPM 条。
+	profile.Layers[1].Enabled = 1;
+	profile.Layers[1].EffectType = RB_RGB_EFFECT_SHIFT_FLASH;
+	strcpy_s(profile.Layers[1].TelemetryKey, sizeof(profile.Layers[1].TelemetryKey), "rb.vehicle.engine.rpm");
+	profile.Layers[1].OutputMask = 0x01;
+	profile.Layers[1].StartPixel = 0;
+	profile.Layers[1].PixelCount = 20;
+	profile.Layers[1].Threshold = 7200.0;
+	profile.Layers[1].ColorA = 0x00FFFFFFU;
+	profile.Layers[1].SpeedHz = 8.0;
+	profile.Layers[1].BlinkDutyPercent = 50.0;
+	profile.Layers[1].Priority = 20;
+	// 第1路的 LED 21-30 在 ABS 激活时独立闪烁，不影响前20颗 RPM 灯。
+	profile.Layers[2].Enabled = 1;
+	profile.Layers[2].EffectType = RB_RGB_EFFECT_TELEMETRY_BLINK;
+	strcpy_s(profile.Layers[2].TelemetryKey, sizeof(profile.Layers[2].TelemetryKey), "rb.driver_assist.abs.active");
+	profile.Layers[2].OutputMask = 0x01;
+	profile.Layers[2].StartPixel = 20;
+	profile.Layers[2].PixelCount = 10;
+	profile.Layers[2].Threshold = 0.5;
+	profile.Layers[2].ColorA = 0x00FFFF00U;
+	profile.Layers[2].SpeedHz = 6.0;
+	profile.Layers[2].BlinkDutyPercent = 35.0;
+	profile.Layers[2].Priority = 30;
+
+	// Apply only updates the runtime copy. Save is the explicit disk write.
+	rc = RB_Rgb_ApplyEffectProfile(&profile);
+	if (rc != RB_OK) return rc;
+	rc = RB_Rgb_SaveEffectProfile(&profile);
+	if (rc != RB_OK || optionalDeviceUid == nullptr || optionalDeviceUid[0] == '\0') return rc;
+
+	// Device discovery is low frequency and UID based; directory indexes are not persisted.
+	if (RB_Rgb_RefreshDevices() < 0) return RB_ERROR;
+	rc = RB_Rgb_Connect(optionalDeviceUid);
+	if (rc != RB_OK) return rc;
+
+	RB_RgbDeviceConfig device{};
+	rc = RB_Rgb_ReadDeviceConfig(&device);
+	if (rc != RB_OK) return rc;
+	device.GlobalBrightness = 204;
+	device.CurrentLimitMa = 5000;
+	// Applying does not write MCU Flash. Call SaveDeviceConfig only from an explicit Save action.
+	return RB_Rgb_ApplyDeviceConfig(&device);
+}

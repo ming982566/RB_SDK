@@ -24,6 +24,9 @@
 - For each editable page: read, modify, apply if supported, save, read back, and compare business fields.
 - Verify unrelated fields survive edits and invalid ranges are rejected without corrupting the stored configuration.
 - Verify Dynamic, Motion Effect, Haptic, Platform, and Output each retain their own catalog index domain.
+- Verify RGB effect telemetry bindings survive restart by stable Key and RGBAPP selection survives refresh by UID.
+- Verify separate RGB layers can map RPM to LED 1-20 and ABS blinking to LED 21-30, including frequency, duty cycle, fill direction, invert, and priority round trips.
+- Verify overlapping RGB layers render in priority order and reject start/end ranges outside the per-strip 1-255 limit.
 
 ## License And Safety
 
@@ -40,6 +43,7 @@
 - Open/close VOCORE repeatedly, test unplug/replug with the selected reconnect policy, and inspect state counters.
 - Open/close Dashboard Web, connect/disconnect a client, and verify frame delivery does not block rendering.
 - Verify missing `libusb-1.0.dll` or dashboard assets produce actionable diagnostics.
+- With RGBAPP hardware, verify four strip mappings, direction/color order, current limiting, test-pattern stop, unplug fail-dark, latest-only frame counters, and shutdown blackout.
 
 ## Evidence
 

@@ -87,7 +87,55 @@ enum RB_Limits
 	RB_MOTION_ROUTE_COUNT = 6,       // 每个运动增强效果最大输出路由数。
 	RB_HAPTIC_EFFECT_COUNT = 7,      // 震动效果数量。
 	RB_SEATBELT_OUTPUT_COUNT = 2,    // 安全带输出通道数。
+	RB_RGB_OUTPUT_COUNT = 4,         // RGBAPP 独立 WS2812B 输出路数。
+	RB_RGB_EFFECT_LAYER_COUNT = 16,  // 单个 RGB 配置最大效果层数。
+	RB_RGB_EFFECT_INPUT_COUNT = 12,  // 单个 RGB 效果最多返回的语义输入数量。
 	RB_MAX_DASHBOARD_PACKAGES = 128 // 客户仪表目录最大返回数量。
+};
+
+enum RB_RgbEffectType
+{
+	RB_RGB_EFFECT_STATIC = 0,
+	RB_RGB_EFFECT_RPM_BAR = 1,
+	RB_RGB_EFFECT_SHIFT_FLASH = 2,
+	RB_RGB_EFFECT_TELEMETRY_THRESHOLD = 3,
+	RB_RGB_EFFECT_PULSE = 4,
+	RB_RGB_EFFECT_STATUS_COLOR = 5,
+	RB_RGB_EFFECT_TELEMETRY_BLINK = 6, // 任意遥测值达到阈值后闪烁。
+	RB_RGB_EFFECT_AUDIO_VOLUME = 7 // 按电脑当前播放声音的音量驱动亮度和点亮数量。
+};
+
+// RGB效果输入值的语义类型，供前端选择合适的参数控件和默认范围。
+enum RB_RgbEffectInputValueType
+{
+	RB_RGB_INPUT_CONTINUOUS = 0, // 连续数值或归一化派生强度。
+	RB_RGB_INPUT_BOOLEAN = 1,    // 0/1 状态值。
+	RB_RGB_INPUT_PERCENT = 2,    // 0-100 百分比。
+	RB_RGB_INPUT_EVENT = 3       // 0-1 短时事件或脉冲强度。
+};
+
+// RGB效果输入标志。
+enum RB_RgbEffectInputFlags
+{
+	RB_RGB_INPUT_FLAG_FIXED = 1 << 0,       // 效果语义固定，前端不允许改为其它输入。
+	RB_RGB_INPUT_FLAG_RECOMMENDED = 1 << 1, // 当前效果的首选输入。
+	RB_RGB_INPUT_FLAG_DERIVED = 1 << 2      // SDK统一计算的派生效果值。
+};
+
+enum RB_RgbFillMode
+{
+	RB_RGB_FILL_FORWARD = 0,    // 从区段起点向终点填充。
+	RB_RGB_FILL_REVERSE = 1,    // 从区段终点向起点填充。
+	RB_RGB_FILL_CENTER_OUT = 2  // 从区段中心向两侧填充。
+};
+
+enum RB_RgbTestPattern
+{
+	RB_RGB_TEST_OFF = 0,
+	RB_RGB_TEST_SOLID = 1,
+	RB_RGB_TEST_COLOR_WIPE = 2,
+	RB_RGB_TEST_RAINBOW = 3,
+	RB_RGB_TEST_OUTPUT_IDENTIFY = 4
 };
 
 // 自定义游戏遥测传输方式。MMF仅支持同机Windows进程，UDP支持跨进程和跨主机。
@@ -430,6 +478,26 @@ struct RB_SeatbeltState
 	int TestOutputEnabled;                       // 是否启用测试输出。
 	double TestLeftPercent;                      // 左测试输出百分比。
 	double TestRightPercent;                     // 右测试输出百分比。
+};
+
+struct RB_RgbState
+{
+	int Size;
+	int Version;
+	int Enabled;
+	int Connected;
+	char DeviceUid[RB_TEXT_SMALL];
+	int ActiveLayerCount;
+	int LogicalPixelCount;
+	unsigned int GeneratedFrames;
+	unsigned int SubmittedFrames;
+	unsigned int SentFrames;
+	unsigned int DroppedFrames;
+	unsigned int FailedFrames;
+	int LastError;
+	unsigned int EstimatedCurrentMa;
+	unsigned int PowerScalePermille;
+	double LastTelemetryValue[RB_RGB_EFFECT_LAYER_COUNT];
 };
 
 // 后端运行态总快照。前端高频读取此结构体即可刷新主状态 UI。
@@ -1194,6 +1262,123 @@ struct RB_SeatbeltEffectConfig
 	double RightOutputRatioPercent;                // 右安全带输出比例百分比。
 	int LeftReverse;                               // 左通道是否反向。
 	int RightReverse;                              // 右通道是否反向。
+};
+
+struct RB_RgbStripConfig
+{
+	int Enabled;
+	int ColorOrder;
+	int Reversed;
+	int Brightness;
+	int LedCount;
+	int LogicalStart;
+};
+
+struct RB_RgbDeviceConfig
+{
+	int Size;
+	int Version;
+	int GlobalBrightness;
+	int CurrentLimitMa;
+	int PixelCurrentMa;
+	int HostTimeoutMs;
+	RB_RgbStripConfig Strips[RB_RGB_OUTPUT_COUNT];
+};
+
+struct RB_RgbDeviceInfo
+{
+	int Size;
+	int Version;
+	char Uid[RB_TEXT_SMALL];
+	unsigned int FirmwareVersion;
+	unsigned int Capabilities;
+	int MaxOutputs;
+	int MaxLedsPerOutput;
+	int Connected;
+	int IapMode;                  // 1 表示设备停在 IAP，只能用于 APP 固件更新。
+};
+
+struct RB_RgbDiagnostics
+{
+	int Size;
+	int Version;
+	unsigned int UptimeMs;
+	unsigned int CommittedFrames;
+	unsigned int DisplayedFrames;
+	unsigned int RejectedFrames;
+	unsigned int UsbRxOverflowCount;
+	unsigned int DmaErrorCount;
+	unsigned int TimeoutBlackoutCount;
+	unsigned int DisconnectBlackoutCount;
+	unsigned int EstimatedCurrentMa;
+	unsigned int PowerScalePermille;
+	unsigned int ActivePixels;
+	int OutputBusy;
+	int UsbConfigured;
+	int UsbSuspended;
+	int LastBlackoutReason;
+};
+
+// RGBAPP APP 固件异步更新状态。前端轮询此结构时只读取内存，不访问固件文件或 USB。
+struct RB_RgbFirmwareUpdateState
+{
+	int Size;
+	int Version;                 // 当前为 1。
+	int Running;
+	int Complete;
+	int Success;
+	int Progress;                // 0-100。
+	int ErrorCode;               // 0 成功；负数为 RGB 控制器错误。
+	char DeviceUid[RB_TEXT_SMALL];
+};
+
+// RGB效果语义输入项。调用 RB_Rgb_GetEffectInput() 填充。
+struct RB_RgbEffectInputItem
+{
+	int Size;                              // 结构体字节数，由 SDK 写入。
+	int Version;                           // 当前为 1。
+	char Key[RB_TEXT_SMALL];               // 稳定遥测或派生效果 Key。
+	char Name[RB_TEXT_MEDIUM];             // 面向开发者的 UTF-8 显示名称。
+	int TelemetryIndex;                    // 当前进程运行时索引，不能持久化。
+	int ValueType;                         // RB_RgbEffectInputValueType。
+	int Flags;                             // RB_RgbEffectInputFlags 位组合。
+	int SupportedByCurrentSource;          // 当前 Source 是否直接支持或可计算该输入。
+	double DefaultMinValue;                // 选择该输入时建议使用的最小值。
+	double DefaultMaxValue;                // 选择该输入时建议使用的最大值。
+	double DefaultThreshold;               // 选择该输入时建议使用的触发阈值。
+};
+
+struct RB_RgbEffectLayerConfig
+{
+	int Enabled;
+	int EffectType;
+	char TelemetryKey[RB_TEXT_SMALL];
+	int TelemetryIndex;
+	int OutputMask;
+	int StartPixel;
+	int PixelCount;
+	int Priority;
+	unsigned int ColorA;
+	unsigned int ColorB;
+	double MinValue;
+	double MaxValue;
+	double Threshold;
+	double BrightnessPercent;
+	double SpeedHz;
+	int Invert;
+	double BlinkDutyPercent; // 闪烁周期内保持点亮的百分比，范围0-100。
+	int FillMode;            // RB_RgbFillMode，仅 RPM 条使用。
+};
+
+struct RB_RgbEffectProfile
+{
+	int Size;
+	int Version;
+	int Enabled;
+	int FrameRateHz;
+	double MasterBrightnessPercent;
+	int LayerCount;
+	RB_RgbEffectLayerConfig Layers[RB_RGB_EFFECT_LAYER_COUNT];
 };
 
 struct RB_SystemConfig
@@ -2116,6 +2301,54 @@ RB_API int RB_Seatbelt_ApplyConfigToCurrentFunction(const RB_SeatbeltEffectConfi
  * @return RB_OK 表示测试状态已更新；其他值表示运行态不可用。
  */
 RB_API int RB_Seatbelt_SetTestOutput(int enabled, double leftPercent, double rightPercent);
+
+/** @brief 刷新 RGBAPP WinUSB 设备目录并返回设备数量。 */
+RB_API int RB_Rgb_RefreshDevices();
+/** @brief 返回最近一次刷新后的 RGBAPP 设备数量。 */
+RB_API int RB_Rgb_GetDeviceCount();
+/** @brief 读取设备目录项；index 为零基目录索引。 */
+RB_API int RB_Rgb_GetDeviceInfo(int index, RB_RgbDeviceInfo* info);
+/** @brief 按稳定 MCU UID 连接 RGBAPP。 */
+RB_API int RB_Rgb_Connect(const char* uid);
+/** @brief 熄灭并断开当前 RGBAPP。 */
+RB_API void RB_Rgb_Disconnect();
+/** @brief 读取设备当前四路灯带与功率保护配置。 */
+RB_API int RB_Rgb_ReadDeviceConfig(RB_RgbDeviceConfig* config);
+/** @brief 将灯带配置应用到设备运行态，不写 Flash。 */
+RB_API int RB_Rgb_ApplyDeviceConfig(const RB_RgbDeviceConfig* config);
+/** @brief 将设备当前灯带配置明确保存到 Flash。 */
+RB_API int RB_Rgb_SaveDeviceConfig();
+/** @brief 返回指定效果可选择的语义输入数量；静态色返回 0。 */
+RB_API int RB_Rgb_GetEffectInputCount(int effectType);
+/** @brief 按效果类型和候选索引读取语义输入；RPM和换挡效果返回固定输入。 */
+RB_API int RB_Rgb_GetEffectInput(int effectType, int inputIndex, RB_RgbEffectInputItem* item);
+/** @brief 读取默认遥测 RGB 效果配置。 */
+RB_API int RB_Rgb_GetDefaultEffectProfile(RB_RgbEffectProfile* profile);
+/** @brief 从 ExtraEffectsV2.json 读取 RGB 效果配置。 */
+RB_API int RB_Rgb_ReadEffectProfile(RB_RgbEffectProfile* profile);
+/** @brief 明确保存 RGB 效果配置；不会自动连接设备。 */
+RB_API int RB_Rgb_SaveEffectProfile(const RB_RgbEffectProfile* profile);
+/** @brief 将 RGB 效果配置应用到当前运行态；Apply 不读取或写入配置文件。 */
+RB_API int RB_Rgb_ApplyEffectProfile(const RB_RgbEffectProfile* profile);
+/** @brief 读取内存中的 RGB 运行状态，不访问配置文件或设备。 */
+RB_API int RB_Rgb_GetState(RB_RgbState* state);
+/** @brief 设置固件测试图案和 RGB888 颜色；硬件诊断测试不依赖运行输出授权。 */
+RB_API int RB_Rgb_SetTestPattern(int pattern, int red, int green, int blue);
+/** @brief 立即请求设备熄灭。 */
+RB_API int RB_Rgb_Blackout();
+/** @brief 主动向设备读取一次诊断快照。 */
+RB_API int RB_Rgb_ReadDiagnostics(RB_RgbDiagnostics* diagnostics);
+/**
+ * @brief 按稳定 UID 异步更新 RGBAPP 的 APP 固件。
+ * @param uid 24 个十六进制字符的 MCU UID；设备可处于 APP 或 IAP 模式。
+ * @param binFilePath RGBAPP APP `.bin` 文件路径。SDK 在擦除前校验大小、向量地址和 CRC。
+ * @return RB_OK 表示后台任务已启动；RB_INVALID_ARGUMENT 表示参数无效；RB_ERROR 表示已有任务或运行态不可用。
+ */
+RB_API int RB_Rgb_StartAppFirmwareUpdate(const char* uid, const char* binFilePath);
+/** @brief 读取 RGBAPP APP 固件更新内存状态。 */
+RB_API int RB_Rgb_GetFirmwareUpdateState(RB_RgbFirmwareUpdateState* state);
+/** @brief 返回 RGBAPP APP 固件更新线程当前是否运行。 */
+RB_API int RB_Rgb_IsFirmwareUpdateRunning();
 
 /**
  * @brief 执行统一动作命令，并可返回命令结果 JSON。

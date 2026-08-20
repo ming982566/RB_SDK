@@ -7,3 +7,4 @@ int ConfigureSerialOutputExample(int instanceIndex, const char* portName);
 int ConfigureAdditionalEffectsExample(int motionProfileIndex, int dynamicProfileIndex);
 int ConfigureGameTelemetryExample(const char* gameKey, int catalogIndex, int sourcePort);
 int InspectPluginsAndManualPoseExample();
+int ConfigureRgbEffectExample(const char* optionalDeviceUid);

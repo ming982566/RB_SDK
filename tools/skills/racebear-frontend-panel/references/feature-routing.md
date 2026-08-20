@@ -13,6 +13,7 @@ Load only the sections needed for the requested page. Confirm every exact signat
 | Motion effects | `RB_MotionEffect_*` | Section 10 |
 | Haptics | `RB_Haptic_*` | Section 11 |
 | Wind and seatbelt | `RB_Wind_*`, `RB_Seatbelt_*` | Section 12 |
+| RGBAPP lighting | `RB_Rgb_*`, `RB_Telemetry_GetCatalog` | Section 12.1 and API section 8.1.6 |
 | Output instances | `RB_Output_*` | Section 13 |
 | RB_CAN devices and binding | `RB_Can_RefreshDevices`, `RB_Can_GetDeviceInfo`, `RB_Can_BindOutputDevice`, binding/motor/health APIs | Section 13 and `docs/RaceBearSDK_RB_CAN_GUIDE.md` |
 | Custom games and external sources | `RB_Game_RegisterCustom`, `RB_ExternalSource_*`, telemetry FieldId APIs | Section 14 |
@@ -30,6 +31,7 @@ Load only the sections needed for the requested page. Confirm every exact signat
 - Use typed numeric controls with documented ranges and units, while keeping reserved fields and runtime-only indexes in the adapter layer.
 - Keep read, apply, save, connect, test, and delete as distinct user actions when their semantics differ.
 - In an RB_CAN page, restore selection by stable UID after every device refresh. Keep duplicate-index devices selectable so the user can assign one target UID a new unique index without unplugging the other device.
+- In an RGB page, separate host effect Save from device Flash Save. Effects retain telemetry `Key`; devices retain UID; Apply operations must not imply persistence.
 
 ## Framework Adapter Shape
 

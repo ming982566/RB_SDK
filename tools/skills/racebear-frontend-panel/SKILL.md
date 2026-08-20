@@ -1,6 +1,6 @@
 ---
 name: racebear-frontend-panel
-description: Build, extend, review, or debug frontend control panels that integrate the RaceBear SDK public C ABI. Use for React, web, Qt, C#, C++, Python, or other host applications that need RaceBear runtime initialization, state dashboards, game and telemetry selection, license UI, platform and motion configuration, haptics, wind, seatbelt, output management, RB_CAN discovery and stable device binding, public CAN health and recovery diagnostics, serial tools, custom dashboards, VOCORE screens, browser dashboard output, deployment, or shutdown handling. Also use when porting SimRacebear behavior to another frontend or diagnosing stale indexes, unstable keys, duplicate CAN logical indexes, blocked UI threads, leaked handles, config round-trip failures, missing DashboardAssets, or SDK threads that do not exit.
+description: Build, extend, review, or debug frontend control panels that integrate the RaceBear SDK public C ABI. Use for React, web, Qt, C#, C++, Python, or other host applications that need RaceBear runtime initialization, state dashboards, game and telemetry selection, license UI, platform and motion configuration, haptics, wind, seatbelt, RGBAPP/WS2812B telemetry lighting, output management, RB_CAN discovery and stable device binding, public CAN health and recovery diagnostics, serial tools, custom dashboards, VOCORE screens, browser dashboard output, deployment, or shutdown handling. Also use when porting SimRacebear behavior to another frontend or diagnosing stale indexes, unstable keys, duplicate CAN logical indexes, blocked UI threads, leaked handles, config round-trip failures, missing DashboardAssets, or SDK threads that do not exit.
 ---
 
 # RaceBear Frontend Panel
@@ -61,10 +61,12 @@ Read [references/dashboard-output.md](references/dashboard-output.md) whenever t
 - Build the adapter from `include/RaceBearSDK.h` and the documented public exports.
 - Persist stable keys and IDs; treat runtime telemetry indexes, catalog rows, device enumeration indexes, and refreshed plugin indexes as snapshot-local values.
 - Identify an RB_CAN device by `Uid` and its unique logical index. `CatalogIndex` and `EnumerationIndex` remain valid only for the current device snapshot.
+- Identify an RGBAPP by `RB_RgbDeviceInfo::Uid`; keep device-directory indexes snapshot-local and populate effect telemetry selectors from `RB_Telemetry_GetCatalog()`.
+- Model RGB lighting as independent segmented layers. Show 1-based inclusive start/end LED controls, convert them to `StartPixel/PixelCount`, and expose output selection, telemetry, effect type, colors, range/threshold, speed, blink duty, RPM fill mode, invert, brightness, and priority without requiring JSON editing.
 - Keep each configuration catalog's index in its own domain, even when displayed names match.
 - Let the SDK-owned loop perform motion calculations; UI timers read state and update presentation.
 - Gate protected actions with `state.License.OutputAllowed`, and present `RB_LICENSE_REQUIRED` without automatic retry loops.
-- Reset manual pose, wind, seatbelt, haptic, and output tests on page transitions and application exit.
+- Reset manual pose, wind, seatbelt, haptic, RGB test patterns, and output tests on page transitions and application exit.
 - Use bounded waits or asynchronous state updates for devices, network clients, callbacks, output disconnect, and frame consumption so the UI remains responsive.
 - Present typed configuration controls when a public typed API is available; reserve raw JSON for advanced tooling.
 - Report SimRacebear validation only after the user has manually built the required frontend configuration.

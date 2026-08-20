@@ -89,6 +89,8 @@ void StopBackend()
     RB_ManualPose_SetTestEnabled(0);
     RB_Wind_SetTestOutput(0, 0.0);
     RB_Seatbelt_SetTestOutput(0, 0.0, 0.0);
+    RB_Rgb_Blackout();
+    RB_Rgb_Disconnect();
 
     RB_Output_RequestDisconnectAll();
     for (int i = 0; i < 100 && !RB_Output_AreAllDisconnected(); ++i)
@@ -115,6 +117,7 @@ void StopBackend()
 | 震动 | 按名称保存 | 当前 `ByIndex` 接口按动态配置名解析 | 内容独立，目录暂时关联动态滤波 | 使用动态目录索引，或直接按名称读写 |
 | 风感 | 全局单配置 | 无目录 | 是 | `RB_Wind_ReadConfig/SaveConfig` |
 | 安全带 | 全局单配置 | 无目录 | 是 | `RB_Seatbelt_ReadConfig/SaveConfig` |
+| RGB 灯效 | 全局单配置 + UID 设备目录 | `RB_Rgb_RefreshDevices/GetDeviceInfo` | 是 | 效果 `Read/Apply/Save`；设备按 UID 连接 |
 | 输出 | 多实例目录 | `RB_Output_GetCatalog` | 是 | 实例索引来自最新输出目录 |
 
 ### 3.1 运动增强不是动态滤波的子配置
@@ -462,6 +465,21 @@ RB_Wind_SaveConfig(&wind);
 
 安全带使用同样的 `GetDefault/Read/Apply/Save` 流程。测试输出只在用户明确启用时
 调用；松开按钮、切换页面和退出程序时固定归零。
+
+### 12.1 RGB 灯效页面
+
+RGB 页面至少包含设备、灯带和效果三部分：
+
+- 设备下拉框来自一次 `RB_Rgb_RefreshDevices()` 快照，显示 UID、APP/IAP 模式和固件版本；保存 UID，不保存目录索引。`IapMode=1` 的目录项禁用普通连接，但允许直接执行 APP 固件更新。
+- 灯带配置显示四路启用、灯数、方向、颜色顺序、亮度，以及全局电流限制和失联超时。Apply 不写 Flash，单独提供“保存到设备”。
+- 效果配置最多提供 16 层。前端先选择效果类型，再用 `RB_Rgb_GetEffectInputCount/GetEffectInput` 填充精简的效果数据目录。静态色没有输入；RPM 条和换挡提示使用带 `RB_RGB_INPUT_FLAG_FIXED` 的固定输入；系统音量律动使用固定输入 `rb.audio.volume`，会让配置的整段 LED 按音量同步变亮或变暗；范围、脉冲、状态双色和闪烁只显示 ABS、TC、锁胎、空转、循迹丢失、路肩、冲击、换挡、悬挂、维修区、DRS、熄火和低油量等适合灯效的语义值。不要把完整 `RB_Telemetry_GetCatalog()` 作为普通 RGB 下拉框。
+- 前端使用从 1 开始且包含端点的“起始 LED / 结束 LED”，提交时转换为 `StartPixel = startLed - 1`、`PixelCount = endLed - startLed + 1`。不要让用户编辑零基像素和数量。
+- 不同图层可以使用不同区段，例如 LED 1-20 显示固定 RPM 输入，LED 21-30 选择“ABS Active”后按目录提供的默认阈值、独立频率和占空比闪烁。重叠区段按 `Priority` 从低到高合成，高优先级层覆盖低优先级层。
+- UI 以 30-60 Hz 调用 `RB_Rgb_GetState()`；设备诊断只在页面打开或用户刷新时主动读取。
+- APP 固件更新提供 `.bin` 选择、开始按钮、0-100 进度和完成状态。调用 `RB_Rgb_StartAppFirmwareUpdate()` 后只轮询 `RB_Rgb_GetFirmwareUpdateState()`；运行中禁用设备刷新、连接、配置、测试和熄灭操作，完成后重新刷新设备目录。最终成功以跳转后同 UID APP 重新枚举为准，不以传输进度达到 100 代替。
+- 离开测试状态、断开设备和退出前调用 `RB_Rgb_Blackout()`；`RB_Runtime_Shutdown()` 也会停止 RGB 线程并尝试熄灭。
+
+推荐调用顺序是：初始化 SDK，读取/应用效果配置，刷新设备，按 UID 连接，读取设备配置，启动运行循环。参数编辑只调用 Apply；只有明确保存动作才调用 `RB_Rgb_SaveEffectProfile()` 或 `RB_Rgb_SaveDeviceConfig()`。
 
 ## 13. 输出页面
 

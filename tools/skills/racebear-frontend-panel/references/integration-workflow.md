@@ -57,7 +57,7 @@ Use `RB_Data_ReadJson()` and `RB_Data_WriteJson()` only for advanced editors, mi
 
 Configuration ownership rules:
 
-- System, wind, and seatbelt are single global configurations unless the current public guide says otherwise.
+- System, wind, seatbelt, and RGB effects are single global configurations unless the current public guide says otherwise.
 - Game telemetry is stored per stable game key.
 - Platform, Dynamic, Motion Effect, and Output use their own catalogs.
 - Haptic structures are independent, while the current profile name directory is associated with Dynamic. Resolve Haptic selections from the Dynamic name directory rather than the Motion Effect catalog.
@@ -78,7 +78,9 @@ Read license presentation state from `RB_RuntimeState::License` and submit licen
 - Keep catalogs, configuration, raw telemetry, activation, disconnect, and reset UI available when permitted by the public contract.
 - Disable protected Apply, connection, and manual-test actions when `License.OutputAllowed == 0`.
 - Always provide an explicit stop/reset path.
-- Zero manual pose, wind, seatbelt, and other active tests on page exit, device loss, license loss, and application shutdown.
+- Zero manual pose, wind, seatbelt, RGB test patterns, and other active tests on page exit, device loss, license loss, and application shutdown.
+
+For RGBAPP pages, refresh the device catalog only on page entry or explicit refresh, restore selection by UID, and read diagnostics deliberately. Use `RB_Rgb_GetState()` for high-frequency presentation. Build RGB profiles as up to 16 independent effect layers: populate telemetry from the catalog, expose 1-based inclusive start/end LED controls, convert them to `StartPixel/PixelCount`, and provide effect type, output mask, colors, threshold/range, speed, blink duty, RPM fill mode, invert, brightness, and priority. The SDK sends complete RGB frames on its own worker and keeps only the latest pending frame; the frontend must not create another per-pixel USB loop.
 
 ## Shutdown Gate
 

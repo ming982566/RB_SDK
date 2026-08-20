@@ -20,6 +20,9 @@ haptics, output, and dashboard frontend applications.
   styles: AIM MXS, BOSCH DDU8, SimpleDash, and Ford GT.
 - Added the reusable, tool-neutral `racebear-frontend-panel` AI coding Skill
   for frontend integration, review, and debugging.
+- Added the RGBAPP WinUSB workflow for four WS2812B outputs, layered telemetry
+  effects, system-audio volume effects, device configuration, diagnostics, and
+  APP firmware updates.
 
 The DLL reports runtime version `0.5.0-vs2019-x64`.
 

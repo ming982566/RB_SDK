@@ -981,7 +981,67 @@ RB_Seatbelt_SetTestOutput(0, 0.0, 0.0);
 
 `RB_SEATBELT_INPUT_HID` 和 `RB_SEATBELT_INPUT_MIXED` 只有在宿主接入 HID 输入源后才有意义。普通游戏遥测前端应使用 `RB_SEATBELT_INPUT_TELEMETRY`。
 
-### 8.1.6 输出参数
+### 8.1.6 RGBAPP 灯带与遥测效果
+
+RGBAPP 是独立 WinUSB 设备，不属于通用 Output 实例，也不占用 Motion 6DOF 或 `Wind/Haptic` Key。设备目录同时包含 APP 和 IAP PID；`RB_RgbDeviceInfo::IapMode=1` 的设备只能用于 APP 固件更新，不能执行普通连接。设备目录索引只在一次刷新快照内有效；持久化选择必须保存 `RB_RgbDeviceInfo::Uid`。
+
+```cpp
+RB_Rgb_RefreshDevices();
+RB_RgbDeviceInfo device{};
+if (RB_Rgb_GetDeviceCount() > 0 && RB_Rgb_GetDeviceInfo(0, &device) == RB_OK)
+    RB_Rgb_Connect(device.Uid);
+
+RB_RgbEffectProfile profile{};
+RB_Rgb_GetDefaultEffectProfile(&profile);
+profile.Enabled = 1;
+profile.Layers[0].Enabled = 1;
+profile.Layers[0].EffectType = RB_RGB_EFFECT_RPM_BAR;
+strcpy_s(profile.Layers[0].TelemetryKey, "rb.vehicle.engine.rpm");
+profile.Layers[0].OutputMask = 0x01; // 第1路灯带
+profile.Layers[0].StartPixel = 0;   // UI 中的第1颗 LED
+profile.Layers[0].PixelCount = 20;  // UI 中的 LED 1-20
+profile.Layers[0].MinValue = 0.0;
+profile.Layers[0].MaxValue = 8000.0;
+profile.Layers[0].FillMode = RB_RGB_FILL_FORWARD;
+
+profile.LayerCount = 2;
+profile.Layers[1].Enabled = 1;
+profile.Layers[1].EffectType = RB_RGB_EFFECT_TELEMETRY_BLINK;
+strcpy_s(profile.Layers[1].TelemetryKey, "rb.driver_assist.abs.active");
+profile.Layers[1].OutputMask = 0x01;
+profile.Layers[1].StartPixel = 20;  // UI 中的第21颗 LED
+profile.Layers[1].PixelCount = 10;  // UI 中的 LED 21-30
+profile.Layers[1].Threshold = 0.5;
+profile.Layers[1].ColorA = 0x00FFFF00U;
+profile.Layers[1].SpeedHz = 6.0;
+profile.Layers[1].BlinkDutyPercent = 35.0;
+profile.Layers[1].Priority = 30;
+RB_Rgb_ApplyEffectProfile(&profile); // 只更新内存运行态
+RB_Rgb_SaveEffectProfile(&profile);  // 用户明确保存时才写配置文件
+```
+
+普通 RGB 编辑器应先调用 `RB_Rgb_GetEffectInputCount(effectType)`，再逐项调用 `RB_Rgb_GetEffectInput()`。返回项包含稳定 `Key`、运行时索引、值类型、固定/推荐/派生标志、当前 Source 支持状态以及建议的最小值、最大值和阈值。静态色返回 0 项；RPM 条和换挡闪烁各返回一个带 `RB_RGB_INPUT_FLAG_FIXED` 的发动机转速输入。完整 `RB_Telemetry_GetCatalog()` 只适合高级诊断或明确的专家模式，不应作为普通 RGB 下拉框。
+
+`RB_RgbEffectLayerConfig::TelemetryKey` 持久化稳定 Key；`TelemetryIndex` 只是当前运行态解析结果，不能持久化或跨版本复用。旧配置中不属于新语义目录的 Key 仍可读取和应用，前端应在用户主动更换效果或输入前保留它。`OutputMask` 的 bit0-bit3 对应四路灯带；`StartPixel/PixelCount` 是每路灯带内部的相对范围。公开接口的 `StartPixel` 从 0 开始，前端应显示为从 1 开始且包含端点的“起始 LED / 结束 LED”，例如 API 的 `StartPixel=20, PixelCount=10` 对应 UI 的 LED 21-30。
+
+设备配置流程使用 `RB_Rgb_ReadDeviceConfig/ApplyDeviceConfig/SaveDeviceConfig`。Apply 只修改 MCU 运行态，Save 才写 Flash。主机效果配置保存到 `ExtraEffectsV2.json` 的 `RgbEffect` 节点；状态刷新调用 `RB_Rgb_GetState()`，不会重复读取该文件。设备诊断由用户打开页面或主动刷新时调用 `RB_Rgb_ReadDiagnostics()`，不要放进高频 UI 定时器。
+
+APP 固件更新使用 `RB_Rgb_StartAppFirmwareUpdate(uid, binFilePath)` 启动后台任务，并轮询 `RB_Rgb_GetFirmwareUpdateState()`。启动接口不会在 UI 线程执行擦除或写入；同一时间只允许一个 RGBAPP 更新。SDK 会校验 APP BIN 的大小、MSP、Thumb Reset Handler、`0x08007000` APP 分区、IAP PID、稳定 UID、硬件 ID 和 CRC，并支持目标设备已经停在 IAP 模式时继续恢复更新。更新运行中不要调用连接、设备配置、诊断、测试或实时输出接口；完成后重新刷新设备目录。`RB_Runtime_Shutdown()` 会停止并回收更新线程。
+
+```cpp
+if (RB_Rgb_StartAppFirmwareUpdate(device.Uid, appBinPath) == RB_OK) {
+    RB_RgbFirmwareUpdateState update{};
+    do {
+        RB_Rgb_GetFirmwareUpdateState(&update);
+        Sleep(100);
+    } while (update.Running);
+    // update.Success != 0 才表示跳转后同 UID APP 已重新枚举。
+}
+```
+
+效果配置最多包含 16 层，每层独立设置输出通道、LED 区段、效果语义 Key、效果类型、主辅颜色、输入范围、阈值、亮度、速度、反向条件和优先级。效果类型包括静态色、RPM 条、换挡闪烁、效果范围触发、脉冲、状态双色、效果闪烁和系统音量律动。`RB_RGB_EFFECT_AUDIO_VOLUME` 使用稳定 Key `rb.audio.volume`，由 SDK 在后台通过 Windows WASAPI Loopback 读取当前默认播放设备的系统声音并平滑为 0-1 音量值；它不读取麦克风，也不需要 RGBAPP 固件修改。音量律动会绘制配置的整段 LED，并用音量比例缩放整段亮度，不会像 RPM 条那样只点亮前段；`BlinkDutyPercent` 设置闪烁周期内的点亮比例；`FillMode` 仅用于 RPM 条的正向、反向或中心向两侧填充。合成顺序按 `Priority` 从低到高，后绘制的高优先级层覆盖同一像素。实时帧由 SDK 后台线程发送；主计算循环只提交 latest-only 完整帧，慢设备不会积累无界队列。
+
+### 8.1.7 输出参数
 
 每个输出实例对应一个 `RB_OutputConfig`。`instanceIndex` 是当前输出实例列表的零基索引，范围由 `RB_Output_GetInstanceCount()` 决定。先读取再修改，能够保留当前输出类型不认识或当前页面未显示的字段。
 
