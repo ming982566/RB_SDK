@@ -1917,6 +1917,8 @@ RB_API double RB_ManualPose_GetDrive(int dofIndex);
  * @note 编辑页面先读取完整结构体，再修改目标字段并保存，以保留未展示字段。
  */
 RB_API int RB_Output_ReadInstanceConfigByIndex(int instanceIndex, RB_OutputConfig* config);
+/** @brief 读取指定输出实例的运行态配置缓存，不访问配置文件；适合状态栏和高频 UI 刷新。 */
+RB_API int RB_Output_GetInstanceConfigSnapshotByIndex(int instanceIndex, RB_OutputConfig* config);
 
 /**
  * @brief 按输出实例索引保存输出配置。
@@ -2312,6 +2314,8 @@ RB_API int RB_Rgb_GetDeviceInfo(int index, RB_RgbDeviceInfo* info);
 RB_API int RB_Rgb_Connect(const char* uid);
 /** @brief 熄灭并断开当前 RGBAPP。 */
 RB_API void RB_Rgb_Disconnect();
+/** @brief 读取连接或应用配置时更新的内存快照，不访问 USB；适合 UI 页面刷新。 */
+RB_API int RB_Rgb_GetDeviceConfigSnapshot(RB_RgbDeviceConfig* config);
 /** @brief 读取设备当前四路灯带与功率保护配置。 */
 RB_API int RB_Rgb_ReadDeviceConfig(RB_RgbDeviceConfig* config);
 /** @brief 将灯带配置应用到设备运行态，不写 Flash。 */
@@ -2345,6 +2349,13 @@ RB_API int RB_Rgb_ReadDiagnostics(RB_RgbDiagnostics* diagnostics);
  * @return RB_OK 表示后台任务已启动；RB_INVALID_ARGUMENT 表示参数无效；RB_ERROR 表示已有任务或运行态不可用。
  */
 RB_API int RB_Rgb_StartAppFirmwareUpdate(const char* uid, const char* binFilePath);
+/**
+ * @brief 按稳定 UID 异步更新 RGBAPP 的 Stage-1/IAP 固件。
+ * @param uid 24 个十六进制字符的 MCU UID；目标必须当前处于 APP 模式。
+ * @param binFilePath RGBAPP_IAP `.bin` 文件路径。SDK 会校验 Stage-1 向量、清单、大小和 CRC。
+ * @return RB_OK 表示后台任务已启动；RB_INVALID_ARGUMENT 表示参数或镜像无效；RB_ERROR 表示设备或运行态不可用。
+ */
+RB_API int RB_Rgb_StartIapFirmwareUpdate(const char* uid, const char* binFilePath);
 /** @brief 读取 RGBAPP APP 固件更新内存状态。 */
 RB_API int RB_Rgb_GetFirmwareUpdateState(RB_RgbFirmwareUpdateState* state);
 /** @brief 返回 RGBAPP APP 固件更新线程当前是否运行。 */

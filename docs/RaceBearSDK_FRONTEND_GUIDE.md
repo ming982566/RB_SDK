@@ -474,12 +474,13 @@ RGB 页面至少包含设备、灯带和效果三部分：
 - 灯带配置显示四路启用、灯数、方向、颜色顺序、亮度，以及全局电流限制和失联超时。Apply 不写 Flash，单独提供“保存到设备”。
 - 效果配置最多提供 16 层。前端先选择效果类型，再用 `RB_Rgb_GetEffectInputCount/GetEffectInput` 填充精简的效果数据目录。静态色没有输入；RPM 条和换挡提示使用带 `RB_RGB_INPUT_FLAG_FIXED` 的固定输入；系统音量律动使用固定输入 `rb.audio.volume`，会让配置的整段 LED 按音量同步变亮或变暗；范围、脉冲、状态双色和闪烁只显示 ABS、TC、锁胎、空转、循迹丢失、路肩、冲击、换挡、悬挂、维修区、DRS、熄火和低油量等适合灯效的语义值。不要把完整 `RB_Telemetry_GetCatalog()` 作为普通 RGB 下拉框。
 - 前端使用从 1 开始且包含端点的“起始 LED / 结束 LED”，提交时转换为 `StartPixel = startLed - 1`、`PixelCount = endLed - startLed + 1`。不要让用户编辑零基像素和数量。
-- 不同图层可以使用不同区段，例如 LED 1-20 显示固定 RPM 输入，LED 21-30 选择“ABS Active”后按目录提供的默认阈值、独立频率和占空比闪烁。重叠区段按 `Priority` 从低到高合成，高优先级层覆盖低优先级层。
+- 不同图层可以使用不同区段，例如 LED 1-20 显示固定 RPM 输入，LED 21-30 选择“ABS Active”后按目录提供的默认阈值、独立频率和占空比闪烁。重叠区段按 `Priority` 从低到高合成，高优先级层覆盖低优先级层。列表式前端让越靠上的图层优先级越高，例如三层列表从上到下写入 `3、2、1`；上下移动列表项就是调整优先级，不再提供容易产生冲突的独立优先级输入。空遥测闪烁和呼吸属于自主动画，也按所在列表行参与覆盖排序。
 - UI 以 30-60 Hz 调用 `RB_Rgb_GetState()`；设备诊断只在页面打开或用户刷新时主动读取。
 - APP 固件更新提供 `.bin` 选择、开始按钮、0-100 进度和完成状态。调用 `RB_Rgb_StartAppFirmwareUpdate()` 后只轮询 `RB_Rgb_GetFirmwareUpdateState()`；运行中禁用设备刷新、连接、配置、测试和熄灭操作，完成后重新刷新设备目录。最终成功以跳转后同 UID APP 重新枚举为准，不以传输进度达到 100 代替。
+- RGB 固件更新选择器应提供 `APP` 和 `IAP` 两种目标。`APP` 调用 `RB_Rgb_StartAppFirmwareUpdate()`（支持 APP 进入 IAP 以及 IAP 恢复 APP）；`IAP` 调用 `RB_Rgb_StartIapFirmwareUpdate()`，只允许当前 APP 设备且要求设备能力包含 `RB_RGB_CAP_STAGE1_UPDATE`。两条任务都只轮询 `RB_Rgb_GetFirmwareUpdateState()`，完成后重新刷新设备目录，并以目标 PID、UID 和固件版本重新枚举作为成功条件。
 - 离开测试状态、断开设备和退出前调用 `RB_Rgb_Blackout()`；`RB_Runtime_Shutdown()` 也会停止 RGB 线程并尝试熄灭。
 
-推荐调用顺序是：初始化 SDK，读取/应用效果配置，刷新设备，按 UID 连接，读取设备配置，启动运行循环。参数编辑只调用 Apply；只有明确保存动作才调用 `RB_Rgb_SaveEffectProfile()` 或 `RB_Rgb_SaveDeviceConfig()`。
+推荐调用顺序是：初始化 SDK，读取/应用效果配置，刷新设备，按 UID 连接，读取设备配置，启动运行循环。连接后页面显示和切换使用 `RB_Rgb_GetDeviceConfigSnapshot()` 获取内存快照，不在 UI 定时器中同步读取 USB；只有用户明确刷新硬件参数时调用 `RB_Rgb_ReadDeviceConfig()`。参数编辑只调用 Apply；只有明确保存动作才调用 `RB_Rgb_SaveEffectProfile()` 或 `RB_Rgb_SaveDeviceConfig()`。
 
 ## 13. 输出页面
 

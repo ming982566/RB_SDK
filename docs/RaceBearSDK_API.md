@@ -1024,9 +1024,11 @@ RB_Rgb_SaveEffectProfile(&profile);  // 用户明确保存时才写配置文件
 
 `RB_RgbEffectLayerConfig::TelemetryKey` 持久化稳定 Key；`TelemetryIndex` 只是当前运行态解析结果，不能持久化或跨版本复用。旧配置中不属于新语义目录的 Key 仍可读取和应用，前端应在用户主动更换效果或输入前保留它。`OutputMask` 的 bit0-bit3 对应四路灯带；`StartPixel/PixelCount` 是每路灯带内部的相对范围。公开接口的 `StartPixel` 从 0 开始，前端应显示为从 1 开始且包含端点的“起始 LED / 结束 LED”，例如 API 的 `StartPixel=20, PixelCount=10` 对应 UI 的 LED 21-30。
 
-设备配置流程使用 `RB_Rgb_ReadDeviceConfig/ApplyDeviceConfig/SaveDeviceConfig`。Apply 只修改 MCU 运行态，Save 才写 Flash。主机效果配置保存到 `ExtraEffectsV2.json` 的 `RgbEffect` 节点；状态刷新调用 `RB_Rgb_GetState()`，不会重复读取该文件。设备诊断由用户打开页面或主动刷新时调用 `RB_Rgb_ReadDiagnostics()`，不要放进高频 UI 定时器。
+设备配置流程使用 `RB_Rgb_ReadDeviceConfig/ApplyDeviceConfig/SaveDeviceConfig`。连接成功和 Apply 成功时 SDK 会更新内存配置；普通页面刷新应调用 `RB_Rgb_GetDeviceConfigSnapshot()`，该接口不访问 USB，不会与实时 RGB 帧争用传输锁。只有用户明确要求从硬件刷新时才调用 `RB_Rgb_ReadDeviceConfig()`。Apply 只修改 MCU 运行态，Save 才写 Flash。主机效果配置保存到 `ExtraEffectsV2.json` 的 `RgbEffect` 节点；状态刷新调用 `RB_Rgb_GetState()`，不会重复读取该文件。设备诊断由用户打开页面或主动刷新时调用 `RB_Rgb_ReadDiagnostics()`，不要放进高频 UI 定时器。所有 RGB C ABI 结构的 `Size/Version` 字段都支持旧调用方的全零初始化；如果调用方提供非零值，`Size` 必须至少覆盖当前完整结构且 `Version` 必须匹配当前版本，否则返回 `RB_INVALID_ARGUMENT`。设备配置的 `CurrentLimitMa` 最小为 100，灯带逻辑范围必须满足 `0 <= LogicalStart <= 600` 且 `LedCount <= 600 - LogicalStart`。
 
 APP 固件更新使用 `RB_Rgb_StartAppFirmwareUpdate(uid, binFilePath)` 启动后台任务，并轮询 `RB_Rgb_GetFirmwareUpdateState()`。启动接口不会在 UI 线程执行擦除或写入；同一时间只允许一个 RGBAPP 更新。SDK 会校验 APP BIN 的大小、MSP、Thumb Reset Handler、`0x08007000` APP 分区、IAP PID、稳定 UID、硬件 ID 和 CRC，并支持目标设备已经停在 IAP 模式时继续恢复更新。更新运行中不要调用连接、设备配置、诊断、测试或实时输出接口；完成后重新刷新设备目录。`RB_Runtime_Shutdown()` 会停止并回收更新线程。
+
+Stage-1/IAP 固件更新使用 `RB_Rgb_StartIapFirmwareUpdate(uid, binFilePath)`。该接口要求目标当前处于 APP 模式并声明 `RB_RGB_CAP_STAGE1_UPDATE`；SDK 会读取 RGBAPP_IAP BIN 中的 Stage-1 向量和 `RB_STAGE1_MANIFEST_MAGIC` 清单，校验硬件 ID、版本、最低 Stage-0 版本、大小和 CRC，然后按 `0x20`（BEGIN）、`0x21`（WRITE）、`0x22`（FINISH）、`0x23`（ACTIVATE）事务写入 staging 区。激活后设备应重新枚举为 IAP PID，SDK 以同 UID 和清单版本重新枚举成功作为最终成功条件。IAP 更新不会把停在 IAP 的设备当作可自更新目标；需要从 IAP 恢复 APP 时仍使用 `RB_Rgb_StartAppFirmwareUpdate()`。
 
 ```cpp
 if (RB_Rgb_StartAppFirmwareUpdate(device.Uid, appBinPath) == RB_OK) {
@@ -1039,7 +1041,7 @@ if (RB_Rgb_StartAppFirmwareUpdate(device.Uid, appBinPath) == RB_OK) {
 }
 ```
 
-效果配置最多包含 16 层，每层独立设置输出通道、LED 区段、效果语义 Key、效果类型、主辅颜色、输入范围、阈值、亮度、速度、反向条件和优先级。效果类型包括静态色、RPM 条、换挡闪烁、效果范围触发、脉冲、状态双色、效果闪烁和系统音量律动。`RB_RGB_EFFECT_AUDIO_VOLUME` 使用稳定 Key `rb.audio.volume`，由 SDK 在后台通过 Windows WASAPI Loopback 读取当前默认播放设备的系统声音并平滑为 0-1 音量值；它不读取麦克风，也不需要 RGBAPP 固件修改。音量律动会绘制配置的整段 LED，并用音量比例缩放整段亮度，不会像 RPM 条那样只点亮前段；`BlinkDutyPercent` 设置闪烁周期内的点亮比例；`FillMode` 仅用于 RPM 条的正向、反向或中心向两侧填充。合成顺序按 `Priority` 从低到高，后绘制的高优先级层覆盖同一像素。实时帧由 SDK 后台线程发送；主计算循环只提交 latest-only 完整帧，慢设备不会积累无界队列。
+效果配置最多包含 16 层，每层独立设置输出通道、LED 区段、效果语义 Key、效果类型、主辅颜色、输入范围、阈值、亮度、速度、反向条件和优先级。效果类型包括静态色、RPM 条、换挡闪烁、效果范围触发、脉冲、状态双色、效果闪烁和系统音量律动。`RB_RGB_EFFECT_AUDIO_VOLUME` 使用稳定 Key `rb.audio.volume`，由 SDK 在后台通过 Windows WASAPI Loopback 读取当前默认播放设备的系统声音并平滑为 0-1 音量值；它不读取麦克风，也不需要 RGBAPP 固件修改。音量律动会绘制配置的整段 LED，并用音量比例缩放整段亮度，不会像 RPM 条那样只点亮前段；`BlinkDutyPercent` 设置闪烁周期内的点亮比例；`FillMode` 仅用于 RPM 条的正向、反向或中心向两侧填充。合成顺序按 `Priority` 从低到高，后绘制的高优先级层覆盖同一像素。列表式编辑器应让越靠上的图层优先级越高，例如三层列表从上到下写入 `3、2、1`；上下移动列表项就是调整优先级，不要再让用户维护一套独立数值。空遥测的闪烁和呼吸属于自主动画，其列表位置同样决定覆盖优先级。实时帧由 SDK 后台线程发送；主计算循环只提交 latest-only 完整帧，慢设备不会积累无界队列。
 
 ### 8.1.7 输出参数
 
@@ -1049,6 +1051,8 @@ SDK 初始化时加载一次输出实例目录。`RB_Output_GetInstanceCount()`�
 和 `RB_Output_GetCatalog()` 查询内存目录，不会在每次调用时重新读取 `OutPutV2.json`。
 添加或删除实例后目录立即更新；`RB_Data_WriteJson("config.output", ...)` 完整替换输出配置后会
 显式重载目录。直接在 SDK 外部编辑文件不会触发隐式轮询，宿主应使用 SDK 写入接口或重新初始化。
+
+状态栏和高频 UI 刷新不要调用持久化读取接口；使用 `RB_Output_GetInstanceConfigSnapshotByIndex()` 从运行态输出对象的内存缓存读取。用户编辑但尚未自动保存的当前配置应由宿主自己的编辑缓存优先显示，保存或 Apply 成功后再由 SDK 运行态缓存接管。
 
 ```cpp
 const int instanceIndex = 0; // 由输出列表中用户选择的实例得到。
