@@ -3,6 +3,16 @@
 RaceBear SDK is a Windows x64 C ABI SDK for building telemetry, motion,
 haptics, output, and dashboard frontend applications.
 
+## 0.5.1
+
+- Fixed repeated configuration-file parsing by caching parsed JSON documents in the SDK.
+- DynamicV2, PlatformV2, Output, SystemConfig, and extra-effect reads now reuse the in-memory configuration cache during normal runtime.
+- Typed saves update the cache, while `RB_Data_WriteJson()` invalidates the matching cache after raw JSON replacement.
+- Output AutoConnect counting, automatic connection, and frontend summaries use the cached output directory.
+- Added a configuration-cache regression smoke test. The public C ABI, structure layouts, and firmware protocols are unchanged.
+
+The DLL reports runtime version `0.5.1-vs2019-x64`.
+
 ## 0.5.0
 
 - Added the public RB_CAN device-management workflow: CANAPP discovery,
@@ -23,8 +33,6 @@ haptics, output, and dashboard frontend applications.
 - Added the RGBAPP WinUSB workflow for four WS2812B outputs, layered telemetry
   effects, system-audio volume effects, device configuration, diagnostics, and
   APP firmware updates.
-
-The DLL reports runtime version `0.5.0-vs2019-x64`.
 
 ## Package Contents
 
@@ -91,7 +99,7 @@ the Microsoft Visual C++ 2015-2022 Redistributable x64.
 
 The Debug and Release package directories contain matching headers, import
 libraries, DLLs, runtime dependencies, and dashboard resources from the same
-verified 0.5.0 build.
+verified 0.5.1 build.
 
 ## Frontend Rules
 

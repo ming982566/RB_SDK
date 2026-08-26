@@ -158,9 +158,11 @@ SDK 0.4.8 新增 VOCORE USB 仪表屏后端。设备通信使用随 SDK 发布�
 
 SDK 0.4.9 将 SimRacebear 使用的仪表模板迁入 SDK，当前提供 AIM MXS、BOSCH DDU8、SimpleDash 和 Ford GT 四套模板，并新增 `RB_Dashboard_RenderFrame()`。同版本还提供浏览器 MJPEG 仪表服务、VOCORE 运行时自动重连开关、CAN 输出健康/人工恢复接口，以及 `RB-A7H` 七轴平台。调用方仍可自行绘制并直接使用 `RB_VoCore_SubmitFrame()`，也可以使用 SDK 模板生成 BGRA8888 画面。
 
+SDK 0.5.1 在 0.5.0 基础上保持公开 C ABI 和结构体布局不变，统一缓存已解析的配置 JSON。DynamicV2、PlatformV2、Output、SystemConfig 及附加效果配置的类型化读取会复用 SDK 内存缓存；类型化保存成功或 `RB_Data_WriteJson()` 替换原始 JSON 后会同步或失效对应缓存。正常运行路径不通过文件时间戳轮询外部变化，外部修改应通过启动或显式重载生效。
+
 SDK 0.5.0 新增客户自定义仪表包。`.rbdash` V1 是 UTF-8 无 BOM JSON 单文件，图片以 PNG/JPEG Data URI 内嵌；模板只能绑定 SDK 认可的稳定 `rb.*` 数据键，不执行脚本，也不能访问文件系统、网络、进程或控制接口。随附的 `tools/DashboardDesigner/index.html` 可直接在浏览器中制作和导出模板。
 
-当前 0.5.0 交付进一步公开 `RB_CAN` 的 CANAPP 设备发现、逻辑索引设置、稳定 UID 绑定、绑定状态和单输出电机状态。完整调用顺序和安全要求见 `RaceBearSDK_RB_CAN_GUIDE.md`。其它 CAN 电机协议、参数维护、固件升级和底层总线控制暂未纳入公开 API。
+0.5.0 版本交付时进一步公开 `RB_CAN` 的 CANAPP 设备发现、逻辑索引设置、稳定 UID 绑定、绑定状态和单输出电机状态。完整调用顺序和安全要求见 `RaceBearSDK_RB_CAN_GUIDE.md`。其它 CAN 电机协议、参数维护、固件升级和底层总线控制暂未纳入公开 API。
 
 宿主程序不需要为 SDK 调用 `CoInitializeEx()` 或 `CoUninitialize()`。SDK 在自己的线程中管理 COM 生命周期。
 
