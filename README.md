@@ -55,6 +55,37 @@ The public package is organized around the stable C ABI and includes the
 headers, binaries, resources, documentation, tools, and examples needed for
 application integration.
 
+## Release Workflow
+
+For this repository, an SDK request to "push" means a complete versioned
+release unless the request explicitly says to push the branch only. A complete
+release must publish all of the following as one version:
+
+- the verified `main` commit;
+- the matching `vX.Y.Z` Git tag;
+- the GitHub Release for that tag;
+- `RaceBearSDK-X.Y.Z-vs2019-x64.zip`; and
+- the matching `.sha256` sidecar file.
+
+Run the repository release script from `RB_SDK` after the SDK source, build
+outputs, documentation, and public repository status have been checked:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.5.1
+```
+
+The script uses the sibling `RaceBear_SDK` development directory by default.
+It rebuilds Debug and Release with VS2019 x64, copies only public package
+contents, checks for private source leakage, creates the archive and SHA256,
+commits the verified public tree, pushes `main` and the version tag, and then
+creates or updates the GitHub Release with both package files attached.
+
+The archive and SHA256 files are intentionally ignored by `.gitignore`; they
+must be uploaded as Release assets rather than committed to the source tree.
+Never reuse an existing version for a different build. If only a branch push is
+needed, state that explicitly so the tag and Release steps are not performed.
+See [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md) for the full checklist.
+
 ## Quick Start
 
 Use the header, DLL, and LIB from the same Debug or Release configuration.
