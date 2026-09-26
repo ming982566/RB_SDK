@@ -23,18 +23,36 @@ add_executable(RaceBearSDKCppExample
     custom_game_example.h
     configuration_examples.cpp
     configuration_examples.h)
+
+# SimHub 公共 Generic UDP 中继；桥接程序只依赖公开 SDK 头和导入库，不复制 CAN 协议。
+add_executable(RaceBearSimHubUdpBridge
+    simhub_udp_bridge/main.cpp)
+
 target_compile_features(RaceBearSDKCppExample PRIVATE cxx_std_17)
+target_compile_options(RaceBearSDKCppExample PRIVATE /utf-8)
+target_compile_features(RaceBearSimHubUdpBridge PRIVATE cxx_std_17)
+target_compile_options(RaceBearSimHubUdpBridge PRIVATE /utf-8)
 
 # 示例源码使用 UTF-8 无 BOM 中文注释；VS2019 必须显式按 UTF-8 解析源码。
 target_compile_options(RaceBearSDKCppExample PRIVATE /utf-8)
 
 target_include_directories(RaceBearSDKCppExample PRIVATE
     "${RACEBEAR_SDK_ROOT}/include")
+target_include_directories(RaceBearSimHubUdpBridge PRIVATE
+    "${RACEBEAR_SDK_ROOT}/include")
 target_link_libraries(RaceBearSDKCppExample PRIVATE
     "${RACEBEAR_SDK_ROOT}/bin/x64/Release/RaceBearSDK.lib")
+target_link_libraries(RaceBearSimHubUdpBridge PRIVATE
+    "${RACEBEAR_SDK_ROOT}/bin/x64/Release/RaceBearSDK.lib"
+    ws2_32)
 
 # Windows 默认从 EXE 同目录查找 DLL，构建后自动复制可直接运行示例。
 add_custom_command(TARGET RaceBearSDKCppExample POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${RACEBEAR_SDK_ROOT}/bin/x64/Release/RaceBearSDK.dll"
         "$<TARGET_FILE_DIR:RaceBearSDKCppExample>")
+
+add_custom_command(TARGET RaceBearSimHubUdpBridge POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${RACEBEAR_SDK_ROOT}/bin/x64/Release/RaceBearSDK.dll"
+        "$<TARGET_FILE_DIR:RaceBearSimHubUdpBridge>")

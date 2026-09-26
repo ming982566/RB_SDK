@@ -19,6 +19,8 @@
 #define RB_API extern "C" __declspec(dllimport)
 #endif
 
+#include <stdint.h>
+
 // 通用返回值。0 表示成功，负数表示失败。
 enum RB_Result
 {
@@ -120,6 +122,14 @@ enum RB_RgbEffectInputFlags
 	RB_RGB_INPUT_FLAG_FIXED = 1 << 0,       // 效果语义固定，前端不允许改为其它输入。
 	RB_RGB_INPUT_FLAG_RECOMMENDED = 1 << 1, // 当前效果的首选输入。
 	RB_RGB_INPUT_FLAG_DERIVED = 1 << 2      // SDK统一计算的派生效果值。
+};
+
+// RGB效果显示目标。安全带联动目标依赖已就绪的联动控制器。
+enum RB_RgbEffectDisplayMode
+{
+	RB_RGB_DISPLAY_INDEPENDENT = 0,
+	RB_RGB_DISPLAY_SEATBELT_LINK = 1,
+	RB_RGB_DISPLAY_BOTH = 2
 };
 
 enum RB_RgbFillMode
@@ -860,7 +870,7 @@ enum RB_DashboardTemplate
 struct RB_VoCoreDeviceInfo
 {
 	int Size;                                      // 调用前设为 sizeof(RB_VoCoreDeviceInfo)。
-	int Version;                                   // 结构体版本，当前为 1。
+	int Version;                                   // 结构体版本，当前为 2。
 	char DeviceId[RB_TEXT_SMALL];                  // 设备唯一 ID；固件无法提供 ID 时退化为 USB 端口路径。
 	char Model[RB_TEXT_MEDIUM];                    // 型号，例如 "VoCore 6.8-inch"。
 	char UsbPath[RB_TEXT_MEDIUM];                  // USB 总线和端口路径，用于诊断。
@@ -1015,9 +1025,9 @@ struct RB_PlatformConfig
 	int DefaultPos;                                // 执行器默认位置。
 	int OutGain;                                   // 平台总输出比例，百分比。
 	int OutSmoothing;                              // 平台最后一级输出平滑，百分比。
-	int Lateral;                                   // 横向几何/混合参数。
-	int Longitudinal;                              // 纵向几何/混合参数。
-	int Vertical;                                  // 垂向几何/混合参数。
+	int Lateral;                                   // 横向姿态突变过滤强度，0-1000。
+	int Longitudinal;                              // 纵向姿态突变过滤强度，0-1000。
+	int Vertical;                                  // 垂向姿态突变过滤强度，0-1000。
 	int DecelerationSpeed;                         // 平台回中/阻尼速度参数。
 	int Percent;                                   // 姿态裁剪或缓冲比例。
 	char OutKey[RB_TEXT_MEDIUM];                   // 平台输出 key，例如 A1-A4。
@@ -1102,6 +1112,61 @@ struct RB_OutputConfig
 	char OutPutTime[RB_TEXT_SMALL];                // 周期输出间隔，十进制毫秒文本，例如 "2"。
 	char EndString[RB_TEXT_LARGE];                 // 断开前发送一次的命令模板；空字符串表示不发送。
 	char EndTime[RB_TEXT_SMALL];                   // EndString 延迟，十进制毫秒文本，例如 "0"。
+};
+
+enum RB_SeatbeltCanChannelMode
+{
+	RB_SEATBELT_CAN_SINGLE = 1,
+	RB_SEATBELT_CAN_DUAL = 2
+};
+
+enum RB_SeatbeltCanSingleChannel
+{
+	RB_SEATBELT_CAN_SINGLE_LEFT = 0,
+	RB_SEATBELT_CAN_SINGLE_RIGHT = 1,
+	RB_SEATBELT_CAN_SINGLE_CENTER = 2
+};
+
+// RB 57 安全带 CAN 输出配置。驱动器参数由 RB 专用上位机设置，SDK 只管理输出绑定和安全边界。
+struct RB_SeatbeltCanConfig
+{
+	int Size;
+	int Version;
+	int ChannelMode;                              // RB_SEATBELT_CAN_SINGLE / RB_SEATBELT_CAN_DUAL。
+	int SingleChannel;                            // 单路信号：0=左，1=右，2=中间公共信号；单路中间通过左节点发送。
+	int LeftNodeId;
+	int RightNodeId;
+	char LeftOutputKey[RB_TEXT_SMALL];
+	char RightOutputKey[RB_TEXT_SMALL];
+	int LeftReverse;
+	int RightReverse;
+	double LeftReductionRatio;
+	double RightReductionRatio;
+	int LeftPositionMin;
+	int LeftPositionMax;
+	int RightPositionMin;
+	int RightPositionMax;
+	int HomingOnConnect;
+	int HomingMethod;
+	int HomingTimeoutMs;
+};
+
+struct RB_SeatbeltCanState
+{
+	int Size;
+	int Version;
+	int Connected;
+	int Ready;
+	int Homing;
+	int Homed;
+	int Fault;
+	int LastError;
+	int ChannelMode;
+	int LeftNodeId;
+	int RightNodeId;
+	int32_t LeftTargetPosition;
+	int32_t RightTargetPosition;
+	char StatusText[RB_TEXT_MEDIUM];
 };
 
 // 动态滤波单个输入的滤波参数。
@@ -1238,7 +1303,7 @@ struct RB_WindEffectConfig
 struct RB_SeatbeltEffectConfig
 {
 	int Size;                                      // 结构体字节数，由 SDK 写入。
-	int Version;                                   // 结构体版本，当前为 1。
+	int Version;                                   // 结构体版本，当前为 2。
 	int Enabled;                                   // 是否启用安全带模拟。
 	int InputMode;                                 // RB_SeatbeltInputMode；当前推荐 RB_SEATBELT_INPUT_TELEMETRY。
 	double BasePreloadPercent;                     // 基础预紧百分比。
@@ -1262,6 +1327,14 @@ struct RB_SeatbeltEffectConfig
 	double RightOutputRatioPercent;                // 右安全带输出比例百分比。
 	int LeftReverse;                               // 左通道是否反向。
 	int RightReverse;                              // 右通道是否反向。
+	int LeftSmoothingSamples;                      // 左通道 DEMALP 样本数，范围 1-1000，默认 4。
+	int RightSmoothingSamples;                     // 右通道 DEMALP 样本数，范围 1-1000，默认 4。
+	double SurgeInputRangeG;                       // Surge 输入满量程，单位 G，范围 0.05-10.0。
+	double SwayInputRangeG;                        // Sway 输入满量程，单位 G，范围 0.05-10.0。
+	char SurgeInputKey[RB_TEXT_SMALL];             // Surge 输入稳定 key，默认 rb.motion.longitudinal.acceleration。
+	char SwayInputKey[RB_TEXT_SMALL];              // Sway 输入稳定 key，默认 rb.motion.lateral.acceleration。
+	char BrakeInputKey[RB_TEXT_SMALL];             // 刹车门控输入稳定 key，默认 rb.vehicle.brake。
+	char SpeedInputKey[RB_TEXT_SMALL];             // 低速门限输入稳定 key，默认 rb.vehicle.speed。
 };
 
 struct RB_RgbStripConfig
@@ -1368,12 +1441,13 @@ struct RB_RgbEffectLayerConfig
 	int Invert;
 	double BlinkDutyPercent; // 闪烁周期内保持点亮的百分比，范围0-100。
 	int FillMode;            // RB_RgbFillMode，仅 RPM 条使用。
+	int DisplayMode;         // RB_RgbEffectDisplayMode，默认独立 RGB。
 };
 
 struct RB_RgbEffectProfile
 {
 	int Size;
-	int Version;
+	int Version;                             // 结构体版本，当前为 3。
 	int Enabled;
 	int FrameRateHz;
 	double MasterBrightnessPercent;
@@ -1407,7 +1481,7 @@ struct RB_SystemConfig
 
 /**
  * @brief 获取 SDK 版本文本。
- * @return SDK 持有的 UTF-8、NUL 结尾字符串，例如 "0.2.0-vs2019-x64"；调用方不得修改或释放。
+ * @return SDK 持有的 UTF-8、NUL 结尾字符串，例如 "0.6.0"；调用方不得修改或释放。
  */
 RB_API const char* RB_Runtime_GetVersion();
 
@@ -1442,15 +1516,15 @@ RB_API int RB_Runtime_Initialize();
 RB_API void RB_Runtime_Shutdown();
 
 /**
- * @brief 启动由 SDK MultimediaTimer 驱动的后端计算循环；已启动时会按新周期间隔重建循环。
+ * @brief 启动由 SDK 专用高分辨率调度线程驱动的后端计算循环；已启动时会按新周期间隔重建循环。
  * @param intervalMs 计算周期间隔，单位毫秒；有效范围 1-1000 ms，推荐初始值为 2 ms。
- * @return RB_OK 表示启动成功；RB_INVALID_ARGUMENT 表示间隔不合法；RB_ERROR 表示未初始化或定时器启动失败。
- * @note 传入 2 表示约每 2 ms 计算一次；传入 1 表示约每 1 ms 计算一次。
+ * @return RB_OK 表示启动成功；RB_INVALID_ARGUMENT 表示间隔不合法；RB_ERROR 表示未初始化或调度线程启动失败。
+ * @note 传入 2 表示约每 2 ms 计算一次；传入 1 表示约每 1 ms 计算一次。调度迟到时跳过旧周期，不连续补跑历史计算。
  */
 RB_API int RB_Runtime_StartLoop(int intervalMs);
 
 /**
- * @brief 暂停已启动的内部计算循环，但保留定时器和当前频率。
+ * @brief 暂停已启动的内部计算循环，但保留调度线程和当前频率。
  * @return RB_OK 表示已暂停；RB_ERROR 表示循环未启动或内部失败。
  */
 RB_API int RB_Runtime_PauseLoop();
@@ -1462,7 +1536,7 @@ RB_API int RB_Runtime_PauseLoop();
 RB_API int RB_Runtime_ResumeLoop();
 
 /**
- * @brief 停止并释放内部计算定时器；未启动时调用也视为成功。
+ * @brief 停止并释放内部计算调度线程；未启动时调用也视为成功。
  * @return RB_OK 表示停止完成；RB_ERROR 表示内部失败。
  */
 RB_API int RB_Runtime_StopLoop();
@@ -1481,7 +1555,7 @@ RB_API int RB_Runtime_SetLoopIntervalMs(int intervalMs);
 RB_API int RB_Runtime_GetLoopIntervalMs();
 
 /**
- * @brief 查询内部计算定时器是否已经启动。
+ * @brief 查询内部计算调度线程是否已经启动。
  * @return 1 表示已启动，0 表示未启动；内部异常也返回 0。
  */
 RB_API int RB_Runtime_IsLoopRunning();
@@ -1556,6 +1630,60 @@ RB_API int RB_Can_BindOutputDevice(int outputIndex, const char* uid, int logical
  */
 RB_API int RB_Can_GetOutputBindingState(int outputIndex, RB_CanOutputBindingState* state);
 
+/** @brief 根据当前输出配置同步 CAN 控制器会话和绑定状态。 */
+RB_API int RB_Can_SyncControllerFromOutputConfig();
+
+/** @brief 读取 CAN 控制器状态文本。 */
+RB_API int RB_Can_GetControllerStatusText(char* buffer, int bufferSize);
+
+/** @brief 读取当前 CAN 控制器管理的电机数量。 */
+RB_API int RB_Can_GetMotorCount();
+
+/** @brief 读取当前 CAN 控制器管理的单个电机状态。 */
+RB_API int RB_Can_GetMotorState(int motorIndex, RB_CanMotorState* state);
+
+/** @brief 读取全局 CAN 参数目录数量。 */
+RB_API int RB_Can_GetMotorParameterCount();
+
+/** @brief 进入 CAN 电机参数维护模式，停止实时初始化/监控并保留参数 SDO 通道。 */
+RB_API int RB_Can_BeginMotorParameterMaintenance();
+
+/** @brief 退出 CAN 电机参数维护模式并请求重新初始化和回零。 */
+RB_API int RB_Can_EndMotorParameterMaintenance();
+
+/** @brief 读取指定参数的显示名称。 */
+RB_API int RB_Can_GetMotorParameterName(int parameterIndex, char* buffer, int bufferSize);
+
+/** @brief 读取指定电机按协议支持的参数数量。 */
+RB_API int RB_Can_GetMotorParameterCountForMotor(int motorIndex);
+
+/** @brief 读取指定电机的参数能力位。 */
+RB_API int RB_Can_GetMotorParameterCapabilitiesForMotor(int motorIndex);
+
+/** @brief 查询指定电机参数是否允许写入。 */
+RB_API int RB_Can_IsMotorParameterWritable(int motorIndex, int parameterIndex);
+
+/** @brief 读取指定电机参数名称。 */
+RB_API int RB_Can_GetMotorParameterNameForMotor(int motorIndex, int parameterIndex, char* buffer, int bufferSize);
+
+/** @brief 读取指定电机参数值。 */
+RB_API int RB_Can_ReadMotorParameter(int motorIndex, int parameterIndex, int* outValue);
+
+/** @brief 写入指定电机参数值。 */
+RB_API int RB_Can_WriteMotorParameter(int motorIndex, int parameterIndex, int value);
+
+/** @brief 保存指定电机参数，可选择保存后重启电机。 */
+RB_API int RB_Can_SaveMotorParameters(int motorIndex, int rebootAfterSave);
+
+/** @brief 恢复指定电机参数默认值。 */
+RB_API int RB_Can_RestoreMotorParameters(int motorIndex);
+
+/** @brief 重启指定电机。 */
+RB_API int RB_Can_RebootMotor(int motorIndex);
+
+/** @brief 清除指定电机故障。 */
+RB_API int RB_Can_ClearMotorFault(int motorIndex);
+
 /**
  * @brief 返回指定 RB_CAN 输出当前管理的电机数量。
  * @param outputIndex 当前输出目录中的零基索引。
@@ -1580,6 +1708,30 @@ RB_API int RB_Can_GetOutputMotorState(int outputIndex, int motorIndex, RB_CanMot
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示参数或结构大小无效；RB_ERROR 表示读取失败。
  */
 RB_API int RB_Can_GetOutputHealthState(int outputIndex, RB_CanOutputHealthState* state);
+
+/**
+ * @brief 向已连接并已武装的 CAN 运动输出提交一帧最新目标位置。
+ * @param outputIndex 当前输出目录中的零基索引；输出类型必须是 RB_CAN、FM_CAN、FC_CAN 或 RDS_CAN。
+ * @param positions 按输出配置 OutPutString 中的轴顺序排列的位置数组；位置使用 SDK 现有的 int32 目标位置单位。
+ * @param positionCount 位置数量，必须与输出配置中的 CAN 轴数量一致，范围 1-16。
+ * @return RB_OK 表示已提交到现有 latest-only 实时位置通道；RB_INVALID_ARGUMENT 表示参数无效；RB_ERROR 表示输出尚未 Ready、被安全状态阻断或提交失败。
+ * @note 该接口只提交最新位置，不复制 CAN 协议，也不绕过现有急停、故障和自动恢复状态机。外部桥接程序必须持续发送，并在输入超时后主动发送停车位置或断开输出。
+ */
+RB_API int RB_Can_SubmitPositions(int outputIndex, const int32_t* positions, int positionCount);
+
+/**
+ * @brief 设置指定 CAN 输出由外部宿主接管实时位置帧。
+ * @param outputIndex 当前输出目录中的零基索引。
+ * @param enabled 非零表示启用；启用后 SDK 内部 CAN 输出模板不再重复发送位置。
+ * @return RB_OK 表示设置成功；RB_INVALID_ARGUMENT 表示索引无效；RB_ERROR 表示会话不存在。
+ * @note 仅用于 SimHub 等外部运动宿主；普通 SimRacebear 前端不应启用。
+ */
+RB_API int RB_Can_SetExternalRealtimeMode(int outputIndex, int enabled);
+
+/**
+ * @brief 查询指定 CAN 输出是否由外部宿主接管实时位置帧。
+ */
+RB_API int RB_Can_IsExternalRealtimeMode(int outputIndex);
 
 /**
  * @brief 人工排除故障后显式清除指定输出的恢复限制并启动一次受控恢复。
@@ -1813,6 +1965,10 @@ RB_API int RB_Platform_ReadConfigByIndex(int platformIndex, RB_PlatformConfig* c
  * @brief 按平台索引保存平台结构和运行参数。
  */
 RB_API int RB_Platform_SaveConfigByIndex(int platformIndex, const RB_PlatformConfig* config);
+/** @brief 导出指定平台的完整配置包。 */
+RB_API int RB_Platform_ExportPackage(int platformIndex, const char* packagePath);
+/** @brief 导入平台配置包并覆盖包内 platformKey 对应的平台节点。 */
+RB_API int RB_Platform_ImportPackage(const char* packagePath, char* outPlatformKey, int bufferSize);
 
 /**
  * @brief 设置当前选中的平台状态缓存。
@@ -1969,6 +2125,36 @@ RB_API int RB_Output_GetKindCount();
 RB_API int RB_Output_GetKind(int kindIndex, char* buffer, int bufferSize);
 
 /**
+ * @brief 读取安全带 CAN 默认配置。
+ */
+RB_API int RB_SeatbeltCan_GetDefaultConfig(RB_SeatbeltCanConfig* config);
+
+/**
+ * @brief 读取指定输出实例的安全带 CAN 配置。
+ */
+RB_API int RB_SeatbeltCan_ReadConfig(int outputInstanceIndex, RB_SeatbeltCanConfig* config);
+
+/**
+ * @brief 保存指定输出实例的安全带 CAN 配置。
+ */
+RB_API int RB_SeatbeltCan_SaveConfig(int outputInstanceIndex, const RB_SeatbeltCanConfig* config);
+
+/**
+ * @brief 将安全带 CAN 配置应用到已创建但未连接的输出实例。
+ */
+RB_API int RB_SeatbeltCan_ApplyConfig(int outputInstanceIndex, const RB_SeatbeltCanConfig* config);
+
+/**
+ * @brief 读取指定安全带 CAN 输出实例的连接、回零和目标位置状态。
+ */
+RB_API int RB_SeatbeltCan_GetState(int outputInstanceIndex, RB_SeatbeltCanState* state);
+
+/**
+ * @brief 请求指定安全带 CAN 输出实例执行一次回零。
+ */
+RB_API int RB_SeatbeltCan_RequestHoming(int outputInstanceIndex);
+
+/**
  * @brief 确保至少存在一个默认 Serial 输出实例。
  * @return RB_OK 表示配置已经存在或创建成功；负数表示初始化或写入失败。
  */
@@ -2084,6 +2270,10 @@ RB_API int RB_Dynamic_SaveProfileByIndex(int profileIndex, const RB_DynamicV2Pro
  * @brief 按配置名保存 6DOF 动态配置。
  */
 RB_API int RB_Dynamic_SaveProfile(const char* profileName, const RB_DynamicV2Profile* profile);
+/** @brief 导出指定动态 profile 的 DynamicV2 与同名 MotionEffect 配置包。 */
+RB_API int RB_Dynamic_ExportPackage(int profileIndex, const char* packagePath);
+/** @brief 导入动态配置包；profile 不存在时自动创建，存在时完整覆盖。 */
+RB_API int RB_Dynamic_ImportPackage(const char* packagePath, char* outProfileName, int bufferSize);
 
 /**
  * @brief 将动态配置应用到当前运行中的平台模型。

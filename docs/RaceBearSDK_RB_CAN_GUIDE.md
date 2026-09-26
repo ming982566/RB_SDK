@@ -9,6 +9,7 @@
 - 输出实例与设备 UID 的稳定绑定；
 - 绑定、运行、电机和健康状态；
 - 用户确认安全后的受控恢复。
+- 外部 Motion 宿主接管实时位置帧。
 
 `FM_CAN`、`FC_CAN`、`RDS_CAN`、电机参数维护、固件升级、底层 SDO/PDO 和急停控制暂未提供公开接入 API，因此不在本文流程内。
 
@@ -256,7 +257,39 @@ const int rc = RB_Can_RequestOutputRecovery(rbCanOutputIndex);
 
 `RB_OK` 表示 SDK 已接受一次恢复请求。页面继续轮询健康状态，恢复接口等待下一次用户明确操作。
 
-## 11. 推荐页面状态机
+## 11. 外部 Motion 宿主和 SimHub 中继
+
+0.6.0 提供公开接口让 SimHub 等外部 Motion 宿主接管已有 `RB_CAN` 输出的实时位置提交。宿主不直接实现 CAN 协议，也不修改设备参数。
+
+SimHub Generic UDP 推荐发送：
+
+```text
+RBH1,<Axis1a>,<Axis2a>,<Axis3a>,<Axis4a>
+```
+
+桥接程序应校验 magic、轴数量、解析结果和位置范围，然后启用接管并提交最新位置：
+
+```cpp
+int32_t positions[] = { 0, 21845, 43690, 65535 };
+if (RB_Can_SetExternalRealtimeMode(outputIndex, 1) == RB_OK)
+    RB_Can_SubmitPositions(outputIndex, positions, 4);
+```
+
+调用约束：
+
+- `positionCount` 必须与该输出配置的 CAN 轴数量一致，外部宿主应以当前输出配置为准。
+- 接管模式启用后，宿主必须持续提交最新位置；不要重复启用 SDK 内部位置模板。
+- UDP 或上游 Motion 输入超时后，必须提交停车位置或断开输出，再关闭接管模式。
+- 急停、Ready、设备绑定、授权、故障检测和人工恢复仍由 SDK 控制；该接口不能绕过安全状态机。
+- 只支持公开 `RB_CAN` 运动输出，不支持 `SEATBELT_CAN` 或其它私有 CAN 协议。
+
+退出或切回 SDK 内部位置计算前，应先停止外部输入，提交停车位置，断开或确认输出安全后调用：
+
+```cpp
+RB_Can_SetExternalRealtimeMode(outputIndex, 0);
+```
+
+## 12. 推荐页面状态机
 
 1. 页面打开或热插拔提示后刷新设备目录。
 2. 使用 UID 恢复设备选择，不保存目录行号。
@@ -268,7 +301,7 @@ const int rc = RB_Can_RequestOutputRecovery(rbCanOutputIndex);
 8. 故障需要人工处理时停止自动操作并显示恢复按钮。
 9. 页面关闭不应断开正在运行的输出；应用退出必须执行安全断开。
 
-## 12. 安全退出
+## 13. 安全退出
 
 ```cpp
 RB_Output_RequestDisconnectAll();
@@ -283,7 +316,7 @@ RB_Runtime_Shutdown();
 
 退出期间停止设备刷新、绑定、恢复和其它新命令，再按 SDK 关闭流程完成断开和资源释放。
 
-## 13. 最低验收清单
+## 14. 最低验收清单
 
 - 单张 RB_CAN 设备可以刷新并显示 UID、索引、固件和身份状态。
 - 两张设备同时在线且旧逻辑索引相同时，可以按 UID 为其中一张设置新的唯一索引，不要求拔出另一张。

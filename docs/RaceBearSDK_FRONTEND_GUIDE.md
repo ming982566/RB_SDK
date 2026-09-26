@@ -331,6 +331,22 @@ if (rc == RB_OK)
     rc = RB_Platform_ApplyRuntimeConfigToCurrentRig(&config);
 ```
 
+平台配置可以使用完整配置包迁移：
+
+```cpp
+RB_Platform_ExportPackage(platformIndex, packagePath);
+
+char importedPlatformKey[RB_TEXT_MEDIUM]{};
+if (RB_Platform_ImportPackage(packagePath,
+                              importedPlatformKey,
+                              sizeof(importedPlatformKey)) == RB_OK) {
+    // 按返回的稳定 platformKey 刷新目录并回读配置。
+}
+```
+
+导入成功后不要继续使用导入前的平台目录索引；目录可能已经重建，应按返回的稳定
+Key 重新定位并读取完整结构。
+
 切换平台类型前先断开输出。预览和手动测试范围来自：
 
 - `RB_Platform_IsDofSupported()`
@@ -533,6 +549,27 @@ if (RB_Can_GetOutputHealthState(outputIndex, &health) == RB_OK) {
 调用 `RB_Can_RequestOutputRecovery(outputIndex)`。返回 `RB_OK` 仅表示恢复请求已
 接受，页面继续轮询健康快照直到进入就绪/运行或再次报告故障。恢复请求由用户明确触发一次，
 UI 定时器只负责读取状态。
+
+DynamicV2 和同名运动增强配置可以使用配置包迁移：
+
+```cpp
+RB_Dynamic_ExportPackage(dynamicProfileIndex, packagePath);
+
+char importedProfileName[RB_TEXT_MEDIUM]{};
+if (RB_Dynamic_ImportPackage(packagePath,
+                              importedProfileName,
+                              sizeof(importedProfileName)) == RB_OK) {
+    // 按返回的稳定 profile 名称刷新目录并回读配置。
+}
+```
+
+配置包路径使用 UTF-8。导入会完整覆盖同名 profile；导入期间不要并发编辑或应用，
+导入完成后刷新目录，再由用户明确执行 Apply。
+
+SimHub 等外部宿主可使用 `RB_Can_SetExternalRealtimeMode()` 和
+`RB_Can_SubmitPositions()` 接管已有 `RB_CAN` 输出的实时位置。外部宿主必须自行
+校验上游数据并在输入超时后停车或断开；该流程不适用于电机参数维护、单圈脉冲数或
+其它私有 CAN 协议。
 
 ## 14. 自定义游戏和外部数据源
 

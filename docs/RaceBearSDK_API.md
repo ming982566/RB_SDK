@@ -138,7 +138,7 @@ RB_Runtime_Shutdown()         退出前必须
 | `2` | 目标周期约 2 ms，当前推荐初始值 |
 | `10` | 目标周期约 10 ms |
 
-有效输入范围为 1-1000 ms。实际执行周期仍受 Windows 调度、计算负载和设备链路影响。UI 刷新周期与后端计算周期是两回事：后端可以按 2 ms 运行，而 UI 只需按约 16-33 ms 调用 `RB_State_Read()`。
+有效输入范围为 1-1000 ms。SDK 使用独立高分辨率可等待定时器和专用计算线程，不在 WinMM 回调线程中直接运行完整计算链。调度迟到时只执行一次当前计算并跳过旧周期，不连续补跑历史 Tick；实际执行周期仍受 Windows 调度、计算负载和设备链路影响。UI 刷新周期与后端计算周期是两回事：后端可以按 2 ms 运行，而 UI 只需按约 16-33 ms 调用 `RB_State_Read()`。
 
 `RB_Runtime_SetLoopIntervalMs()` 使用相同的毫秒单位，`RB_Runtime_GetLoopIntervalMs()` 返回当前目标周期间隔毫秒数。
 
@@ -163,6 +163,10 @@ SDK 0.5.1 在 0.5.0 基础上保持公开 C ABI 和结构体布局不变，统�
 SDK 0.5.0 新增客户自定义仪表包。`.rbdash` V1 是 UTF-8 无 BOM JSON 单文件，图片以 PNG/JPEG Data URI 内嵌；模板只能绑定 SDK 认可的稳定 `rb.*` 数据键，不执行脚本，也不能访问文件系统、网络、进程或控制接口。随附的 `tools/DashboardDesigner/index.html` 可直接在浏览器中制作和导出模板。
 
 0.5.0 版本交付时进一步公开 `RB_CAN` 的 CANAPP 设备发现、逻辑索引设置、稳定 UID 绑定、绑定状态和单输出电机状态。完整调用顺序和安全要求见 `RaceBearSDK_RB_CAN_GUIDE.md`。其它 CAN 电机协议、参数维护、固件升级和底层总线控制暂未纳入公开 API。
+
+SDK 0.6.0 将运行时版本更新为 `0.6.0`。本版本补齐平台配置包和动态配置包的公开导入导出接口，并公开 SimHub 等外部 Motion 宿主接管 `RB_CAN` 实时位置帧的接口。配置包导入导出使用 UTF-8 文件路径；导入后应使用返回的稳定 Key/名称重新读取配置，不能继续使用旧目录索引。
+
+0.6.0 的外部实时位置能力只复用 SDK 已有的 `RB_CAN` 输出状态机和安全链路，不开放 CAN 协议、底层 SDO/PDO 或电机维护协议。外部宿主必须持续提交最新位置，输入超时后主动提交停车位置或断开输出；急停、Ready、设备绑定、故障恢复和授权限制仍由 SDK 判断。
 
 宿主程序不需要为 SDK 调用 `CoInitializeEx()` 或 `CoUninitialize()`。SDK 在自己的线程中管理 COM 生命周期。
 
@@ -967,6 +971,27 @@ RB_Seatbelt_SetTestOutput(1, 40.0, 40.0);
 RB_Seatbelt_SetTestOutput(0, 0.0, 0.0);
 ```
 
+安全带的 RB 57 步进驱动使用独立输出类型 `SEATBELT_CAN`。它沿用 RB 驱动的位置模式和 `0x607A:00` 目标位置 SDO，但不配置位置 RPDO，也不进入平台运动 CAN 的动态批处理、固件安全和平台堵转回零流程。驱动器电流、速度、加速度、自动使能等参数由 RB 专用上位机预先设置。旧名称 `RB_CAN_SEATBELT` 仅作为配置读取和旧前端调用的兼容别名，新建与保存统一写入 `SEATBELT_CAN`。
+
+```cpp
+RB_SeatbeltCanConfig canConfig{};
+RB_SeatbeltCan_GetDefaultConfig(&canConfig);
+canConfig.ChannelMode = RB_SEATBELT_CAN_DUAL;
+canConfig.LeftNodeId = 1;
+canConfig.RightNodeId = 2;
+canConfig.LeftReductionRatio = 1.0;
+canConfig.RightReductionRatio = 1.0;
+canConfig.HomingOnConnect = 1;
+canConfig.HomingMethod = 17;
+RB_SeatbeltCan_SaveConfig(outputInstanceIndex, &canConfig);
+RB_SeatbeltCan_ApplyConfig(outputInstanceIndex, &canConfig);
+
+// 连接后可按需手动回零；SDK 会先确认回零完成，再允许发送目标位置。
+RB_SeatbeltCan_RequestHoming(outputInstanceIndex);
+```
+
+安全带和 RGB 可以同时输出：安全带使用 `SEATBELT_CAN` 输出实例，RGB 继续使用独立 RGBAPP/效果链，两者不共享输出数据通道。
+
 | 字段 | 单位和范围 |
 | ---- | ---------- |
 | `BasePreloadPercent` | 固定基础预紧，`0-100%`，不随车速增加 |
@@ -1047,6 +1072,8 @@ if (RB_Rgb_StartAppFirmwareUpdate(device.Uid, appBinPath) == RB_OK) {
 
 ### 8.1.7 输出参数
 
+RGB效果层新增 `DisplayMode`：`RB_RGB_DISPLAY_INDEPENDENT` 表示仅独立 RGB，`RB_RGB_DISPLAY_SEATBELT_LINK` 表示仅在安全带联动控制器就绪时显示，`RB_RGB_DISPLAY_BOTH` 表示两种场景都允许。当前安全带 CAN 固件只提供联动状态，尚未提供 RGB 像素传输协议。
+
 每个输出实例对应一个 `RB_OutputConfig`。`instanceIndex` 是当前输出实例列表的零基索引，范围由 `RB_Output_GetInstanceCount()` 决定。先读取再修改，能够保留当前输出类型不认识或当前页面未显示的字段。
 
 SDK 初始化时加载一次输出实例目录。`RB_Output_GetInstanceCount()`、`RB_Output_GetInstanceKey()`
@@ -1103,6 +1130,7 @@ if (rc != RB_OK) {
 | UDP | `OutputKind`、`IpAddrs`、`UdpPort`、`UdpLPort`、命令和延时字段 |
 | MMF | `OutputKind`、`MMFName`、命令模板 |
 | CAN | `OutputKind`、`CANindex`、`ConnectionSpeed`、`ParkPositionPercent`、`AutoConnect` |
+| SEATBELT_CAN | `OutputKind`、`CANindex`；另用 `RB_SeatbeltCanConfig` 设置单/双路、节点、Key、比例、位置边界和回零 |
 | Sim-FAN | Serial 字段和 Wind1-Wind4 输出命令模板 |
 | Vibration | Serial 字段和 Haptic1-Haptic7 输出命令模板 |
 
@@ -1251,7 +1279,7 @@ const int rc = RB_Can_RequestOutputRecovery(outputIndex);
 
 ## 8.2 平台目录和平台参数
 
-平台下拉框应由 SDK 平台目录动态填充。平台目录索引是零基索引，只用于调用当前 SDK；`RB_PlatformConfig::Type` 是平台类型编号，当前为 1-12，两者含义不同。
+平台下拉框应由 SDK 平台目录动态填充。平台目录索引是零基索引，只用于调用当前 SDK；`RB_PlatformConfig::Type` 是平台类型编号，当前为 1-13，两者含义不同。
 
 ```cpp
 const int platformCount = RB_Platform_GetCount();
@@ -1277,6 +1305,7 @@ for (int platformIndex = 0; platformIndex < platformCount; ++platformIndex) {
 | 9 | RB-A6V | 10 | 6 | Surge、Heave、Yaw、Roll、Pitch |
 | 10 | RB-A6L | 11 | 6 | Sway、Surge、Heave、Yaw、Roll、Pitch |
 | 11 | RB-A7H | 12 | 7 | Sway、Surge、Heave、Yaw、Roll、Pitch |
+| 12 | RB-A6X | 13 | 6 | Sway、Surge、Heave、Yaw、Roll、Pitch |
 
 前端仍应调用 `RB_Platform_IsDofSupported()` 动态决定是否显示 DOF，而不是依赖上表。
 
@@ -1321,6 +1350,7 @@ for (int number = 8; number <= 10; ++number) {
 | RB-A6V | L1 下层杆端宽度；L2 下层外壳固定端宽度；L3 下层旋转中心偏移；L4 上框宽度；L5 上框长度；L6-L7 未使用 | L8 上层 A1-A4 总行程；L9 下层 A5-A6 总行程；L10 未使用 |
 | RB-A6L | L1 上平台相邻点距离；L2 上平台对角点距离；L3 下平台相邻点距离；L4 下平台对角点距离；L5 执行器中间长度；L6 Yaw 中心 Y 偏移，正值向前；L7 旋转中心 Z 高度，正值向上 | L8 A1-A6 总行程；L9-L10 未使用 |
 | RB-A7H | L1 上框宽度；L2 上框长度；L3 A6 到 Yaw 中心距离；L4 A7 到 Yaw 中心距离；L5-L7 未使用 | L8 上层 A1-A4 总行程；L9 Surge 轴 A5 总行程；L10 对置轴 A6/A7 共同总行程 |
+| RB-A6X | L1 六边形滑台内切圆半径；L2 上平台同组连接点间距；L3 上平台跨组连接点间距；L4 未使用（固定前方基准）；L5 连杆固定长度；L6 Yaw 中心 Y 偏移；L7 旋转中心相对上平台平面的 Z 高度 | L8 A1-A6 滑台共同总行程；L9-L10 未使用 |
 
 ### 8.2.3 保存和应用平台参数
 
@@ -1477,7 +1507,7 @@ for (int dof = 0; dof < RB_DOF_COUNT; ++dof) {
 }
 ```
 
-手动测试值直接进入真实运行 Rig：线性 DOF 使用毫米，Yaw/Roll/Pitch 使用度。
+手动测试值在启用测试后直接进入真实运行 Rig 的六自由度几何解算，不经过 DynamicV2、倾斜协调或 Rig 姿态滤波；线性 DOF 使用毫米，Yaw/Roll/Pitch 使用度。
 
 ```cpp
 if (RB_ManualPose_SetTestEnabled(1) == RB_OK) {
@@ -1842,7 +1872,7 @@ void DrainSdkLogs()
 
 | 工作                | 建议线程                                                    |
 | ------------------- | ----------------------------------------------------------- |
-| SDK 后端计算        | 由 `RB_Runtime_StartLoop(intervalMs)` 创建的内部 MultimediaTimer 负责 |
+| SDK 后端计算        | 由 `RB_Runtime_StartLoop(intervalMs)` 创建的高分辨率专用调度线程负责 |
 | UI 状态刷新         | UI 定时器，通常 30-60 Hz；需要更顺滑预览时可到 100 Hz       |
 | JSON 目录和配置读取 | 页面加载或用户刷新时调用，不要高频轮询                      |
 | 串口和设备回调      | SDK 工作线程触发，转发到 UI 线程                            |
@@ -1997,6 +2027,38 @@ void DrainSdkLogs()
 | `RB_DashboardWeb_SubmitFrame()` / `RB_DashboardWeb_GetState()` | 提交最新仪表帧并读取 URL、客户端和编码统计。 |
 | `RB_Can_GetOutputHealthState()` | 读取指定输出的 CAN 状态机、故障、恢复和链路诊断。 |
 | `RB_Can_RequestOutputRecovery()` | 人工排障完成后请求一次受控恢复；由用户明确触发单次请求。 |
+| `RB_Platform_ExportPackage()` / `RB_Platform_ImportPackage()` | 导出或导入完整平台配置包；导入后按返回的稳定平台 Key 回读。 |
+| `RB_Dynamic_ExportPackage()` / `RB_Dynamic_ImportPackage()` | 导出或导入 DynamicV2 与同名 MotionEffect 配置包。 |
+| `RB_Can_SetExternalRealtimeMode()` / `RB_Can_SubmitPositions()` | 供外部 Motion 宿主接管公开 `RB_CAN` 实时位置通道。 |
+| `RB_Can_IsExternalRealtimeMode()` | 查询外部实时位置接管状态。 |
+
+### 17.3.1 SimHub 公共 UDP 中继
+
+外部 Motion 宿主可以使用 SimHub 的公开 Generic UDP 输出，把已经完成平台计算的轴值发送给独立的 RaceBear 桥接程序。桥接程序先调用 `RB_Can_SetExternalRealtimeMode()`，再调用 `RB_Can_SubmitPositions()`，复用 SDK 当前 RB_CAN 输出实例和 CAN 状态机。
+
+SimHub 侧推荐发送以下文本：
+
+```text
+RBH1,<Axis1a>,<Axis2a>,<Axis3a>,<Axis4a>
+```
+
+桥接程序严格检查 magic、轴数量和 `0..65535` 数值范围，并把值映射到 `int32` CAN 目标位置。有效包超过配置的超时时间未到达时，桥接程序提交输出配置中的停车位置；SDK 负责 CAN 电机状态、故障检测、自动恢复和安全阻断。
+
+公开提交接口：
+
+```cpp
+int32_t positions[] = { 0, 21845, 43690, 65535 };
+RB_Can_SetExternalRealtimeMode(outputIndex, 1);
+RB_Can_SubmitPositions(outputIndex, positions, 4);
+```
+
+该接口只允许运动 CAN 输出，不接受 `SEATBELT_CAN`；它不会绕过急停、Ready、设备绑定或 latest-only 实时位置保护。输入超时后桥接程序必须提交停车位置或断开输出，并调用 `RB_Can_SetExternalRealtimeMode(outputIndex, 0)`。完整桥接示例位于 `examples/cpp/simhub_udp_bridge`。
+
+### 17.3.2 CAN 设备维护边界
+
+CAN 电机参数维护、单圈脉冲数等维护模式参数读写、保存/恢复、重启、清故障，以及对应的 `FM_CAN`、`FC_CAN`、`RDS_CAN` 和 `SEATBELT_CAN` 协议，仍属于 SimRacebear 私有适配层和内部设备维护链路。它们不是 0.6.0 标准第三方 SDK 合同，不能根据内部实现或旧版前端调用自行接入。
+
+标准公开 SDK 只承诺本节的 `RB_CAN` 设备发现、稳定绑定、健康诊断、人工恢复和外部实时位置接管。若未来开放参数维护，应另行定义参数编号、数据类型、范围、掉电保存、互斥状态和失败恢复合同，并同步更新公开头、测试和发布文档。
 
 ### 17.4 串口高级接口
 

@@ -27,6 +27,10 @@ objects, not by README version text or the latest branch commit.
    tag, and GitHub Release.
 4. Never reuse an existing version tag for a different build. Increment the
    version first, even when the ABI is unchanged.
+5. For 0.6.0 and later, verify that `RB_Runtime_GetVersion()` returns the exact
+   `X.Y.Z` value expected by the release before packaging. The `vs2019-x64`
+   suffix belongs only to archive naming and does not belong to the runtime
+   version string.
 
 ## Preflight
 
@@ -46,6 +50,12 @@ Before running the release script:
   private project files cannot enter the public package. The public
   `examples/RaceBearMotionStudio` sample may retain its own public solution and
   project files.
+- Compare the public header and exported DLL symbols against the approved public
+  API list. Configuration package APIs and external `RB_CAN` realtime position
+  APIs are public in 0.6.0; motor parameter maintenance, private CAN protocols,
+  SDO/PDO, firmware-internal commands, and SimRacebear UI APIs are not.
+- Confirm the API manual, RB_CAN guide, frontend guide, README, runtime version,
+  header, DLL/LIB and archive all identify the same release version.
 
 ## One-Command Publish
 
@@ -96,7 +106,9 @@ A release is complete only when all of these are true:
 - both package assets are attached;
 - the Release notes identify the same version as `RB_Runtime_GetVersion()`;
 - the archive contains no private source or development artifacts; and
-- the published DLL/LIB/header/resources passed the matching-build checks.
+- the published DLL/LIB/header/resources passed the matching-build checks; and
+- the public API diff contains no private CAN maintenance or firmware protocol
+  entry.
 
 If a step fails, stop before claiming publication and record the exact failed
 step, command, and artifact state.

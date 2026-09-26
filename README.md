@@ -3,6 +3,19 @@
 RaceBear SDK is a Windows x64 C ABI SDK for building telemetry, motion,
 haptics, output, and dashboard frontend applications.
 
+## 0.6.0
+
+- The DLL reports runtime version `0.6.0`.
+- Added platform and DynamicV2 configuration package import/export APIs.
+- Added the public SimHub/external-host CAN latest-position submission workflow.
+- External realtime mode is opt-in; normal SimRacebear output continues to use
+  the SDK-owned position channel by default.
+- The public SDK still covers only the documented `RB_CAN` device-management,
+  diagnostics, configuration-package, and external-position workflows.
+  CAN motor parameter maintenance, `FM_CAN`, `FC_CAN`, `RDS_CAN`,
+  `SEATBELT_CAN`, raw SDO/PDO, firmware-internal protocols, and SimRacebear
+  private UI adapters remain outside the public handoff boundary.
+
 ## 0.5.1
 
 - Fixed repeated configuration-file parsing by caching parsed JSON documents in the SDK.
@@ -10,8 +23,6 @@ haptics, output, and dashboard frontend applications.
 - Typed saves update the cache, while `RB_Data_WriteJson()` invalidates the matching cache after raw JSON replacement.
 - Output AutoConnect counting, automatic connection, and frontend summaries use the cached output directory.
 - Added a configuration-cache regression smoke test. The public C ABI, structure layouts, and firmware protocols are unchanged.
-
-The DLL reports runtime version `0.5.1-vs2019-x64`.
 
 ## 0.5.0
 
