@@ -266,7 +266,8 @@ function Invoke-ReleasePreflight {
     if (& git -C $publishRoot show-ref --verify --quiet "refs/tags/$tag") {
         throw "Version tag already exists locally: $tag. Choose a new version."
     }
-    $remoteTag = (& git -C $publishRoot ls-remote --tags origin "refs/tags/$tag" 2>$null).Trim()
+    $remoteTagOutput = @(& git -C $publishRoot ls-remote --tags origin "refs/tags/$tag" 2>$null)
+    $remoteTag = ($remoteTagOutput -join "`n").Trim()
     if ($remoteTag) {
         throw "Version tag already exists on origin: $tag. Choose a new version."
     }
