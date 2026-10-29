@@ -81,6 +81,16 @@ The script performs these operations in order:
 The script is the release boundary. Do not run a separate ordinary `git push`
 for a release after it completes.
 
+## Post-Release Cleanup
+
+After a successful release, keep only the current version's archive and
+checksum in the repository root. Remove or move older versioned archives,
+checksums, temporary release staging directories, and historical build output
+from `RB_SDK`; do not remove the public source tree, matching Debug/Release
+package contents, or the current release assets. Before cleanup, confirm that
+no script or documentation references the old paths and record the moved or
+removed items.
+
 ## Release Assets
 
 The archive and checksum are ignored by `.gitignore` so they do not become

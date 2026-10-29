@@ -5,7 +5,8 @@ param(
 
     [string]$SdkSourceRoot = '',
     [string]$Repository = 'ming982566/RB_SDK',
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [switch]$PreflightOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -137,6 +138,142 @@ function Assert-NoPrivateSdkSource {
     }
 }
 
+function Remove-ReleaseStage([string]$stage) {
+    $tempRoot = [IO.Path]::GetFullPath($env:TEMP).TrimEnd('\') + '\'
+    $target = [IO.Path]::GetFullPath($stage)
+    if (-not $target.StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase) -or
+        (Split-Path -Leaf $target) -notmatch '^RaceBearSdkRelease-[0-9a-f]{32}$') {
+        throw "Refusing to remove release staging outside the expected temporary directory: $target"
+    }
+    if (Test-Path -LiteralPath $target) {
+        Remove-Item -LiteralPath $target -Recurse -Force
+    }
+}
+
+function New-ReleaseStage {
+    $stage = Join-Path $env:TEMP ("RaceBearSdkRelease-" + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $stage -Force | Out-Null
+    $allowed = @(
+        '^README\.md$', '^LICENSE$',
+        '^bin\\x64\\(Debug|Release)\\(RaceBearSDK\.(dll|lib)|libusb-1\.0\.dll)$',
+        '^bin\\x64\\(Debug|Release)\\DashboardAssets\\RaceBear\\[^\\]+\.(png|ttf|rbdash)$',
+        '^bin\\x64\\(Debug|Release)\\DashboardAssets\\RaceBear\\[^\\]+\\[^\\]+\.(png|ttf|rbdash)$',
+        '^bin\\x64\\(Debug|Release)\\DashboardAssets\\RaceBear\\[^\\]+\\[^\\]+\\[^\\]+\.(png|ttf|rbdash)$',
+        '^include\\RaceBearSDK\.h$',
+        '^docs\\(RaceBearSDK_API|RaceBearSDK_FRONTEND_GUIDE|RaceBearSDK_RB_CAN_GUIDE|RELEASE_PROCESS)\.md$',
+        '^examples\\README\.md$',
+        '^examples\\(cpp|python|qt)\\[^\\]+\.(cpp|h|py|md|txt)$',
+        '^examples\\RaceBearMotionStudio\\(RaceBearMotionStudio\.(sln|vcxproj|vcxproj\.filters)|README\.md)$',
+        '^examples\\RaceBearMotionStudio\\src\\[^\\]+\.(cpp|h)$',
+        '^examples\\RaceBearMotionStudio\\src\\pages\\[^\\]+\.(cpp|h)$',
+        '^tools\\Publish-Release\.ps1$',
+        '^tools\\DashboardDesigner\\(app\.js|index\.html|Start-DashboardDesigner\.cmd|styles\.css)$',
+        '^tools\\skills\\racebear-frontend-panel\\SKILL\.md$',
+        '^tools\\skills\\racebear-frontend-panel\\references\\[^\\]+\.md$'
+    )
+    try {
+        $packagePaths = @('bin', 'include', 'docs', 'examples', 'tools', 'README.md', 'LICENSE')
+        $stagedFiles = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+        foreach ($path in $packagePaths) {
+            $source = Join-Path $publishRoot $path
+            $files = if (Test-Path -LiteralPath $source -PathType Leaf) {
+                @(Get-Item -LiteralPath $source)
+            }
+            else {
+                @(Get-ChildItem -LiteralPath $source -Recurse -File)
+            }
+            foreach ($file in $files) {
+                $relative = $file.FullName.Substring($publishRoot.Length + 1)
+                if (-not @($allowed | Where-Object { $relative -match $_ }).Count) {
+                    throw "Unexpected file in release package paths: $relative"
+                }
+                $target = Join-Path $stage $relative
+                New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
+                Copy-Item -LiteralPath $file.FullName -Destination $target -Force
+                if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ne
+                    (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash) {
+                    throw "Staging hash mismatch: $relative"
+                }
+                [void]$stagedFiles.Add($relative)
+            }
+        }
+        foreach ($required in @('README.md', 'LICENSE', 'include\RaceBearSDK.h',
+            'bin\x64\Debug\RaceBearSDK.dll', 'bin\x64\Debug\RaceBearSDK.lib',
+            'bin\x64\Release\RaceBearSDK.dll', 'bin\x64\Release\RaceBearSDK.lib')) {
+            if (-not $stagedFiles.Contains($required)) {
+                throw "Release staging misses required file: $required"
+            }
+        }
+        return $stage
+    }
+    catch {
+        Remove-ReleaseStage $stage
+        throw
+    }
+}
+
+function Invoke-PublicMirrorAbiGate {
+    $gate = Join-Path $SdkSourceRoot 'tests\Test-PublicMirrorAbi.ps1'
+    if (-not (Test-Path -LiteralPath $gate)) {
+        throw "Public/mirror ABI gate not found: $gate"
+    }
+    $powershell = Get-Command powershell.exe -ErrorAction SilentlyContinue
+    if (-not $powershell) {
+        throw 'Windows PowerShell is required to run the public/mirror ABI gate.'
+    }
+    Invoke-Checked $powershell.Source @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $gate,
+        '-SdkRoot', $SdkSourceRoot,
+        '-MirrorHeader', (Join-Path (Split-Path -Parent $SdkSourceRoot) 'SimRacebear\module\RB_SDK\RBSDK\RaceBearSDK.h')
+    )
+}
+
+function Invoke-ReleasePreflight {
+    $gitCommand = Get-Command git -ErrorAction SilentlyContinue
+    if (-not $gitCommand) {
+        throw 'Git is required for a release.'
+    }
+
+    $actualRoot = (& git -C $publishRoot rev-parse --show-toplevel 2>$null).Trim()
+    if (-not $actualRoot) {
+        throw "The publish directory is not a Git worktree: $publishRoot"
+    }
+    if ([System.IO.Path]::GetFullPath($actualRoot).TrimEnd('\') -ne
+        [System.IO.Path]::GetFullPath($publishRoot).TrimEnd('\')) {
+        throw "Git root does not match the publish repository: $actualRoot"
+    }
+
+    $branch = (& git -C $publishRoot symbolic-ref --quiet --short HEAD 2>$null).Trim()
+    if ($branch -ne 'main') {
+        throw "Release must run from the main branch; current branch is '$branch'."
+    }
+
+    $origin = (& git -C $publishRoot remote get-url origin 2>$null).Trim()
+    if (-not $origin) {
+        throw 'Git remote origin is not configured.'
+    }
+    $normalizedOrigin = $origin.TrimEnd('/').TrimEnd('.git')
+    if ($normalizedOrigin -notmatch "/$([regex]::Escape($Repository))$") {
+        throw "origin '$origin' does not match the requested GitHub repository '$Repository'."
+    }
+
+    $status = @(& git -C $publishRoot status --porcelain=v1 --untracked-files=all)
+    if ($status.Count -gt 0) {
+        $details = $status -join [Environment]::NewLine
+        throw "Release requires a clean worktree. Existing changes were not modified:`n$details"
+    }
+
+    if (& git -C $publishRoot show-ref --verify --quiet "refs/tags/$tag") {
+        throw "Version tag already exists locally: $tag. Choose a new version."
+    }
+    $remoteTag = (& git -C $publishRoot ls-remote --tags origin "refs/tags/$tag" 2>$null).Trim()
+    if ($remoteTag) {
+        throw "Version tag already exists on origin: $tag. Choose a new version."
+    }
+
+    Write-Host "Release preflight passed: clean main worktree, matching origin, unused tag $tag."
+}
+
 if (-not (Test-Path -LiteralPath $project)) {
     throw "SDK project not found: $project"
 }
@@ -151,6 +288,11 @@ if (-not (Test-Path -LiteralPath $gh)) {
 
 Push-Location $publishRoot
 try {
+    Invoke-ReleasePreflight
+    if ($PreflightOnly) {
+        return
+    }
+
     # Publishing is explicit: normal IDE builds never invoke this script.
     if (-not $SkipBuild) {
         Invoke-Checked $msbuild @($project, '/t:Rebuild', '/p:Configuration=Debug', '/p:Platform=x64', '/m')
@@ -159,6 +301,7 @@ try {
 
     Copy-SdkPackage
     Assert-NoPrivateSdkSource
+    Invoke-PublicMirrorAbiGate
 
     if (Test-Path -LiteralPath $archivePath) {
         Remove-Item -LiteralPath $archivePath -Force
@@ -167,16 +310,13 @@ try {
         Remove-Item -LiteralPath $hashPath -Force
     }
 
-    $packageItems = @(
-        (Join-Path $publishRoot 'bin'),
-        (Join-Path $publishRoot 'include'),
-        (Join-Path $publishRoot 'docs'),
-        (Join-Path $publishRoot 'examples'),
-        (Join-Path $publishRoot 'tools'),
-        (Join-Path $publishRoot 'README.md'),
-        (Join-Path $publishRoot 'LICENSE')
-    )
-    Compress-Archive -Path $packageItems -DestinationPath $archivePath -CompressionLevel Optimal
+    $stage = New-ReleaseStage
+    try {
+        Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $archivePath -CompressionLevel Optimal
+    }
+    finally {
+        Remove-ReleaseStage $stage
+    }
 
     $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash
     "$hash  $archiveName" | Set-Content -LiteralPath $hashPath -Encoding ASCII

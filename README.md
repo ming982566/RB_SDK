@@ -3,6 +3,12 @@
 RaceBear SDK is a Windows x64 C ABI SDK for building telemetry, motion,
 haptics, output, and dashboard frontend applications.
 
+## 0.6.1
+
+- The DLL reports runtime version `0.6.1`.
+- This maintenance release preserves the public C ABI, structure layouts, and
+  public protocols, and remains compatible with `0.6.0` callers.
+
 ## 0.6.0
 
 - The DLL reports runtime version `0.6.0`.
@@ -66,6 +72,12 @@ The public package is organized around the stable C ABI and includes the
 headers, binaries, resources, documentation, tools, and examples needed for
 application integration.
 
+The public package is x64 only. The separate Win32 SDK DLL used by the private
+SimHub x86 plugin is built and maintained in `RaceBear_SDK\bin\Win32\Release`;
+it is not part of this repository's x64 package. The SimRacebear炫彩 mirror
+is maintained in the private frontend directory and is checked against the
+public header by the SDK ABI gate before a release.
+
 ## Release Workflow
 
 For this repository, an SDK request to "push" means a complete versioned
@@ -82,7 +94,7 @@ Run the repository release script from `RB_SDK` after the SDK source, build
 outputs, documentation, and public repository status have been checked:
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.5.1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.6.1
 ```
 
 The script uses the sibling `RaceBear_SDK` development directory by default.
@@ -141,7 +153,7 @@ the Microsoft Visual C++ 2015-2022 Redistributable x64.
 
 The Debug and Release package directories contain matching headers, import
 libraries, DLLs, runtime dependencies, and dashboard resources from the same
-verified 0.5.1 build.
+verified 0.6.1 build.
 
 ## Frontend Rules
 

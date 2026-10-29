@@ -1,6 +1,6 @@
 # RaceBear Motion Studio
 
-Native Windows x64 motion-simulation frontend for RaceBear SDK 0.5.1. It uses Win32/Common Controls, C++17 and the SDK-owned 2 ms runtime loop. No real output is connected automatically.
+Native Windows x64 motion-simulation frontend for RaceBear SDK 0.6.1. It uses Win32/Common Controls, C++17 and the SDK-owned 2 ms runtime loop. No real output is connected automatically.
 
 ## Build with Visual Studio 2019
 
