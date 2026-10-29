@@ -1033,6 +1033,41 @@ struct RB_PlatformConfig
 	char OutKey[RB_TEXT_MEDIUM];                   // 平台输出 key，例如 A1-A4。
 };
 
+// Motion 碰撞/异常保护配置。独立于 RB_PlatformConfig，避免改变既有 ABI 布局。
+struct RB_MotionProtectionConfig
+{
+	int Size;                                      // 结构体字节数，由 SDK 写入。
+	int Version;                                   // 结构体版本，当前为 1。
+	int Enabled;                                   // 总开关，1=启用。
+	int CrashDetectionEnabled;                     // 高加速度碰撞检测开关，1=启用。
+	int AbnormalSurgeEnabled;                     // 异常 Surge 触发检测开关，1=启用，不跳帧。
+	int DetectionMode;                             // 检测模式：0=Absolute，1=Delta。
+	int Preset;                                    // 强度预设：-2 最弱，2 最强，0 均衡。
+	double AccelerationThreshold;                  // 碰撞加速度阈值，m/s²。
+	double AbnormalSurgeThreshold;                // 异常 Surge 阈值，m/s²。
+	double HoldSeconds;                            // 触发后最短保护时间，秒。
+	double RecoverySeconds;                       // 保护结束后的恢复时间，秒。
+};
+
+// V2 使用独立结构与函数，V1 的大小和字段偏移保持不变；旧接口更新时保留新增字段。
+struct RB_MotionProtectionConfigV2
+{
+	int Size;                                     // sizeof(RB_MotionProtectionConfigV2)。
+	int Version;                                  // 固定为 2。
+	int Enabled;                                  // 1=启用；默认关闭，升级需主动开启。
+	int CrashDetectionEnabled;                    // 三轴无重力加速度检测。
+	int AbnormalSurgeEnabled;                     // 极端纵向加速度检测，不跳帧。
+	int DetectionMode;                            // 0=各轴绝对峰值，1=三轴差向量长度。
+	int Preset;                                   // -2 最弱，2 最强。
+	double AccelerationThreshold;                 // m/s²。
+	double AbnormalSurgeThreshold;                // m/s²。
+	double HoldSeconds;                           // 最短保护时长，默认 0.2s，期间继续受限追随。
+	double RecoverySeconds;                      // 接近实时目标后的退出时长，默认 0.5s。
+	int AngleDetectionEnabled;                    // 1=检测相邻 Pitch/Roll 角度变化。
+	int IgnorePositiveHeave;                      // 1=仅检测时忽略正向 Heave，不改变动态输入。
+	double AngleThresholdDegrees;                // |deltaPitch|+|deltaRoll|，默认 10°。
+};
+
 // UI 无关的平台预览图元。SDK 计算真实 Rig 几何，调用方把回调映射到自己的绘图库。
 struct RB_DrawPointF
 {
@@ -1182,8 +1217,8 @@ struct RB_FilterEffect
 	int Smoothing;                                 // 范围0-100；低通平滑强度，0关闭，数值越大响应越慢。
 	int DeadZone;                                  // 范围0-100；输出死区占最大输出范围的百分比，0关闭。
 	int Washout;                                   // 范围0-100；加速度模板的高通洗出强度，0关闭。
-	int Sensitivity;                               // 范围0-100；GUARD安全区占有效输出范围的百分比，0关闭保护。
-	int SensitivityStrength;                       // 范围0-100；GUARD保护强度，0关闭，仅Sensitivity>0时有效。
+	int Sensitivity;                               // 范围0-100；单路最终变化步长比例，按固定2ms基准换算速度，0关闭。
+	int SensitivityStrength;                       // 范围0-100；单路限速强度，非零越大越慢，0关闭，仅Sensitivity>0时有效。
 };
 
 struct RB_DynamicInputEffect
@@ -1481,7 +1516,7 @@ struct RB_SystemConfig
 
 /**
  * @brief 获取 SDK 版本文本。
- * @return SDK 持有的 UTF-8、NUL 结尾字符串，例如 "0.6.0"；调用方不得修改或释放。
+ * @return SDK 持有的 UTF-8、NUL 结尾字符串，例如 "0.6.1"；调用方不得修改或释放。
  */
 RB_API const char* RB_Runtime_GetVersion();
 
@@ -1645,6 +1680,9 @@ RB_API int RB_Can_GetMotorState(int motorIndex, RB_CanMotorState* state);
 /** @brief 读取全局 CAN 参数目录数量。 */
 RB_API int RB_Can_GetMotorParameterCount();
 
+/** @brief 设置参数维护使用的 CAN 波特率，支持 500 或 1000 Kbit/s。 */
+RB_API int RB_Can_SetMotorParameterCanBaudRate(int baudRateK);
+
 /** @brief 进入 CAN 电机参数维护模式，停止实时初始化/监控并保留参数 SDO 通道。 */
 RB_API int RB_Can_BeginMotorParameterMaintenance();
 
@@ -1656,6 +1694,48 @@ RB_API int RB_Can_GetMotorParameterName(int parameterIndex, char* buffer, int bu
 
 /** @brief 读取指定电机按协议支持的参数数量。 */
 RB_API int RB_Can_GetMotorParameterCountForMotor(int motorIndex);
+
+/** @brief 返回当前电机的参数文件类型 RB_CAN/FM_CAN/FC_CAN/RDS_CAN；只查询定义，不访问设备。 */
+RB_API int RB_Can_GetMotorParameterProfileType(int motorIndex, char* buffer, int bufferSize);
+
+/**
+ * @brief 导出调用方提供的当前窗口原始参数值为 UTF-8 JSON .rbmotor 文件，不读取或写入设备。
+ * @param values 按 SDK 参数索引排列，count 必须等于该电机参数数量；版本号以 uint32 原始位放入 int。
+ * @param packagePath UTF-8 文件路径；验证全部数值后以临时文件替换目标。
+ * @param errorParameterIndex 可空；失败的 SDK 参数索引，无具体参数时为 -1。
+ * @return RB_OK 成功；RB_INVALID_ARGUMENT 表示类型/数量/数值无效；RB_ERROR 表示文件操作失败。
+ */
+RB_API int RB_Can_ExportMotorParameterPackage(int motorIndex, const int* values, int count, const char* packagePath, int* errorParameterIndex);
+
+/**
+ * @brief 完整校验同类型文件后返回参数草稿，不写设备；失败时两个输出数组保持不变。
+ * @param values SDK 参数索引排列的草稿值；仅 selected[i]==1 的值有效。
+ * @param selected 同等长度的选择数组；Node-ID、波特率、只读项始终为 0。
+ * @param count 两个数组长度，必须等于该电机参数数量。
+ * @param errorParameterIndex 可空；具体参数错误时返回 SDK 索引，其余为 -1。
+ */
+RB_API int RB_Can_ImportMotorParameterPackage(int motorIndex, const char* packagePath, int* values, int* selected, int count, int* errorParameterIndex);
+
+/** @brief 同步执行结果；调用前设置 Size=sizeof(RB_CanMotorParameterSyncResult)。 */
+struct RB_CanMotorParameterSyncResult
+{
+	int Size;                /**< 结构大小，用于兼容性检查。 */
+	int AttemptedCount;      /**< 已尝试写入数量，失败/超时的写入也可能已生效。 */
+	int ChangedCount;        /**< 已写入且立即回读一致的数量，不代表断电持久化验证。 */
+	int UnchangedCount;      /**< 预读已相同、未重复写入的数量。 */
+	int ErrorParameterIndex; /**< 失败的 SDK 参数索引，整体校验/保存失败为 -1。 */
+	int Stage;               /**< 0校验、1目标预读、2写入、3回读、4保存/重启、5完成。 */
+};
+
+/**
+ * @brief 同步窗口提供的勾选值到另一同类型电机；必须已进入参数维护模式。
+ * @param values SDK 参数索引排列；count 必须等于源/目标参数数量。
+ * @param selected 同长度的 0/1 标记；地址、波特率和只读项始终忽略。
+ * @param result 必填。完整校验/目标预读后仅写差异，逐项回读，最后调用厂家保存/重启。
+ * @return RB_OK 成功，校验失败为 RB_INVALID_ARGUMENT，其它为设备或 SDK 错误。
+ * @note 同步调用可能等待设备超时；失败可能已部分生效，不提供事务回滚。源电机不读写。
+ */
+RB_API int RB_Can_SyncMotorParameters(int sourceMotorIndex, int targetMotorIndex, const int* values, const int* selected, int count, RB_CanMotorParameterSyncResult* result);
 
 /** @brief 读取指定电机的参数能力位。 */
 RB_API int RB_Can_GetMotorParameterCapabilitiesForMotor(int motorIndex);
@@ -1683,6 +1763,9 @@ RB_API int RB_Can_RebootMotor(int motorIndex);
 
 /** @brief 清除指定电机故障。 */
 RB_API int RB_Can_ClearMotorFault(int motorIndex);
+
+/** @brief 在电机参数维护模式中异步升级指定 RB 伺服驱动器固件。 */
+RB_API int RB_Can_StartServoFirmwareUpdate(int motorIndex, const char* binFilePath);
 
 /**
  * @brief 返回指定 RB_CAN 输出当前管理的电机数量。
@@ -1981,6 +2064,28 @@ RB_API int RB_Platform_SetSelectedState(int platformIndex, const RB_PlatformConf
 RB_API int RB_Platform_ApplyRuntimeConfigToCurrentRig(const RB_PlatformConfig* config);
 
 /**
+ * @brief 按平台索引读取 Motion 碰撞/异常保护配置。
+ */
+RB_API int RB_Platform_ReadMotionProtectionConfigByIndex(int platformIndex, RB_MotionProtectionConfig* config);
+
+/**
+ * @brief 按平台索引保存 Motion 碰撞/异常保护配置。
+ */
+RB_API int RB_Platform_SaveMotionProtectionConfigByIndex(int platformIndex, const RB_MotionProtectionConfig* config);
+
+/**
+ * @brief 将 Motion 碰撞/异常保护配置热应用到当前运行中的 Rig。
+ */
+RB_API int RB_Platform_ApplyMotionProtectionConfigToCurrentRig(const RB_MotionProtectionConfig* config);
+
+/** @brief 读取六自由度结果保护 V2 配置，SDK 写入 Size/Version 和全部字段。 */
+RB_API int RB_Platform_ReadMotionProtectionConfigV2ByIndex(int platformIndex, RB_MotionProtectionConfigV2* config);
+/** @brief 保存 V2 配置，Size 和 Version 必须正确，失败不部分保存。 */
+RB_API int RB_Platform_SaveMotionProtectionConfigV2ByIndex(int platformIndex, const RB_MotionProtectionConfigV2* config);
+/** @brief 热应用 V2 配置，需有效授权和当前 Rig。 */
+RB_API int RB_Platform_ApplyMotionProtectionConfigV2ToCurrentRig(const RB_MotionProtectionConfigV2* config);
+
+/**
  * @brief 保存并应用指定平台配置到当前运行中的平台模型。
  */
 RB_API int RB_Platform_ApplyConfigToCurrentRig(int platformIndex, const RB_PlatformConfig* config);
@@ -2093,6 +2198,14 @@ RB_API int RB_Output_SaveInstanceConfigByIndex(int instanceIndex, const RB_Outpu
  * @note Apply 不表示用户要求立即连接，也不能替代 Save。
  */
 RB_API int RB_Output_ApplyInstanceConfigByIndex(int instanceIndex, const RB_OutputConfig* config);
+
+/**
+ * @brief 读取或保存 CAN 输出空闲下使能超时，单位秒；0 禁止自动下使能。
+ * @note 不扩展 RB_OutputConfig；只有 RB_CAN/FM_CAN/FC_CAN 支持该设置，
+ *       并且仅在输出配置的 AutoConnect 为 1 时执行。
+ */
+RB_API int RB_Output_GetIdleDisableTimeoutSeconds(int instanceIndex, int* timeoutSeconds);
+RB_API int RB_Output_SetIdleDisableTimeoutSeconds(int instanceIndex, int timeoutSeconds);
 
 /**
  * @brief 一次读取输出实例目录和当前可用于命令模板的输出 Key。

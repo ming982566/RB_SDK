@@ -164,6 +164,8 @@ SDK 0.5.0 新增客户自定义仪表包。`.rbdash` V1 是 UTF-8 无 BOM JSON �
 
 0.5.0 版本交付时进一步公开 `RB_CAN` 的 CANAPP 设备发现、逻辑索引设置、稳定 UID 绑定、绑定状态和单输出电机状态。完整调用顺序和安全要求见 `RaceBearSDK_RB_CAN_GUIDE.md`。其它 CAN 电机协议、参数维护、固件升级和底层总线控制暂未纳入公开 API。
 
+SDK 0.6.1 将运行时版本更新为 `0.6.1`。本版本保持公开 C ABI、结构体布局和公开协议不变，兼容 0.6.0 的调用方式。
+
 SDK 0.6.0 将运行时版本更新为 `0.6.0`。本版本补齐平台配置包和动态配置包的公开导入导出接口，并公开 SimHub 等外部 Motion 宿主接管 `RB_CAN` 实时位置帧的接口。配置包导入导出使用 UTF-8 文件路径；导入后应使用返回的稳定 Key/名称重新读取配置，不能继续使用旧目录索引。
 
 0.6.0 的外部实时位置能力只复用 SDK 已有的 `RB_CAN` 输出状态机和安全链路，不开放 CAN 协议、底层 SDO/PDO 或电机维护协议。外部宿主必须持续提交最新位置，输入超时后主动提交停车位置或断开输出；急停、Ready、设备绑定、故障恢复和授权限制仍由 SDK 判断。
@@ -722,23 +724,47 @@ if (RB_Dynamic_GetInputCandidateCatalog(dofIndex, &candidates) == RB_OK) {
 | ---- | ------------ | ---- | ------------ |
 | `Filter.InMapping` | `int`，`0` 到 `INT_MAX` | 输入遥测自身单位 | 输入达到正负满输出所需的绝对量。单位从候选项的 `TelemetryKey` 对应遥测目录 `Unit` 读取，例如 `g`、`deg`、`deg/s`、`km/h`。`0` 表示无有效映射；输入通道启用时必须大于 `0`。该字段没有统一 UI 上限，应使用非负整数输入框。 |
 | `Filter.InGain` | 任意有限 `double` | 倍率 | 输入增益和方向。常用 `1.0`（原方向）或 `-1.0`（反向），允许小数；`0` 表示无有效输出。SDK 不规定固定最小值和最大值，UI 应使用支持正负号和小数的输入框。NaN 和正负无穷会被拒绝。 |
-| `Filter.OutScaling` | `int`，`0-100` | `%` | 最大输出占当前 DOF `PoseLimit` 的比例。`0` 使当前滤波链输出为 `0`，`100` 允许达到完整 `PoseLimit`。 |
+| `Filter.OutScaling` | `int`，`0-100` | `%` | 输入映射阶段的基础幅度占当前 DOF `PoseLimit` 的比例。`0` 使当前滤波链输出为 `0`。它不是最终姿态的硬上限：后续 Logistic、滤波动态和多路叠加仍会改变幅度，最终受平台姿态和行程限制。 |
 | `Filter.Proportion` | `int`，`0-100` | `%` | Logistic 软限幅的有效输出范围占 `PoseLimit` 的比例。必须与 `Strength` 同时大于 `0` 才启用 Logistic；`0` 仅关闭软限幅，不关闭前面的基础输出链。 |
 | `Filter.Strength` | `int`，`0-100` | UI 标度 | Logistic 软限幅锐度。内部参数为 `Strength * 0.1`，即有效内部范围 `0-10`。必须与 `Proportion` 同时大于 `0` 才生效。 |
 | `Filter.Smoothing` | `int`，`0-100` | UI 标度 | DEMA 低通平滑强度；内部参数为 `Smoothing * 10`。`0` 关闭，数值越大响应越慢。它不是毫秒数或 Hz。 |
 | `Filter.DeadZone` | `int`，`0-100` | `%` | 中心死区占 `OutScaling` 所确定最大输出范围的比例。`0` 关闭；死区外的数据会重新映射到完整输出范围。 |
 | `Filter.Washout` | `int`，`0-100` | UI 标度 | DEMA 高通洗出强度；内部参数为 `Washout * 10`。`0` 关闭。只对 Sway、Surge、Heave 的加速度模板生效；Yaw、Roll、Pitch、Traction Loss 和两个倾斜协调槽位会忽略该字段。它不是毫秒数或 Hz。 |
-| `Filter.Sensitivity` | `int`，`0-100` | `%` | GUARD/GUARD2 的安全区占当前有效输出范围的比例。`0` 关闭冲击保护；还必须满足 `SensitivityStrength > 0` 才会建立保护滤波器。 |
-| `Filter.SensitivityStrength` | `int`，`0-100` | `%` | GUARD/GUARD2 的保护强度。内部强度按 `1 + value / 100 * 9` 换算，即 `1-10`；`0` 关闭保护，仅在 `Sensitivity > 0` 时生效。 |
+| `Filter.Sensitivity` | `int`，`0-100` | `%` | 界面称“变化步长”（旧称“安全阈值”），以基础映射幅度的比例及固定 2ms 基准换算单路最终输出速度。非零时越小限制越强。`0` 关闭单路变化限制；还必须满足 `SensitivityStrength > 0`。它不是碰撞检测阈值。 |
+| `Filter.SensitivityStrength` | `int`，`0-100` | UI 标度 | 界面称“限制强度”（旧称“保护强度”）。内部除数为 `1 + value / 100 * 9`，非零时越大步长越小。`0` 关闭单路变化限制，仅在 `Sensitivity > 0` 时生效。 |
 
 除 `InMapping` 和 `InGain` 外，其余八个数值字段都是严格的 `0-100`：传入负数或大于
 `100` 的值时，Apply/Save 会拒绝整个动态配置。不要在写入前静默取模；前端应限制控件范围
 或明确提示参数无效。`Filter.Enabled`、输入通道 `Enabled` 和 DOF `Enabled` 都只接受
 `0` 或 `1`。
 
-滤波链的执行顺序为：`GAIN -> REMAP -> GUARD/GUARD2 -> DEADZONE -> DEMAHP
-(仅加速度模板) -> DEMALP -> LOGISTIC`。因此 `OutScaling` 是硬输出上限，
-`Proportion/Strength` 只控制末级软限幅，不能用它们代替 `OutScaling`。
+滤波链的执行顺序为：`GAIN -> REMAP -> DEADZONE -> DEMAHP
+(仅加速度模板) -> DEMALP -> LOGISTIC -> 参数过渡 -> 单路最终输出限速`。`OutScaling` 控制基础映射幅度，
+`Proportion/Strength` 控制末级非线性响应，不能用其中一组推断最终输出上限。
+Logistic 为 `range * tanh(value * alpha / range)`，其中
+`range = PoseLimit * Proportion / 100`，`alpha = Strength * 0.1`。
+`Strength = 10` 时零点斜率为 1，超过 10 时会放大小信号。
+例如 `PoseLimit = 100`、`OutScaling = 39`、`Proportion = 100`、
+`Strength = 100`，映射后的 39 经 Logistic 约为 99.918，而非 39。
+
+单路限速只以基础映射幅度 `outputRange = abs(PoseLimit) * OutScaling / 100` 为基准。
+速度为基准步长
+`max(1e-7, max(1e-6, outputRange * Sensitivity / 100) / (1 + SensitivityStrength / 100 * 9))`
+除以固定 `0.002` 秒；每帧允许变化量为速度乘以实际经过秒数。
+保留原字段、取值、配置键与 500Hz 基准，参数本身仍是百分比/UI 标度，不能直接标成速度。
+平滑、死区、洗出、软限幅范围/锐度及软限幅开关均不参与速度上限计算，
+调整它们无需为了保持同一上限而重调限速参数；它们仍会改变目标，因此实际速度可低于上限。
+改变基础输出比例或平台 DOF 范围会按比例改变速度上限，它并非独立的 mm/s 或 deg/s 字段。
+与上一版相比，软限幅范围小于基础映射幅度且启用时，删除关联会提高原来的限速上限；
+配置数值保留，不静默改写。两参数任一为零时的关闭行为和原滤波输出保持不变。
+首次计算从零保持一帧，不再直通首个大输入；超过 100ms 的计算停顿不积累变化额度。
+源切换和连接状态恢复时保持上次单路输出、丢弃本帧时间；手动/DirectDof 返回重新从零建立单路历史。
+重复遥测仍随时间继续追目标，持续输入最终可达到大幅度，因此不是碰撞抑制器。
+表达式改变沿用约 2 秒参数过渡，限速作用于过渡后的结果；修改限速参数保留上次输出，
+任意一项为零立即旁路。六 DOF 和两个倾斜协调槽的各条输入分别限速，再参与叠加；
+不对叠加总和、附加效果或执行器独立限速，没有碰撞识别、保持时间和退出阶段。
+动态预览采用同一末级限制，按 2ms 计算 60 步（120ms），不模拟实时调参过渡；
+平滑/洗出仍按采样次数工作。速度约束不再绘制为位置阈值水平线。
 
 增加输入通道时使用当前 DOF 候选目录中的完整项，不要从遥测目录任意挑选字段：
 
@@ -1370,6 +1396,59 @@ if (RB_Platform_SaveConfigByIndex(platformIndex, &platform) == RB_OK) {
 ```
 
 `RB_Platform_ApplyRuntimeConfigToCurrentRig()` 用于同一平台运行参数热更新。切换平台类型或完整重建前应先断开全部输出。
+
+### 8.2.4 Motion 碰撞/异常保护参数
+
+2026-10-20 试验版采用事件触发的六自由度结果保护。参数独立于
+`RB_PlatformConfig`；V1 结构体和函数保留，新增 V2 接口支持全部检测选项：
+
+```cpp
+RB_MotionProtectionConfigV2 protection{};
+if (RB_Platform_ReadMotionProtectionConfigV2ByIndex(platformIndex, &protection) == RB_OK) {
+    protection.Enabled = 1;
+    protection.CrashDetectionEnabled = 1;
+    protection.AbnormalSurgeEnabled = 1;
+    protection.AngleDetectionEnabled = 1;
+    if (RB_Platform_SaveMotionProtectionConfigV2ByIndex(platformIndex, &protection) == RB_OK) {
+        RB_Platform_ApplyMotionProtectionConfigV2ToCurrentRig(&protection);
+    }
+}
+```
+
+读取时 SDK 写入 `Size=sizeof(RB_MotionProtectionConfigV2)`、`Version=2`；
+保存和应用时调用方必须保留这两个字段。V1 仍为 64 字节，V2 为 80 字节；
+V1 保存/应用只覆盖旧字段，保留原 V2 角度与垂向选项。
+
+| 参数 | 作用与默认值 |
+|---|---|
+| `Enabled` | 默认 0；关闭时有限值逐位直通，全部检测子开关关闭也取消保护 |
+| `CrashDetectionEnabled` | 默认 1；检测三轴原始无重力加速度 |
+| `DetectionMode` | 0：最大轴绝对值；1：相邻三轴加速度差的向量长度，不除以时间；触发样本也更新历史 |
+| `AccelerationThreshold` | 40 m/s²，达到阈值触发 |
+| `AbnormalSurgeEnabled / AbnormalSurgeThreshold` | 默认 1 / 500 m/s²；纵向绝对值超过阈值触发，不跳过该帧 |
+| `AngleDetectionEnabled / AngleThresholdDegrees` | 默认 1 / 10°；相邻 Pitch 和 Roll 绝对变化之和超过阈值触发，处理 Roll ±180° 表示边界 |
+| `IgnorePositiveHeave` | 默认 0；仅在加速度检测中将正向垂向视为零，不修改动态输入 |
+| `Preset` | -2 最弱，+2 最强，默认 0；速度与加速度乘数依次为 1.75、1.52、1.3、0.75、0.3 |
+| `HoldSeconds` | 默认 0.2s；最后一次触发后的最短保护期，期间继续受限追随当前目标，并非冻结 |
+| `RecoverySeconds` | 默认 0.5s；接近当前目标后 EaseInOut 接回的时长 |
+
+检测读取原始遥测；动态滤波、倾斜协调、附加效果、Rig 姿态滤波正常推进。
+保护完整六自由度结果后才进入逆解。平移基础速度/加速度为 200 mm/s、400 mm/s²，
+有限旋转为 30°/s、60°/s²，均乘强度系数；接近目标的距离分别为 0.75mm、0.25°。
+保护阶段按刹车距离和加速度追随当前目标，重复触发重新计算最短保护期，
+不会回放已消失的碰撞峰值。速度/加速度限制针对受保护追随阶段；
+退出混合逐渐恢复实时动作，不是始终开启的机械硬限速器。
+有检测启用时，100ms～10s 的计算间隔异常也触发保护，时间步最多推进 20ms。
+
+基础/完整姿态使用相同检测同步保护，使既有附加效果双次逆解只使用受保护的增量，
+不切换执行器平滑历史。保留原输出平滑和 `ApplyAntiClipping()`，
+不独立限制执行器；手动校准、DirectDof 与暂停/未连接数据源不进入保护。
+NaN/Inf 输入先进行有限值防护，不能污染有状态滤波器。
+
+保存 JSON 增加 `AlgorithmVersion=2`。旧配置首次读取时关闭总开关，
+保留原阈值/检测开关，强度数值反号保持原强弱含义，时序使用新版 0.2s/0.5s；
+这一步不自动写回用户文件。用户重新启用并保存后使用新版格式。
+软件回归不能代替实机验收。测试电脑必须同时更新匹配 EXE 与 `RaceBearSDK.dll`。
 
 ## 8.3 输出 Key 和命令模板
 
@@ -2084,6 +2163,54 @@ CAN 电机参数维护、单圈脉冲数等维护模式参数读写、保存/恢
 | `RB_Debug_CloseMonitor()` | 关闭诊断窗口；宿主退出前也应调用。 |
 
 ## 18. 升级 SDK 依赖检查清单
+
+### 电机参数文件
+
+电机参数窗口的备份文件使用 `.rbmotor` 扩展名，内容为 UTF-8 JSON。
+`RB_Can_GetMotorParameterProfileType()` 返回 `RB_CAN`、`FM_CAN`、`FC_CAN` 或 `RDS_CAN`。
+类型来自当前会话，不可由参数数量或显示名称推断。
+
+`RB_Can_ExportMotorParameterPackage(motorIndex, values, count, packagePath, errorParameterIndex)`
+导出调用方提供的当前窗口值；不会重新读取设备，因此包含未保存的编辑。
+`values` 按 SDK 参数索引排列，`count` 必须等于 `RB_Can_GetMotorParameterCountForMotor()`。
+每个元素是原始整数；RB 的三个版本号以 `uint32_t` 位模式保存在 `int` 中。
+文件完整校验后通过同目录临时文件替换目标，验证失败不修改已有文件。
+
+文件字段为 `format: "racebear.motor-parameters"`、整数 `version: 1`、`driverType`、
+仅作参考的 `sourceNodeId`、可恢复的 `parameters` 和不可恢复的 `reference`。
+参数采用固定键，不保存界面行号或运行时电机索引；RB 使用 `rb.motor.*`，
+其他厂家使用 `od.<十进制对象索引>.<十进制子索引>`。型号、版本号等已开放只读参数保存在
+`reference` 中；没有读取渠道的信息不伪造。Node-ID 和 CAN 波特率同样只作参考。
+
+`RB_Can_ImportMotorParameterPackage(motorIndex, packagePath, values, selected, count, errorParameterIndex)`
+校验同类型文件后返回草稿及选择数组；仅 `selected[i] == 1` 的值有效。
+允许只包含部分可恢复参数。两个数组均需有 `count` 个元素且互不重叠；失败时保持原值。
+Node-ID、波特率和只读项始终不选中，不能通过调整文件位置或伪造写权限恢复。
+导入拒绝不支持的版本、类型不符、重复键、未知参数、非整数和越界值；最大文件为 64 KiB。
+`RB_INVALID_ARGUMENT` 表示校验失败，`RB_ERROR` 表示文件或内部错误；
+可选 `errorParameterIndex` 返回具体的 SDK 参数索引，没有具体参数时为 `-1`。
+
+上述三个接口只访问参数定义和文件，不初始化、读写、保存或重启 CAN 设备。
+导入后由前端显示草稿，用户检查后另行调用已有参数写入和保存接口。
+
+### 电机参数差异同步
+
+`RB_Can_SyncMotorParameters(sourceMotorIndex, targetMotorIndex, values, selected, count, result)`
+将调用方当前草稿的选中调参项同步到另一个同类型电机，源电机不读写。
+调用前进入参数维护模式，设置 `result.Size = sizeof(RB_CanMotorParameterSyncResult)`。
+`values` 和 0/1 数组 `selected` 按 SDK 索引排列，长度必须与两台电机参数表一致；
+Node-ID、CAN 波特率和只读项始终忽略。兼容性使用驱动器类型和完整稳定参数定义检查。
+
+SDK 先校验全部选中值及范围，然后预读所有待同步目标值；预读失败时没有参数写入。
+只写有差异的参数，每次写入后立即回读检查，全部成功后执行厂家的保存/重启流程。
+已经相同的参数不重复写入，但仍执行一次保存，以允许上次保存失败后重试提交 RAM 中的值。
+回读确认不等于断电持久化验证，实际保存能力沿用各厂家现有实现。
+
+结果 `AttemptedCount` 包含失败/超时但可能已生效的写入，`ChangedCount` 表示已写且回读一致，
+`UnchangedCount` 表示预读相同的项。`ErrorParameterIndex` 为具体 SDK 索引或 -1；
+`Stage` 为 0校验、1预读、2写入、3回读、4保存/重启、5完成。失败立即停止后续操作，
+可能部分生效，不回滚。同步调用会等待设备响应，宿主宜在后台调用并在 UI 线程显示结果；
+任务结束前不得切换连接/配置、退出维护或关闭 SDK。
 
 应用升级 RaceBear SDK 时，请从同一个 Release 同步替换以下依赖：
 
