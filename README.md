@@ -3,11 +3,33 @@
 RaceBear SDK is a Windows x64 C ABI SDK for building telemetry, motion,
 haptics, output, and dashboard frontend applications.
 
+## 0.6.2
+
+- The DLL reports runtime version `0.6.2`; existing structure layouts and calling
+  conventions remain compatible. Added `RB_SeatbeltCan_RequestReenable()` for
+  explicit recovery after a seatbelt protection lock.
+- Integrated the documented single/dual-motor release workflow, USB scheduling
+  and RGB streaming fixes. Use seatbelt APP `2026110103` for the latest recovery
+  path; firmware images are not part of this x64 SDK package.
+- A late but fully successful OUT with no endpoint recovery no longer clears a
+  complete command stream. The original deadline error is still reported.
+- Numeric output rates remain targets. The previously reported long Windows
+  Abort stall has not been reproduced locally and is still unresolved.
+- Log reads with insufficient buffers preserve the queued record for retry.
+- Added the complete AI development entry point, UI specification, dashboard
+  development guide, updated examples and full frontend integration Skill.
+
 ## 0.6.1
 
 - The DLL reports runtime version `0.6.1`.
-- This maintenance release preserves the public C ABI, structure layouts, and
-  public protocols, and remains compatible with `0.6.0` callers.
+- Existing public structure layouts, calling conventions, and protocols remain
+  compatible with `0.6.0` callers; the release adds new exported functions.
+- Added the public high-level CAN maintenance workflow: maintenance-bus
+  bitrate selection, stable-key `.rbmotor` import/export, same-type parameter
+  synchronization, and asynchronous RB servo firmware updates.
+- Added independent CAN idle-disable timeout accessors. The default is
+  60 seconds, `0` disables the timer, and only `RB_CAN`, `FM_CAN`, and
+  `FC_CAN` outputs with `AutoConnect` enabled run the timer.
 
 ## 0.6.0
 
@@ -16,11 +38,11 @@ haptics, output, and dashboard frontend applications.
 - Added the public SimHub/external-host CAN latest-position submission workflow.
 - External realtime mode is opt-in; normal SimRacebear output continues to use
   the SDK-owned position channel by default.
-- The public SDK still covers only the documented `RB_CAN` device-management,
+- In 0.6.0, the public SDK covered the documented `RB_CAN` device-management,
   diagnostics, configuration-package, and external-position workflows.
-  CAN motor parameter maintenance, `FM_CAN`, `FC_CAN`, `RDS_CAN`,
-  `SEATBELT_CAN`, raw SDO/PDO, firmware-internal protocols, and SimRacebear
-  private UI adapters remain outside the public handoff boundary.
+  CAN motor maintenance, `FM_CAN`, `FC_CAN`, `RDS_CAN`, `SEATBELT_CAN`, raw
+  SDO/PDO, firmware-internal protocols, and SimRacebear private UI adapters
+  remained outside that release's handoff boundary.
 
 ## 0.5.1
 
@@ -59,18 +81,34 @@ haptics, output, and dashboard frontend applications.
 | `bin/x64/Debug` | Matching Debug DLL, import library, optional VOCORE dependency, and dashboard assets |
 | `bin/x64/Release` | Matching Release DLL, import library, optional VOCORE dependency, and dashboard assets |
 | `docs/RaceBearSDK_FRONTEND_GUIDE.md` | Page-by-page frontend workflow and configuration ownership rules |
+| `docs/RaceBearSDK_AI_DEVELOPMENT.md` | AI development entry point, implementation stages, coverage and delivery checks |
+| `docs/RaceBearSDK_FRONTEND_UI_SPEC.md` | Page containers, controls, drafts, background tasks and UI acceptance |
 | `docs/RaceBearSDK_API.md` | API reference, structures, units, deployment, and examples |
+| `docs/RaceBearSDK_DASHBOARD_DEVELOPMENT.md` | Dashboard templates, data bindings, rendering, VOCORE, Web output, threading, and deployment |
 | `docs/RaceBearSDK_RB_CAN_GUIDE.md` | RB_CAN discovery, logical-index assignment, stable UID binding, diagnostics, and recovery |
 | `examples/cpp` | Standard C++17 and CMake example |
 | `examples/python` | Dependency-free Python `ctypes` binding and example |
-| `examples/qt` | Qt 5/Qt 6 integration guide |
 | `examples/RaceBearMotionStudio` | Native VS2019 Windows frontend example |
 | `tools/DashboardDesigner` | Local browser dashboard editor |
 | `tools/skills/racebear-frontend-panel` | Tool-neutral AI frontend integration Skill |
+| `Install-RaceBearSkill.cmd` | Double-click installer for the AI Skill into the detected AI coding tools |
 
 The public package is organized around the stable C ABI and includes the
 headers, binaries, resources, documentation, tools, and examples needed for
 application integration.
+
+## AI Skill Install
+
+Double-click `Install-RaceBearSkill.cmd` to copy `tools/skills/racebear-frontend-panel`
+into the skills directory of every AI coding tool detected in your user profile
+(Claude Code, Codex CLI, DSH, Qoder). The installer records this package's absolute
+path inside the installed copy, so the Skill resolves the SDK headers, libraries and
+documents without searching your project directory. An existing skill that this
+installer did not create is kept as a `.bak-` backup next to it.
+
+To remove it again, run `Install-RaceBearSkill.cmd -Uninstall` from a command prompt,
+or `powershell -ExecutionPolicy Bypass -File tools\Install-RaceBearSkill.ps1 -Target
+claude` to install into one tool only.
 
 The public package is x64 only. The separate Win32 SDK DLL used by the private
 SimHub x86 plugin is built and maintained in `RaceBear_SDK\bin\Win32\Release`;
@@ -94,7 +132,7 @@ Run the repository release script from `RB_SDK` after the SDK source, build
 outputs, documentation, and public repository status have been checked:
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.6.1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.6.2
 ```
 
 The script uses the sibling `RaceBear_SDK` development directory by default.
@@ -153,7 +191,7 @@ the Microsoft Visual C++ 2015-2022 Redistributable x64.
 
 The Debug and Release package directories contain matching headers, import
 libraries, DLLs, runtime dependencies, and dashboard resources from the same
-verified 0.6.1 build.
+verified 0.6.2 build.
 
 ## Frontend Rules
 
@@ -177,9 +215,13 @@ required.
 Exported `.rbdash` files can be imported through the dashboard package API.
 Templates are declarative and bind to recognized stable `rb.*` keys. The format
 contains visual data only, with no script, filesystem, network, process, or SDK
-control capabilities.
+control capabilities. See `docs/RaceBearSDK_DASHBOARD_DEVELOPMENT.md` for the
+complete template, rendering, output, lifecycle, and deployment workflow.
 
 ## AI-Assisted Development
+
+For complete frontend delivery, start with `docs/RaceBearSDK_AI_DEVELOPMENT.md`.
+Use `docs/RaceBearSDK_FRONTEND_UI_SPEC.md` for page and interaction requirements.
 
 Supply the complete Skill directory to the AI coding tool using that tool's
 own Skill or reusable-instruction import mechanism. Installation locations,

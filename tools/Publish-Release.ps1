@@ -74,11 +74,17 @@ function Copy-SdkPackage {
     Copy-Item (Join-Path $SdkSourceRoot 'include\RaceBearSDK.h') (Join-Path $publishRoot 'include\RaceBearSDK.h') -Force
     Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_API.md') (Join-Path $publishRoot 'docs\RaceBearSDK_API.md') -Force
     Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_FRONTEND_GUIDE.md') (Join-Path $publishRoot 'docs\RaceBearSDK_FRONTEND_GUIDE.md') -Force
+    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_DASHBOARD_DEVELOPMENT.md') (Join-Path $publishRoot 'docs\RaceBearSDK_DASHBOARD_DEVELOPMENT.md') -Force
     Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_RB_CAN_GUIDE.md') (Join-Path $publishRoot 'docs\RaceBearSDK_RB_CAN_GUIDE.md') -Force
+    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_AI_DEVELOPMENT.md') (Join-Path $publishRoot 'docs\RaceBearSDK_AI_DEVELOPMENT.md') -Force
+    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_FRONTEND_UI_SPEC.md') (Join-Path $publishRoot 'docs\RaceBearSDK_FRONTEND_UI_SPEC.md') -Force
     Copy-Item (Join-Path $SdkSourceRoot 'examples\README.md') (Join-Path $publishRoot 'examples\README.md') -Force
+    # Double-click skill installer: package root entry point plus its implementation.
+    Copy-Item (Join-Path $SdkSourceRoot 'Install-RaceBearSkill.cmd') (Join-Path $publishRoot 'Install-RaceBearSkill.cmd') -Force
+    Copy-Item (Join-Path $SdkSourceRoot 'tools\Install-RaceBearSkill.ps1') (Join-Path $publishRoot 'tools\Install-RaceBearSkill.ps1') -Force
     # SDK language examples are flat source directories. Copy only files so local
     # CMake builds and Python caches can never enter the distribution package.
-    foreach ($exampleName in @('cpp', 'python', 'qt')) {
+    foreach ($exampleName in @('cpp', 'python')) {
         $exampleSource = Join-Path $SdkSourceRoot "examples\$exampleName"
         $exampleTarget = Join-Path $publishRoot "examples\$exampleName"
         if (Test-Path -LiteralPath $exampleTarget) {
@@ -86,6 +92,18 @@ function Copy-SdkPackage {
         }
         New-Item -ItemType Directory -Path $exampleTarget -Force | Out-Null
         Get-ChildItem -LiteralPath $exampleSource -File | Copy-Item -Destination $exampleTarget -Force
+    }
+
+    # simhub_udp_bridge is a second C++ target in a nested directory. The loop above
+    # copies only top-level files, so copy this one directory's files explicitly.
+    $bridgeSource = Join-Path $SdkSourceRoot 'examples\cpp\simhub_udp_bridge'
+    $bridgeTarget = Join-Path $publishRoot 'examples\cpp\simhub_udp_bridge'
+    if (Test-Path -LiteralPath $bridgeTarget) {
+        Remove-Item -LiteralPath $bridgeTarget -Recurse -Force
+    }
+    if (Test-Path -LiteralPath $bridgeSource) {
+        New-Item -ItemType Directory -Path $bridgeTarget -Force | Out-Null
+        Get-ChildItem -LiteralPath $bridgeSource -File | Copy-Item -Destination $bridgeTarget -Force
     }
 
     foreach ($generatedExamplePath in @(
@@ -154,25 +172,27 @@ function New-ReleaseStage {
     $stage = Join-Path $env:TEMP ("RaceBearSdkRelease-" + [Guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $stage -Force | Out-Null
     $allowed = @(
-        '^README\.md$', '^LICENSE$',
+        '^README\.md$', '^LICENSE$', '^Install-RaceBearSkill\.cmd$',
         '^bin\\x64\\(Debug|Release)\\(RaceBearSDK\.(dll|lib)|libusb-1\.0\.dll)$',
         '^bin\\x64\\(Debug|Release)\\DashboardAssets\\RaceBear\\[^\\]+\.(png|ttf|rbdash)$',
         '^bin\\x64\\(Debug|Release)\\DashboardAssets\\RaceBear\\[^\\]+\\[^\\]+\.(png|ttf|rbdash)$',
         '^bin\\x64\\(Debug|Release)\\DashboardAssets\\RaceBear\\[^\\]+\\[^\\]+\\[^\\]+\.(png|ttf|rbdash)$',
         '^include\\RaceBearSDK\.h$',
-        '^docs\\(RaceBearSDK_API|RaceBearSDK_FRONTEND_GUIDE|RaceBearSDK_RB_CAN_GUIDE|RELEASE_PROCESS)\.md$',
+        '^docs\\(RaceBearSDK_API|RaceBearSDK_FRONTEND_GUIDE|RaceBearSDK_DASHBOARD_DEVELOPMENT|RaceBearSDK_RB_CAN_GUIDE|RaceBearSDK_AI_DEVELOPMENT|RaceBearSDK_FRONTEND_UI_SPEC|RELEASE_PROCESS)\.md$',
         '^examples\\README\.md$',
-        '^examples\\(cpp|python|qt)\\[^\\]+\.(cpp|h|py|md|txt)$',
+        '^examples\\(cpp|python)\\[^\\]+\.(cpp|h|py|md|txt)$',
+        '^examples\\cpp\\simhub_udp_bridge\\[^\\]+\.(cpp|h|md|txt)$',
         '^examples\\RaceBearMotionStudio\\(RaceBearMotionStudio\.(sln|vcxproj|vcxproj\.filters)|README\.md)$',
         '^examples\\RaceBearMotionStudio\\src\\[^\\]+\.(cpp|h)$',
         '^examples\\RaceBearMotionStudio\\src\\pages\\[^\\]+\.(cpp|h)$',
         '^tools\\Publish-Release\.ps1$',
+        '^tools\\Install-RaceBearSkill\.ps1$',
         '^tools\\DashboardDesigner\\(app\.js|index\.html|Start-DashboardDesigner\.cmd|styles\.css)$',
         '^tools\\skills\\racebear-frontend-panel\\SKILL\.md$',
         '^tools\\skills\\racebear-frontend-panel\\references\\[^\\]+\.md$'
     )
     try {
-        $packagePaths = @('bin', 'include', 'docs', 'examples', 'tools', 'README.md', 'LICENSE')
+        $packagePaths = @('bin', 'include', 'docs', 'examples', 'tools', 'README.md', 'LICENSE', 'Install-RaceBearSkill.cmd')
         $stagedFiles = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         foreach ($path in $packagePaths) {
             $source = Join-Path $publishRoot $path
@@ -199,7 +219,8 @@ function New-ReleaseStage {
         }
         foreach ($required in @('README.md', 'LICENSE', 'include\RaceBearSDK.h',
             'bin\x64\Debug\RaceBearSDK.dll', 'bin\x64\Debug\RaceBearSDK.lib',
-            'bin\x64\Release\RaceBearSDK.dll', 'bin\x64\Release\RaceBearSDK.lib')) {
+            'bin\x64\Release\RaceBearSDK.dll', 'bin\x64\Release\RaceBearSDK.lib',
+            'Install-RaceBearSkill.cmd', 'tools\Install-RaceBearSkill.ps1')) {
             if (-not $stagedFiles.Contains($required)) {
                 throw "Release staging misses required file: $required"
             }
@@ -263,10 +284,17 @@ function Invoke-ReleasePreflight {
         throw "Release requires a clean worktree. Existing changes were not modified:`n$details"
     }
 
-    if (& git -C $publishRoot show-ref --verify --quiet "refs/tags/$tag") {
+    & git -C $publishRoot show-ref --verify --quiet "refs/tags/$tag"
+    if ($LASTEXITCODE -eq 0) {
         throw "Version tag already exists locally: $tag. Choose a new version."
     }
-    $remoteTagOutput = @(& git -C $publishRoot ls-remote --tags origin "refs/tags/$tag" 2>$null)
+    if ($LASTEXITCODE -ne 1) {
+        throw 'Unable to check local version tags.'
+    }
+    $remoteTagOutput = @(& git -C $publishRoot -c http.proxy= -c https.proxy= ls-remote --tags origin "refs/tags/$tag")
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Unable to check remote version tags; publication stopped.'
+    }
     $remoteTag = ($remoteTagOutput -join "`n").Trim()
     if ($remoteTag) {
         throw "Version tag already exists on origin: $tag. Choose a new version."

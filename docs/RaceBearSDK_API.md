@@ -20,18 +20,20 @@
 | `bin/x64/Release/DashboardAssets/RaceBear` | Ford GT 仪表图片和字体资源；保持目录结构部署到 DLL 同级 |
 | `RaceBearSDK_API.md`              | 本接入手册                                              |
 | `RaceBearSDK_FRONTEND_GUIDE.md`   | 完整前端的页面设计与调用流程                            |
+| `RaceBearSDK_AI_DEVELOPMENT.md`  | AI 开发总入口、实施阶段、覆盖和交付验收                  |
+| `RaceBearSDK_FRONTEND_UI_SPEC.md` | 页面容器、控件、编辑草稿与后台任务规范                  |
+| `RaceBearSDK_DASHBOARD_DEVELOPMENT.md` | 仪表模板、数据绑定、渲染和输出开发指南             |
 
 目标电脑需要安装 Microsoft Visual C++ 2015-2022 Redistributable x64。不使用 VOCORE 时，`RaceBearSDK.dll` 不会强制加载 `libusb-1.0.dll`。Ford GT 模板需要 `DashboardAssets/RaceBear`，缺少时其它纯绘制模板仍可使用；除这些可选运行库和资源外，其它依赖均为 Windows 系统组件。
 
 请使用同一次发布、同一构建配置中的 `.h`、`.lib` 和 `.dll`，以确保 ABI 和运行库匹配。
 
-SDK 目录提供了四套现成示例：
+SDK 目录提供了三套现成示例：
 
 | 目录              | 内容                                            |
 | ----------------- | ----------------------------------------------- |
 | `examples/cpp`    | 可使用 VS2019/CMake 构建的 C++ 控制台示例       |
 | `examples/python` | 无第三方依赖的 Python `ctypes` 封装和运行示例   |
-| `examples/qt`     | Qt 5/Qt 6 的 CMake、qmake、适配类和线程模型说明 |
 | `examples/RaceBearMotionStudio` | 可直接用 VS2019 构建的完整 Win32 前端示例 |
 
 ## 2. 配置 Visual Studio 项目
@@ -164,11 +166,31 @@ SDK 0.5.0 新增客户自定义仪表包。`.rbdash` V1 是 UTF-8 无 BOM JSON �
 
 0.5.0 版本交付时进一步公开 `RB_CAN` 的 CANAPP 设备发现、逻辑索引设置、稳定 UID 绑定、绑定状态和单输出电机状态。完整调用顺序和安全要求见 `RaceBearSDK_RB_CAN_GUIDE.md`。其它 CAN 电机协议、参数维护、固件升级和底层总线控制暂未纳入公开 API。
 
-SDK 0.6.1 将运行时版本更新为 `0.6.1`。本版本保持公开 C ABI、结构体布局和公开协议不变，兼容 0.6.0 的调用方式。
+SDK 0.6.2 将运行时版本更新为 `0.6.2`，保持已有公开结构体布局和调用约定，
+新增安全带保护后显式恢复接口 `RB_SeatbeltCan_RequestReenable()`。安全带高层
+接口及单/双电机释放流程见安全带 CAN 章节；底层 SDO/PDO 和固件内部协议仍不公开。
+本版整合 USB 单写者调度、RGB 异步更新和异常边界恢复；完整成功且未操作端点的
+迟到写入不清理命令流，但仍报告原期限失败。输出目标周期不保证实际频率，
+长阻塞问题仍须实机验证。日志缓冲区不足会保留队首记录供扩容后重读。
+AI 总入口、UI 规范、仪表指南和完整 Skill 随本版本一起交付。
+
+SDK 0.6.1 将运行时版本更新为 `0.6.1`。本版本保持已有公开结构体布局、
+调用约定和协议兼容，新增导出函数不会破坏 0.6.0 调用方。新增能力包括：
+
+- 参数维护使用的 CAN 波特率切换（500/1000 Kbit/s）。
+- `.rbmotor` 参数包的导入、导出和同类型电机差异同步。
+- 参数维护模式中的 RB 伺服固件异步升级。
+- CAN 输出空闲下使能超时的独立读写接口，默认 60 秒，`0` 表示关闭。
+
+这些接口仍复用 SDK 的维护状态机和安全边界；它们不会开放底层 SDO/PDO
+协议，也不会把 `RB_OutputConfig` 旧结构扩展成不兼容的新布局。
 
 SDK 0.6.0 将运行时版本更新为 `0.6.0`。本版本补齐平台配置包和动态配置包的公开导入导出接口，并公开 SimHub 等外部 Motion 宿主接管 `RB_CAN` 实时位置帧的接口。配置包导入导出使用 UTF-8 文件路径；导入后应使用返回的稳定 Key/名称重新读取配置，不能继续使用旧目录索引。
 
-0.6.0 的外部实时位置能力只复用 SDK 已有的 `RB_CAN` 输出状态机和安全链路，不开放 CAN 协议、底层 SDO/PDO 或电机维护协议。外部宿主必须持续提交最新位置，输入超时后主动提交停车位置或断开输出；急停、Ready、设备绑定、故障恢复和授权限制仍由 SDK 判断。
+0.6.0 的外部实时位置能力只复用 SDK 已有的 `RB_CAN` 输出状态机和安全链路，
+不开放 CAN 协议或底层 SDO/PDO。外部宿主必须持续提交最新位置，输入超时后
+主动提交停车位置或断开输出；急停、Ready、设备绑定、故障恢复和授权限制仍由
+SDK 判断。
 
 宿主程序不需要为 SDK 调用 `CoInitializeEx()` 或 `CoUninitialize()`。SDK 在自己的线程中管理 COM 生命周期。
 
@@ -997,7 +1019,7 @@ RB_Seatbelt_SetTestOutput(1, 40.0, 40.0);
 RB_Seatbelt_SetTestOutput(0, 0.0, 0.0);
 ```
 
-安全带的 RB 57 步进驱动使用独立输出类型 `SEATBELT_CAN`。它沿用 RB 驱动的位置模式和 `0x607A:00` 目标位置 SDO，但不配置位置 RPDO，也不进入平台运动 CAN 的动态批处理、固件安全和平台堵转回零流程。驱动器电流、速度、加速度、自动使能等参数由 RB 专用上位机预先设置。旧名称 `RB_CAN_SEATBELT` 仅作为配置读取和旧前端调用的兼容别名，新建与保存统一写入 `SEATBELT_CAN`。
+安全带的 RB 57 步进驱动使用独立输出类型 `SEATBELT_CAN`。它使用 RB 驱动位置模式，不进入平台运动批处理或平台堵转回零流程。专用安全带APP提供独立失联/急停释放保护，要求固件 `2026103102` 或更新版本；旧固件不能进入动作就绪状态。驱动电流、速度、加速度和上电回零参数由 RB 专用上位机预先设置。旧名称 `RB_CAN_SEATBELT` 仅用于兼容读取，新建与保存统一写入 `SEATBELT_CAN`。
 
 ```cpp
 RB_SeatbeltCanConfig canConfig{};
@@ -1015,6 +1037,66 @@ RB_SeatbeltCan_ApplyConfig(outputInstanceIndex, &canConfig);
 // 连接后可按需手动回零；SDK 会先确认回零完成，再允许发送目标位置。
 RB_SeatbeltCan_RequestHoming(outputInstanceIndex);
 ```
+
+`ChannelMode` 为单路时，仅访问 `SingleChannel` 选定的电机：左侧和居中使用
+`LeftNodeId`，右侧使用 `RightNodeId`；未启用节点不参与过滤、PDO配置、回零或释放。
+双路必须设置两个不同的有效节点（1-127）。位置单位为驱动用户脉冲。
+
+连接时若驱动配置了上电传感器回零，SDK等待其完成，不抢先切模式或重新启动回零。
+完成后先以实际位置覆盖残留目标，再使能位置输出。等待、初始化或运行驱动异常
+进入释放锁定，不自动清故障重使能。
+
+USB复位/挂起、独立主机心跳超时或急停时，专用固件清除旧主机目标，按已建立坐标
+逐轴限速回绝对0；新鲜实际位置确认到位后逐轴下使能，并用新反馈确认下使能。
+这不是重新寻找传感器。坐标无效、反馈缺失、驱动故障或CAN不可用时不能保证主动
+回0；固件记录故障并重试停机，健康的另一轴仍独立释放。不能把故障锁定解释为已到零位。
+
+当前内部参数为：主机失联超时5000ms、释放最长15000ms、速度10000用户脉冲/秒、
+加速度20000用户脉冲/秒²、零位容差20用户脉冲。它们不是现有回零参数的别名，
+当前无公开调参字段；机械零位、松带方向和速度尚需空载确认。
+独立心跳和已接受实时运动命令都过期才判主机失联；RGB等普通通信不续期该期限。
+SDK运行线程停止提交输入时也会停止心跳续期，USB失联和急停不等待该期限。
+安全带运行会话的USB发送由SDK单一后台线程分级调度，释放/急停及心跳优先；
+位置只保留最新目标，排队过期的控制请求撤销，不在恢复后补发。
+安全带APP `2026110101` 或更新且报告对应能力时，RGB使用完整帧异步传输，
+不等待逐帧固件应答；SDK通过低频状态区分接收与完成灯带输出。提交成功仅表示
+最新帧已缓存，不代表已显示。旧APP继续由独立RGB任务等待原协议应答，
+两种模式都不占用USB写线程等待应答，也不推迟电机状态监测。
+安全带灯效最高60Hz，配置中的较低帧率仍有效；独立RGB控制器使用独立节拍，
+不会因其容量限制而降低安全带RGB的目标帧率。
+安全带输出实例的`OutPutTime`是毫秒文本，生效范围2..1000ms；
+0/1/2均按2ms（目标500Hz）处理，4为4ms（目标250Hz）。
+这只限制实际位置发送，不降低上游采样/断流检测频率；实际频率仍取决于输入与USB调度。
+排队等待、单次USB传输和固件应答分别有期限；Windows调度与驱动取消不提供
+绝对实时保证。宿主继续轮询真实状态，不因RGB失败自行重置或重新启用电机。
+正常TPDO周期按启用节点300/310ms错开；状态超过1000ms未更新后用SDO复核，
+连续失败至少3次且持续至少1200ms才判离线，成功反馈清除失败窗口。
+固件不再用正常运行时500ms缺TPDO直接锁定，释放期间仍校验1000ms内真实反馈。
+正常断开必须先确认所有启用节点回绝对0并下使能，再停周期TPDO；失败时保留
+反馈及保护。仅干净的正常退出终态可在下次连接自动恢复；SDK故障释放不属于正常退出。
+
+前端轮询 `RB_SeatbeltCan_GetState` 的 `Ready/Fault/StatusText`：
+
+| StatusText | 前端行为 |
+|---|---|
+| `RB seatbelt releasing to zero` | 展示释放中；不允许回零或重新启用 |
+| `RB seatbelt released and disabled; explicit re-enable required` | 展示已释放锁定，提供显式重新启用 |
+| `RB seatbelt release fault; safety locked` | 展示保护故障；仅终态接受重新启用，不能显示为释放成功 |
+| `RB seatbelt release state unavailable; safety locked` | 状态未确认，停止动作；控制器复位导致未配置时须显式断开并重新连接 |
+
+用户确认机械情况、解除急停并排除故障后，调用：
+
+```cpp
+const int result = RB_SeatbeltCan_RequestReenable(outputInstanceIndex);
+// RB_OK仅表示异步请求已接受；继续轮询GetState，Ready后才可接受新的测试输入。
+```
+
+释放中会拒绝该请求；物理急停未解除时固件仍拒绝恢复。重连、页面刷新、普通回零
+请求不能解除锁定。恢复成功丢弃锁定期间旧目标，只接受恢复后的新输入。
+重新启用属于受保护输出动作，无输出授权时返回 `RB_LICENSE_REQUIRED`；
+读取状态、停止和断开仍可用。
+正常断开也请求固件释放；SDK后台最多等待约16.5秒，断开完成不等于机械释放已确认。
+前端关闭流程须等待输出会话结束，不能在工作线程未结束时卸载DLL或强杀进程。
 
 安全带和 RGB 可以同时输出：安全带使用 `SEATBELT_CAN` 输出实例，RGB 继续使用独立 RGBAPP/效果链，两者不共享输出数据通道。
 
@@ -1098,7 +1180,7 @@ if (RB_Rgb_StartAppFirmwareUpdate(device.Uid, appBinPath) == RB_OK) {
 
 ### 8.1.7 输出参数
 
-RGB效果层新增 `DisplayMode`：`RB_RGB_DISPLAY_INDEPENDENT` 表示仅独立 RGB，`RB_RGB_DISPLAY_SEATBELT_LINK` 表示仅在安全带联动控制器就绪时显示，`RB_RGB_DISPLAY_BOTH` 表示两种场景都允许。当前安全带 CAN 固件只提供联动状态，尚未提供 RGB 像素传输协议。
+RGB效果层新增 `DisplayMode`：`RB_RGB_DISPLAY_INDEPENDENT` 表示仅独立 RGB，`RB_RGB_DISPLAY_SEATBELT_LINK` 表示仅在安全带联动控制器就绪时显示，`RB_RGB_DISPLAY_BOTH` 表示两种场景都允许。专用安全带控制器已支持RGB像素输出，最大75颗；普通灯效通信不影响独立的安全释放心跳。
 
 每个输出实例对应一个 `RB_OutputConfig`。`instanceIndex` 是当前输出实例列表的零基索引，范围由 `RB_Output_GetInstanceCount()` 决定。先读取再修改，能够保留当前输出类型不认识或当前页面未显示的字段。
 
@@ -1170,7 +1252,7 @@ if (rc != RB_OK) {
 | `ConnectionSpeed` | 连接、回零或过渡速度百分比，具体约束以当前输出类型为准 |
 | `ParkPositionPercent` | 停放位置百分比 |
 | `StartString` / `StartTime` | 连接后的起始命令及延时文本 |
-| `OutPutString` / `OutPutTime` | 周期输出模板及输出间隔文本 |
+| `OutPutString` / `OutPutTime` | 周期输出模板及输出间隔文本；安全带CAN的间隔单位为ms，最小2，4用于250Hz对比 |
 | `EndString` / `EndTime` | 断开前的结束命令及延时文本 |
 
 三个时间字段都是十进制毫秒文本，不是 Hz：`"2"` 表示约每 2 ms 输出一次，`"100"` 表示延迟 100 ms。使用文本是为了兼容现有配置格式，前端保存前必须验证为非负十进制数。
@@ -1260,11 +1342,42 @@ if (saveRc == RB_OK) {
 
 保存和应用不会自动代表“用户要求立即连接”。是否重新连接应由用户操作或该实例的 `AutoConnect` 策略决定。
 
-### 8.1.7 CAN 输出健康与人工恢复
+### 8.1.8 CAN 输出空闲下使能
+
+CAN 输出的空闲下使能超时独立于 `RB_OutputConfig`，用于保持既有公开结构的
+大小和布局。读取和保存使用：
+
+```cpp
+int idleSeconds = 0;
+if (RB_Output_GetIdleDisableTimeoutSeconds(outputIndex, &idleSeconds) == RB_OK) {
+    // 0 表示关闭；首次创建或旧配置缺字段时默认为 60 秒。
+}
+
+RB_Output_SetIdleDisableTimeoutSeconds(outputIndex, 30);
+```
+
+有效范围为 `0-2147483` 秒。只有 `RB_CAN`、`FM_CAN` 和 `FC_CAN` 输出类型
+支持该设置；其它类型返回 `RB_INVALID_ARGUMENT`。设置值后由输出配置立即保存，
+普通 `RB_Output_SaveInstanceConfigByIndex()` 会保留已有超时值。
+
+实际计时还必须同时满足 `AutoConnect=1`。首次进入 Ready 但没有用户连接请求，
+或停车完成后开始计时；到期后按 CAN 安全流程逐节点下使能并停止后台自动初始化。
+下一次明确连接会重新初始化、回零并渐入。该功能不是急停，也不会覆盖失联、急停、
+维护和固件升级的安全处理。
+
+### 8.1.9 CAN 输出健康与人工恢复
 
 标准 SDK 当前公开 `RB_CAN` 的设备发现、逻辑索引、稳定 UID 绑定、绑定状态、单输出电机状态、健康快照和人工恢复。完整设备接入流程见 `RaceBearSDK_RB_CAN_GUIDE.md`。`outputIndex` 使用输出实例目录中的索引，增删输出后必须重新取得；设备目录索引只在一次 `RB_Can_RefreshDevices()` 快照内有效。
 
-当前公开 CAN 工作流聚焦 `RB_CAN`。`FM_CAN`、`FC_CAN`、`RDS_CAN`、电机参数维护、固件更新、底层 SDO/PDO 和急停控制暂未提供公开接入 API。
+`RB_Can_GetOutputBindingState` 同时支持独立 `SEATBELT_CAN` 的UID绑定身份查询。
+公开 `RB_OutputConfig` 没有 `CANUid` 成员，前端应读取绑定快照的 `Uid`；
+身份就绪不表示电机已就绪，也不代替安全带最低运行固件检查。
+运行、释放及急停状态继续读取 `RB_SeatbeltCan_GetState`，不套用平台CAN健康恢复流程。
+
+当前公开 CAN 工作流覆盖 `RB_CAN` 的设备管理、状态诊断、参数维护、参数包、
+差异同步和 RB 伺服升级；`FM_CAN`、`FC_CAN`、`RDS_CAN` 的参数表可通过类型
+查询和参数维护接口使用，但不代表底层协议对外公开。`SEATBELT_CAN` 使用独立的
+高层配置、状态与恢复接口；底层 SDO/PDO、固件内部协议和急停控制不属于公开接入 API。
 
 ```cpp
 RB_CanOutputHealthState health{};
@@ -1295,6 +1408,37 @@ const int rc = RB_Can_RequestOutputRecovery(outputIndex);
 ```
 
 `RB_OK` 表示 SDK 接受本次受控恢复请求，不表示输出已经恢复运行；前端随后继续轮询健康快照。`RB_ERROR` 表示当前输出不存在、不是可恢复状态或安全条件仍不满足。不要在 UI 定时器中持续调用该函数，也不要用它绕过急停和人工检查。
+
+### 8.1.10 电机参数维护和 RB 伺服升级
+
+0.6.1 公开了维护窗口所需的高层接口。它们仍由 SDK 管理 CAN 会话，
+调用方不直接发送 SDO/PDO，也不能在平台承载运动时操作：
+
+```cpp
+if (RB_Can_BeginMotorParameterMaintenance() == RB_OK) {
+    RB_Can_SetMotorParameterCanBaudRate(500); // 仅支持 500 或 1000 Kbit/s
+    // 读取、编辑、保存参数或调用参数包/同步接口。
+    RB_Can_EndMotorParameterMaintenance();
+}
+```
+
+进入维护会暂停实时初始化和监控，并对全部相关节点执行安全下使能；退出后
+SDK 请求重新初始化和回零。切换维护波特率会结束当前维护占用、按新速率重开
+CAN 卡，然后自动重新进入维护。已因空闲超时下使能且尚未重新 Ready 的会话不能
+直接进入维护，必须先由用户发起连接并等待 Ready。
+
+参数表必须按当前电机索引读取，使用
+`RB_Can_GetMotorParameterProfileType()` 区分 `RB_CAN`、`FM_CAN`、`FC_CAN`
+和 `RDS_CAN`。参数文件接口只处理 UTF-8 `.rbmotor` 文件和稳定参数键；
+导入/导出不读取或写入设备，导入结果只是草稿，用户确认后仍需调用现有的
+单项写入和保存接口。`RB_Can_SyncMotorParameters()` 要求源、目标同类型且
+都处于维护模式，失败时可能已有部分写入，不提供事务回滚。
+
+`RB_Can_StartServoFirmwareUpdate()` 只面向 RB 伺服电机，要求已经进入参数维护、
+输出未运行，并在后台线程执行。调用成功后通过 `RB_State_Read()` 轮询
+`RuntimeState::Can` 固件状态，直到 `FirmwareUpdateComplete`；
+升级期间禁止切换输出、离开维护或关闭 SDK。固件升级前应确认设备处于安全停机
+状态，实际镜像兼容性和升级结果仍需在目标硬件上验证。
 
 结构体接口的通用规则：
 
@@ -1792,7 +1936,7 @@ if (rc == RB_LICENSE_REQUIRED) {
 
 仪表运行资源位于 DLL 同级的 `DashboardAssets/RaceBear`。当前仅 Ford GT 模板需要外部图片和字体资源，其余模板由渲染器直接绘制。
 
-客户仪表使用另一组句柄 API，并与旧的 `RB_Dashboard_RenderFrame()` 并存。启动或用户刷新时调用 `RB_Dashboard_RefreshPackages()`，再用 `RB_Dashboard_GetPackageCount()` 和 `RB_Dashboard_GetPackageInfo()` 枚举有效模板。配置必须保存 `PackageId`，不能保存目录索引。
+客户仪表使用另一组句柄 API，并与旧的 `RB_Dashboard_RenderFrame()` 并存。启动或用户刷新时调用 `RB_Dashboard_RefreshPackages()`，再用 `RB_Dashboard_GetPackageCount()` 和 `RB_Dashboard_GetPackageInfo()` 枚举有效模板。配置必须保存 `PackageId`，不能保存目录索引。完整的模板制作、生命周期、线程和部署流程见 `RaceBearSDK_DASHBOARD_DEVELOPMENT.md`。
 
 ```cpp
 RB_Dashboard_RefreshPackages();
@@ -1927,23 +2071,40 @@ RB_Serial_Destroy()
 
 ## 12. 日志接入
 
-`RB_Log_Read()` 每次从 SDK 日志队列弹出一条 UTF-8 文本。队列为空时返回空字符串。
+`RB_Log_Read()` 成功时从 SDK 日志队列弹出一条 UTF-8 文本；队列为空时返回空字符串。
+容量包含结尾NUL。`RB_BUFFER_TOO_SMALL`会写入空字符串，但保留队首及最近日志类型；
+无效参数也不消耗日志。使用单一消费者，容量不足时扩容重试，不能当作队列为空。
+USB恢复快照可能超过260字节，4096也不是接口规定的最大长度。
 
 ```cpp
 void DrainSdkLogs()
 {
-    char text[4096]{};
+    std::vector<char> text(4096); // 需包含<vector>和<limits>。
     for (;;) {
-        const int rc = RB_Log_Read(text, sizeof(text));
+        const int rc = RB_Log_Read(text.data(), static_cast<int>(text.size()));
+        if (rc == RB_BUFFER_TOO_SMALL) {
+            if (text.size() > static_cast<size_t>((std::numeric_limits<int>::max)()) / 2) {
+                break; // 记录宿主容量错误；队首仍保留，不能当作成功。
+            }
+            text.resize(text.size() * 2);
+            continue;
+        }
         if (rc != RB_OK || text[0] == '\0') {
             break;
         }
-        std::printf("[RaceBear] %s\n", text);
+        std::printf("[RaceBear] %s\n", text.data());
     }
 }
 ```
 
 建议每 100-500 ms 清空一次日志队列。不要只在 Debug 构建中显示日志，正式版也应保存必要的 SDK 运行日志，便于排查设备和现场问题。
+
+CAN USB读写及安全带运行诊断按故障过程记录：同类异常首次出现时输出，
+持续失败或不足5秒的短暂恢复不重复刷屏，稳定正常至少5秒后静默允许下次故障记录。
+真实严重程度升级仍可另记一条。RGB完整重试成功、正常反馈、正常释放及恢复成功
+不输出诊断；用户操作、程序生命周期及真实保护故障仍保留必要事件。
+日志不是逐帧状态，也不是累计失败次数接口；没有新增日志不代表当前故障已消失，
+前端仍需读取状态快照。SDK不替宿主限制日志控件或持久化文件的容量。
 
 ## 13. 线程、刷新频率和退出
 
@@ -2110,6 +2271,13 @@ void DrainSdkLogs()
 | `RB_Dynamic_ExportPackage()` / `RB_Dynamic_ImportPackage()` | 导出或导入 DynamicV2 与同名 MotionEffect 配置包。 |
 | `RB_Can_SetExternalRealtimeMode()` / `RB_Can_SubmitPositions()` | 供外部 Motion 宿主接管公开 `RB_CAN` 实时位置通道。 |
 | `RB_Can_IsExternalRealtimeMode()` | 查询外部实时位置接管状态。 |
+| `RB_Can_BeginMotorParameterMaintenance()` / `RB_Can_EndMotorParameterMaintenance()` | 暂停或恢复 CAN 运行会话，进入/退出参数维护。 |
+| `RB_Can_SetMotorParameterCanBaudRate()` | 在维护会话中切换 500/1000 Kbit/s，并按新速率重新进入维护。 |
+| `RB_Can_GetMotorParameterProfileType()` | 查询当前电机参数文件类型，供 `.rbmotor` 校验使用。 |
+| `RB_Can_ExportMotorParameterPackage()` / `RB_Can_ImportMotorParameterPackage()` | 导出窗口草稿或导入并校验参数草稿，不直接写设备。 |
+| `RB_Can_SyncMotorParameters()` | 把当前草稿的选中参数同步到同类型目标电机。 |
+| `RB_Can_StartServoFirmwareUpdate()` | 在维护模式下异步升级指定 RB 伺服；状态通过 CAN 固件状态接口读取。 |
+| `RB_Output_GetIdleDisableTimeoutSeconds()` / `RB_Output_SetIdleDisableTimeoutSeconds()` | 读取或保存 CAN 输出空闲下使能超时，单位秒，`0` 关闭。 |
 
 ### 17.3.1 SimHub 公共 UDP 中继
 
@@ -2135,9 +2303,15 @@ RB_Can_SubmitPositions(outputIndex, positions, 4);
 
 ### 17.3.2 CAN 设备维护边界
 
-CAN 电机参数维护、单圈脉冲数等维护模式参数读写、保存/恢复、重启、清故障，以及对应的 `FM_CAN`、`FC_CAN`、`RDS_CAN` 和 `SEATBELT_CAN` 协议，仍属于 SimRacebear 私有适配层和内部设备维护链路。它们不是 0.6.0 标准第三方 SDK 合同，不能根据内部实现或旧版前端调用自行接入。
+0.6.1 起，标准 SDK 公开高层电机参数维护、参数包导入/导出、同类型差异同步、
+维护波特率切换和 RB 伺服固件升级。调用方必须通过 SDK 进入维护模式，遵守
+停止输出、设备下使能、固件状态轮询和退出后重新初始化的顺序。
 
-标准公开 SDK 只承诺本节的 `RB_CAN` 设备发现、稳定绑定、健康诊断、人工恢复和外部实时位置接管。若未来开放参数维护，应另行定义参数编号、数据类型、范围、掉电保存、互斥状态和失败恢复合同，并同步更新公开头、测试和发布文档。
+公开接口不承诺底层 CAN 帧格式、SDO/PDO 事务、固件内部升级协议或任意厂家的
+完整维护能力。`FM_CAN`、`FC_CAN` 和 `RDS_CAN` 是否支持某个参数，以当前
+电机的类型、参数数量、可写标记和能力位为准。`SEATBELT_CAN` 的高层配置、
+状态、回零与显式恢复已公开，但控制器刷写和底层协议不属于公开维护范围。
+不能根据内部对象索引或旧版前端实现自行发送总线命令。
 
 ### 17.4 串口高级接口
 
@@ -2232,3 +2406,29 @@ SDK 先校验全部选中值及范围，然后预读所有待同步目标值；�
 9. 退出前停止所有前端定时器和工作线程，再调用 `RB_Runtime_Shutdown()`。
 
 函数的精确参数、返回值、结构体字段和单位以同一发布包中的 `RaceBearSDK.h` 为准。本手册负责说明接入流程，头文件负责说明单个接口合同。
+
+## 19. 第三方前端开发与交付
+
+从零开发时，以 [AI 开发总入口](RaceBearSDK_AI_DEVELOPMENT.md) 建立功能覆盖矩阵、
+阶段任务、验证证据和交付文件；页面、容器、字段控件与统一交互见
+[前端产品与交互规范](RaceBearSDK_FRONTEND_UI_SPEC.md)。这些文档不增加公开接口，
+也不意味着每个导出函数都应显示为一个按钮。
+
+开发者须特别区分：
+
+- Runtime 快照、配置基线、未提交草稿和实际硬件状态。
+- 已保存、已应用、请求已接受与最终动作成功。
+- 当前选择的设备和输出已绑定的设备。
+- SDK 当前有效字段、兼容保留字段和宿主自己的界面设置。
+- 离线/模拟验证、真实 DLL 集成验证和现场硬件验证。
+
+`RB_Command_Run()` 的动作可能在返回结果拷贝之前已执行。对于
+`RB_BUFFER_TOO_SMALL` 或结果不完整，不自动重发带副作用命令；
+先检查相关状态并报告未确认结果。查询接口按其合同允许的扩容重试另行处理。
+用户输入的命令参数应使用 JSON 序列化器，结果使用解析器同时检查 native 返回值
+和业务字段；不要手工拼接或搜索 `"ok":true` 子串。
+
+当前 SDK 的 RGB 普通输入由效果专用候选目录提供；物理输出限制以设备能力为准，
+逻辑映射限制另行检查。安全带算法中未使用的兼容字段读取后保留，新 UI 不把它们
+呈现为有效功能；MotionProtection 新页面优先 V2，旧接口只用于兼容。
+精确字段、例外和限制仍以本手册对应专题与公开头为准。

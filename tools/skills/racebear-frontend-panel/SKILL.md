@@ -1,6 +1,6 @@
 ---
 name: racebear-frontend-panel
-description: Build, extend, review, or debug frontend control panels that integrate the RaceBear SDK public C ABI. Use for React, web, Qt, C#, C++, Python, or other host applications that need RaceBear runtime initialization, state dashboards, game and telemetry selection, license UI, platform and motion configuration, haptics, wind, seatbelt, RGBAPP/WS2812B telemetry lighting, output management, RB_CAN discovery and stable device binding, public CAN health and recovery diagnostics, serial tools, custom dashboards, VOCORE screens, browser dashboard output, deployment, or shutdown handling. Also use when porting SimRacebear behavior to another frontend or diagnosing stale indexes, unstable keys, duplicate CAN logical indexes, blocked UI threads, leaked handles, config round-trip failures, missing DashboardAssets, or SDK threads that do not exit.
+description: Build, extend, review, or debug third-party control panels using the RaceBear SDK public C ABI. Use for complete frontend delivery or individual runtime, motion, device, RGB, CAN, dashboard, configuration, and lifecycle workflows. Includes page/container design, stable selection, editable drafts, asynchronous tasks, offline validation, deployment, and delivery evidence across C++, C#, Qt, web/native bridges, and Python hosts.
 ---
 
 # RaceBear Frontend Panel
@@ -17,6 +17,12 @@ Use the public SDK contract to build a complete, maintainable frontend around st
 6. For RB_CAN device discovery, logical-index assignment, UID binding, motor state, diagnostics, or recovery, read `docs/RaceBearSDK_RB_CAN_GUIDE.md`.
 7. Verify that the public header, import library, DLL, runtime dependencies, and resources belong to the same SDK build and configuration.
 
+For a new or complete frontend, read `docs/RaceBearSDK_AI_DEVELOPMENT.md` first and
+use its staged workflow through local delivery. For page layout, controls, interactions,
+localization, or visual acceptance, read `docs/RaceBearSDK_FRONTEND_UI_SPEC.md`.
+These documents are relative to the SDK root; they are also usable without installing a Skill.
+Do not require SDK private sources or SimRacebear's UI helpers.
+
 ## Define The Requested Surface
 
 List the requested pages and behaviors before coding. Distinguish:
@@ -30,6 +36,11 @@ List the requested pages and behaviors before coding. Distinguish:
 - dashboard rendering and frame delivery.
 
 Keep the implementation scoped to the requested pages and SDK-defined configuration fields. Prefer the target application's existing architecture, component library, state management, and FFI pattern.
+
+For each requested workflow, record the page/container, public APIs, writable and preserved
+fields, dependencies, implementation state, and actual validation evidence. Treat planning,
+code complete, build passed, offline passed, and hardware passed as distinct facts.
+Do not turn every public helper or legacy export into a button or equate API counts with completion.
 
 Read [references/feature-routing.md](references/feature-routing.md) to map each page to the correct public API family and authoritative documentation section.
 
@@ -45,6 +56,9 @@ Read [references/feature-routing.md](references/feature-routing.md) to map each 
 8. Stop UI timers and callbacks, zero manual tests, request output disconnect, close owned handles, then shut down the SDK once.
 
 Read [references/integration-workflow.md](references/integration-workflow.md) for lifecycle, threading, keys, configuration transactions, licensing, and error handling.
+Read [references/implementation-patterns.md](references/implementation-patterns.md)
+when implementing selectors, editable forms, debounce, background work, command results, or close handling.
+It provides state models, task ownership, stale-result protection and reproducible host fixtures.
 
 ## Treat Dashboards As A Separate Pipeline
 
@@ -61,19 +75,26 @@ Read [references/dashboard-output.md](references/dashboard-output.md) whenever t
 - Build the adapter from `include/RaceBearSDK.h` and the documented public exports.
 - Persist stable keys and IDs; treat runtime telemetry indexes, catalog rows, device enumeration indexes, and refreshed plugin indexes as snapshot-local values.
 - Identify an RB_CAN device by `Uid` and its unique logical index. `CatalogIndex` and `EnumerationIndex` remain valid only for the current device snapshot.
-- Identify an RGBAPP by `RB_RgbDeviceInfo::Uid`; keep device-directory indexes snapshot-local and populate effect telemetry selectors from `RB_Telemetry_GetCatalog()`.
-- Model RGB lighting as independent segmented layers. Show 1-based inclusive start/end LED controls, convert them to `StartPixel/PixelCount`, and expose output selection, telemetry, effect type, colors, range/threshold, speed, blink duty, RPM fill mode, invert, brightness, and priority without requiring JSON editing.
+- Identify an RGBAPP by `RB_RgbDeviceInfo::Uid`; keep device-directory indexes snapshot-local. Populate ordinary effect inputs through `RB_Rgb_GetEffectInputCount/GetEffectInput` for the selected effect type; reserve the full telemetry catalog for expert diagnostics.
+- Model RGB lighting as independent segmented layers. Show 1-based inclusive start/end LED controls, convert them to `StartPixel/PixelCount`, and expose the effect's applicable fields. Reordering layers determines priority. Respect both device physical capabilities and documented logical bounds.
 - Keep each configuration catalog's index in its own domain, even when displayed names match.
 - Let the SDK-owned loop perform motion calculations; UI timers read state and update presentation.
-- Gate protected actions with `state.License.OutputAllowed`, and present `RB_LICENSE_REQUIRED` without automatic retry loops.
-- Reset manual pose, wind, seatbelt, haptic, RGB test patterns, and output tests on page transitions and application exit.
+- Gate protected actions with `state.License.OutputAllowed`, and present `RB_LICENSE_REQUIRED` without automatic retry loops. Follow API-specific exceptions such as RGB hardware diagnostic patterns; do not disable all tools indiscriminately.
+- Reset manual pose, wind, seatbelt, RGB patterns and any host-owned test mode on leaving the relevant test page and on exit. Do not invent a public Haptic test API or disconnect normal running outputs simply because navigation changed.
 - Use bounded waits or asynchronous state updates for devices, network clients, callbacks, output disconnect, and frame consumption so the UI remains responsive.
 - Present typed configuration controls when a public typed API is available; reserve raw JSON for advanced tooling.
+- Preserve numeric text while editing, separate drafts from snapshots, resolve targets by stable identity before writing, and ignore stale UI results. No detached SDK workers or automatic replay of side-effecting commands after a short result buffer.
 - Report SimRacebear validation only after the user has manually built the required frontend configuration.
 
 ## Verify Before Finishing
 
 Run focused binding tests first, then the page workflow and shutdown tests. Use [references/validation-checklist.md](references/validation-checklist.md) as the completion gate.
+
+For implementation requests, continue through the next uncompleted in-scope stage after each
+successful check. Complete independently testable work while hardware or credentials are unavailable.
+Respect the user's pause/cancel requests and actual execution permissions. Publish or operate hardware
+only within the user's authorization; never claim mock, visual, or offline checks prove real device behavior.
+Stop only at actual local delivery or a concrete external blocker, recording what remains.
 
 Report:
 

@@ -52,8 +52,12 @@ Before running the release script:
   project files.
 - Compare the public header and exported DLL symbols against the approved public
   API list. Configuration package APIs and external `RB_CAN` realtime position
-  APIs are public in 0.6.0; motor parameter maintenance, private CAN protocols,
-  SDO/PDO, firmware-internal commands, and SimRacebear UI APIs are not.
+  APIs are public in 0.6.0. From 0.6.1, the approved list also includes the
+  high-level motor maintenance, `.rbmotor` package, same-type synchronization,
+  RB servo firmware update, and CAN idle-disable timeout APIs. The documented
+  high-level `RB_SeatbeltCan_*` APIs, seatbelt instance configuration and binding
+  state are public; 0.6.2 adds explicit seatbelt protection recovery. Raw SDO/PDO,
+  firmware-internal commands and SimRacebear UI APIs remain private.
 - Confirm the API manual, RB_CAN guide, frontend guide, README, runtime version,
   header, DLL/LIB and archive all identify the same release version.
 

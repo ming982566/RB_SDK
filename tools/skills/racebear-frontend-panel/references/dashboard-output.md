@@ -1,6 +1,6 @@
 # Dashboard And Output
 
-Use `docs/RaceBearSDK_FRONTEND_GUIDE.md` section 15 for the integration workflow and the dashboard chapters in `docs/RaceBearSDK_API.md` for the package format, renderer, designer, VOCORE, Web output, and deployment contract.
+Use `docs/RaceBearSDK_FRONTEND_GUIDE.md` section 15 for the integration workflow and `docs/RaceBearSDK_DASHBOARD_DEVELOPMENT.md` for the complete package format, renderer, designer, VOCORE, Web output, threading, and deployment contract. The dashboard chapters in `docs/RaceBearSDK_API.md` remain the API reference.
 
 ## Pipeline
 
@@ -21,6 +21,8 @@ Use a dedicated 16-33 ms render timer for typical dashboards. VOCORE and Web acc
 - Persist `PackageId`, not the package catalog index.
 - Refresh the package catalog after import or delete, then relocate the selection by `PackageId`.
 - Close the previous `RB_DashboardPackageHandle` when selection changes or the page exits.
+- If active VOCORE/Web outputs still use the package after preview navigation, keep it owned by
+  the rendering service until the last consumer stops; hiding a preview is not an output stop request.
 - Treat the format as declarative visual data, limited to recognized bindings and packaged assets rather than executable or system-control capabilities.
 
 ## Designer

@@ -8,7 +8,11 @@ Use one process-wide SDK owner:
 2. Call `RB_Runtime_Initialize()` once.
 3. Call `RB_Runtime_StartLoop(intervalMs)` once. A normal frontend does not periodically call `RB_Runtime_DoCalculations()`.
 4. Read `RB_RuntimeState` through `RB_State_Read()` on a UI refresh timer, normally 30-60 Hz.
-5. Drain logs separately, normally every 100-500 ms. Refresh catalogs only on page entry, explicit refresh, or a known mutation.
+5. Drain logs separately with one consumer, normally every 100-500 ms. On `RB_Log_Read`
+   returning `RB_BUFFER_TOO_SMALL`, grow the UTF-8 buffer (including NUL) and retry:
+   the queued record is retained. Only `RB_OK` with empty text means the queue is empty.
+   Diagnostic snapshots can exceed 260 bytes; see the API guide's resizable reader.
+   Refresh catalogs only on page entry, explicit refresh, or a known mutation.
 6. On exit, stop producers of SDK calls, zero tests, disconnect outputs with a bounded wait, close handles, and call `RB_Runtime_Shutdown()` once.
 
 Keep the backend loop independent from rendering so UI delays do not interrupt motion calculations and slow devices do not stall presentation.
@@ -18,6 +22,8 @@ Keep the backend loop independent from rendering so UI delays do not interrupt m
 - Load the DLL that matches the header, import library, and Debug or Release configuration.
 - Match the C calling convention and exact integer, pointer, array, and structure layout.
 - Set versioned structure `Size` fields before calls that require them.
+- Follow the particular structure's contract for `Version`; do not assume every output
+  requires caller initialization or that all structure versions equal the runtime version.
 - Allocate writable output buffers and handle documented buffer-too-small behavior.
 - Copy fixed character arrays into frontend-owned strings before the next mutation or shutdown.
 - Marshal callbacks to the UI thread before updating visual controls.
@@ -48,8 +54,8 @@ Prefer typed public structures for normal UI pages:
 2. Preserve fields the page does not edit, including compatibility fields.
 3. Modify only fields represented by valid controls and SDK-provided candidates.
 4. Validate ranges before calling Apply or Save.
-5. Use Apply for supported runtime preview and Save when the change should persist.
-6. Use Save for persistence.
+5. Use Apply for supported runtime preview; it does not connect an output or imply persistence.
+6. Use Save for persistence and report its result independently of a requested runtime Apply.
 7. Read back and compare business fields instead of using whole-structure `memcmp`.
 8. Refresh affected catalogs after create, delete, or rename.
 
@@ -61,12 +67,21 @@ Configuration ownership rules:
 - Game telemetry is stored per stable game key.
 - Platform, Dynamic, Motion Effect, and Output use their own catalogs.
 - Haptic structures are independent, while the current profile name directory is associated with Dynamic. Resolve Haptic selections from the Dynamic name directory rather than the Motion Effect catalog.
+- Seatbelt CAN configuration belongs to an output instance, unlike the global seatbelt effect configuration.
+
+Keep baseline, draft, selected stable identity and draft revision separate. Resolve the identity
+against the current owning catalog before a write; preserve all non-edited fields.
+Do not overwrite active input with state polling or localization. Default/reset actions load
+valid defaults into the draft rather than silently writing hardware.
+See `implementation-patterns.md` for stale-selection, debounce and late-result handling.
 
 ## Commands And Errors
 
 - Use typed APIs for structured state and configuration.
 - Use `RB_Command_Run()` for actions documented as commands and pass `{}` for no-argument commands.
 - Check both the integer return code and any returned command JSON.
+- Use a real JSON parser/serializer. A side-effecting command may have executed even if
+  copying its response returns `RB_BUFFER_TOO_SMALL`; reread state before considering a retry.
 - Surface `RB_INVALID_ARGUMENT` as a validation or stale-selection problem.
 - Treat `RB_ERROR` according to the called API's documented state and diagnostics, and offer a deliberate retry path where appropriate.
 - When `RB_LICENSE_REQUIRED` is returned, explain that the operation requires output permission and stop automatic retries.
@@ -80,7 +95,20 @@ Read license presentation state from `RB_RuntimeState::License` and submit licen
 - Always provide an explicit stop/reset path.
 - Zero manual pose, wind, seatbelt, RGB test patterns, and other active tests on page exit, device loss, license loss, and application shutdown.
 
-For RGBAPP pages, refresh the device catalog only on page entry or explicit refresh, restore selection by UID, and read diagnostics deliberately. Use `RB_Rgb_GetState()` for high-frequency presentation. Build RGB profiles as up to 16 independent effect layers: populate telemetry from the catalog, expose 1-based inclusive start/end LED controls, convert them to `StartPixel/PixelCount`, and provide effect type, output mask, colors, threshold/range, speed, blink duty, RPM fill mode, invert, brightness, and priority. The SDK sends complete RGB frames on its own worker and keeps only the latest pending frame; the frontend must not create another per-pixel USB loop.
+Gate actions by their specific public contract: RGB hardware diagnostic test patterns do not
+depend on runtime output permission. Do not invent a Haptic test API or stop normal outputs
+on page navigation.
+
+For RGBAPP pages, refresh the device catalog only on page entry or explicit refresh, restore
+selection by UID, and read diagnostics deliberately. Use `RB_Rgb_GetState()` and
+`RB_Rgb_GetDeviceConfigSnapshot()` for ordinary presentation. Hardware reads are explicit.
+Build profiles as up to 16 independent effect layers: select effect inputs with
+`RB_Rgb_GetEffectInputCount/GetEffectInput`, use 1-based inclusive LED start/end controls,
+and convert them to `StartPixel/PixelCount`. Expose the selected effect's applicable fields;
+list ordering determines Priority. Physical limits come from device capabilities and logical
+bounds from the API contract; do not use one universal LED limit.
+The SDK sends complete RGB frames on its own worker and keeps only the latest pending frame;
+the frontend must not create another per-pixel USB loop.
 
 ## Shutdown Gate
 
@@ -93,3 +121,7 @@ Before `RB_Runtime_Shutdown()`:
 - call `RB_Output_RequestDisconnectAll()` and poll `RB_Output_AreAllDisconnected()` with a bounded timeout;
 - close dashboard package, VOCORE, Dashboard Web, serial, debug monitor, and other owned handles;
 - prevent late callbacks from touching destroyed frontend objects.
+
+A bounded disconnect wait does not establish success if it times out. Preserve the still-active
+state and follow the host's explicit close policy. Do not call Shutdown while a tracked native
+task is still executing. The full close coordinator is in `implementation-patterns.md`.

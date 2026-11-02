@@ -1516,7 +1516,7 @@ struct RB_SystemConfig
 
 /**
  * @brief 获取 SDK 版本文本。
- * @return SDK 持有的 UTF-8、NUL 结尾字符串，例如 "0.6.1"；调用方不得修改或释放。
+ * @return SDK 持有的 UTF-8、NUL 结尾字符串，例如 "0.6.2"；调用方不得修改或释放。
  */
 RB_API const char* RB_Runtime_GetVersion();
 
@@ -1658,10 +1658,11 @@ RB_API int RB_Can_SetDeviceLogicalIndex(const char* uid, int logicalIndex);
 RB_API int RB_Can_BindOutputDevice(int outputIndex, const char* uid, int logicalIndex);
 
 /**
- * @brief 读取一个 RB_CAN 输出与物理 CANAPP 的稳定绑定状态。
+ * @brief 读取一个 CAN 输出与物理控制器的稳定绑定状态，包括独立 SEATBELT_CAN。
  * @param outputIndex 当前输出目录中的零基索引。
  * @param state 接收绑定状态；调用前必须把 Size 设为 sizeof(RB_CanOutputBindingState)。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示参数或结构大小无效；RB_ERROR 表示输出不存在或不是有效 CAN 输出。
+ * @note SEATBELT_CAN 按保存的 UID 查询缓存目录；绑定就绪不代表电机就绪或满足最低运行固件版本。
  */
 RB_API int RB_Can_GetOutputBindingState(int outputIndex, RB_CanOutputBindingState* state);
 
@@ -2267,6 +2268,11 @@ RB_API int RB_SeatbeltCan_GetState(int outputInstanceIndex, RB_SeatbeltCanState*
  */
 RB_API int RB_SeatbeltCan_RequestHoming(int outputInstanceIndex);
 
+/** 显式重新启用已完成释放/停机的安全带会话。仍释放时拒绝提交，急停仍按下时固件拒绝恢复。
+ * 仅提交异步请求，随后轮询RB_SeatbeltCan_GetState；RB_OK不表示已进入Ready。
+ * 旧遥测/测试目标会作废，恢复后等待新的输入。 */
+RB_API int RB_SeatbeltCan_RequestReenable(int outputInstanceIndex);
+
 /**
  * @brief 确保至少存在一个默认 Serial 输出实例。
  * @return RB_OK 表示配置已经存在或创建成功；负数表示初始化或写入失败。
@@ -2678,6 +2684,8 @@ RB_API int RB_Command_Run(const char* command, const char* argsJson, char* resul
  * @brief 从 SDK 运行日志队列中弹出一条日志文本。
  * @param buffer 接收 UTF-8、NUL 结尾日志的调用方缓冲区；队列为空时写入空字符串。
  * @param bufferSize buffer 的总容量，单位为字节且必须大于 0。
+ * @note 容量不足时保留队首及最近日志类型，写入空字符串；调用方应扩容后重试。
+ *       无效参数不消耗日志。日志队列应由单一消费者读取，成功后再取对应类型。
  * @return RB_OK 表示读取完成；RB_INVALID_ARGUMENT 表示缓冲区无效；RB_BUFFER_TOO_SMALL 表示容量不足；RB_ERROR 表示内部失败。
  */
 RB_API int RB_Log_Read(char* buffer, int bufferSize);

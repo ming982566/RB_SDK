@@ -11,6 +11,12 @@
 
 ### AI 辅助开发入口
 
+从零开发一个第三方前端时，先读取
+[AI 开发总入口](RaceBearSDK_AI_DEVELOPMENT.md)，按其中的阶段和完成标准持续实现。
+页面导航、功能应放入的容器、控件类型、编辑草稿、任务反馈、多语言和视觉验收见
+[前端产品与交互规范](RaceBearSDK_FRONTEND_UI_SPEC.md)。本文负责 SDK 接入流程，
+两份新文档负责产品组织和完整交付，不能以接入了若干 API 代替用户工作流完成。
+
 SDK 源稿中的 `tools/skills/racebear-frontend-panel` 是面向支持 Skill 或可复用指令
 的 AI 编码工具的前端接入包。它把本文的页面流程与公开头、API 手册、仪表专题和
 工程规则组合成可执行的开发顺序，并提供实现前检查、稳定键与索引约束、句柄关闭
@@ -27,6 +33,17 @@ SDK 源稿中的 `tools/skills/racebear-frontend-panel` 是面向支持 Skill �
 Skill 不替代本文，也不固定前端框架。AI 应以当前
 `include/RaceBearSDK.h` 的签名和结构体布局为准，只读取本次功能相关章节，并沿用
 目标工程已经存在的 UI、状态管理和本地调用方式。
+
+### 开发前注意事项
+
+- 先建立范围、字段处置、页面与验收矩阵；无公开能力的项明确标记限制。
+- 使用独立 AppDataName 和 SDK 默认初始化，不从其它产品复制客户配置或授权。
+- 目录行号只用于当前快照；写入前按稳定身份重定位，读取失败不允许提交旧草稿。
+- 只读轮询不覆盖编辑文本；保存、应用、连接及最终运行成功分别反馈。
+- 长任务使用可收敛的宿主任务服务；调用期间不得卸载 DLL 或关闭 SDK。
+- 配置 UI 采用用户语义，不把内部算法名、兼容字段或高级 JSON 当作普通参数编辑器。
+- 示例只覆盖其说明的范围，不代表所有页面、所有绑定或所有硬件已验证。
+- 交付必须区分代码完成、构建通过、离线验证和硬件验证，不填写未经执行的结果。
 
 ## 1. 前端与 SDK 的职责边界
 
@@ -102,6 +119,10 @@ void StopBackend()
 ```
 
 在 `RB_Runtime_Shutdown()` 前停止串口回调、宿主线程和 UI 定时器，并把该调用作为 SDK 生命周期的终点。
+
+上例假设宿主已等待所有工作任务结束。真实 UI 应用应使用异步关闭状态机保持界面响应；
+断开等待超时必须显示“未确认断开”，不能把到期视为设备安全停止。
+没有取消接口的任务须等待完成，不能 detach 后直接 Shutdown。
 
 ## 3. 配置目录与索引关系
 
@@ -188,6 +209,11 @@ return rc;
 规范化字段；字节不同不代表保存失败。保存接口和回读接口都返回 `RB_OK` 即表示
 该保存流程成功。
 
+页面需独立保留基线、草稿、目标身份与修订号。选择变化、目录重排、延迟回调、
+自动保存或语言刷新不能把 A 的数据写到 B。每个字段的用户标签、范围、单位、
+显示条件及兼容保留策略按产品规范建立清单。保存成功但回读失败时报告未确认，
+应用失败不改变已经保存成功的事实。
+
 ## 5. 总览和状态看板
 
 高频状态统一从一个结构体读取：
@@ -241,6 +267,10 @@ RB_Command_Run("license.deactivate", "{}", result, resultSize);
 - `RB_Telemetry_GetRawValue()` 可继续用于遥测诊断；`RB_Telemetry_GetProcessedValue()` 在锁定状态返回 0。
 - 授权恢复由 SDK 自动从零淡入，前端不需要重建第二套过渡。
 所有真实连接和手动测试按钮还应检查 `state.License.OutputAllowed`。
+
+上述门控适用于受保护运行接口；具体 API 有独立合同的例外按其合同处理。
+例如 `RB_Rgb_SetTestPattern()` 是不依赖运行输出授权的硬件诊断测试；
+不能以一个全局禁用逻辑误锁全部工具、读取、诊断和复位。
 
 ## 7. 游戏和遥测页面
 
@@ -336,6 +366,7 @@ if (rc == RB_OK)
 `RB_Platform_SaveMotionProtectionConfigV2ByIndex()`，编辑后调用
 `RB_Platform_ApplyMotionProtectionConfigV2ToCurrentRig()`。
 V1 API 和布局保持兼容，旧接口更新不会覆盖 V2 字段。
+新建普通参数页只编辑 V2，V1 不并列作为另一套当前有效保护开关。
 前端需呈现总开关、碰撞/异常 Surge/角度突变检测、忽略正向垂向选项，
 以及三项阈值、最短保护时长、平滑接回时长、强度和检测模式。
 强度 -2 最弱、+2 最强；模式 0 为轴绝对值，1 为三轴相邻差向量长度。
@@ -378,16 +409,26 @@ Key 重新定位并读取完整结构。
 `RB_Dynamic_GetInputCandidateCatalog(dofIndex, ...)`，不能把完整遥测目录直接
 展示成效果列表。
 
-添加通道：
+添加通道（以下片段放在返回 `int` 的处理函数中，所用索引来自当前目录）：
 
 ```cpp
+if (dofIndex < 0 || dofIndex >= RB_DYNAMIC_DOF_COUNT)
+    return RB_INVALID_ARGUMENT;
 RB_DynamicInputCandidateCatalog candidates{};
-RB_Dynamic_GetInputCandidateCatalog(dofIndex, &candidates);
+int rc = RB_Dynamic_GetInputCandidateCatalog(dofIndex, &candidates);
+if (rc != RB_OK)
+    return rc;
+if (candidateIndex < 0 || candidateIndex >= candidates.Count)
+    return RB_INVALID_ARGUMENT;
 
 RB_DynamicV2Profile profile{};
-RB_Dynamic_ReadProfileByIndex(dynamicProfileIndex, &profile);
+rc = RB_Dynamic_ReadProfileByIndex(dynamicProfileIndex, &profile);
+if (rc != RB_OK)
+    return rc;
 
 RB_DynamicDofEffect& dof = profile.Dofs[dofIndex];
+if (dof.InputCount < 0 || dof.InputCount >= RB_DYNAMIC_MAX_INPUTS)
+    return RB_INVALID_ARGUMENT;
 const RB_DynamicInputCandidateItem& source = candidates.Items[candidateIndex];
 RB_DynamicInputEffect& input = dof.Inputs[dof.InputCount++];
 input = {};
@@ -410,7 +451,7 @@ dof.Enabled = 1;
 
 | 字段 | SDK 接受范围 | 推荐控件 |
 | ---- | ------------ | -------- |
-| `InMapping` | 非负 `int`；启用通道时必须大于 `0` | 非负整数输入框；单位显示候选遥测的 `Unit`，不设置统一最大值 |
+| `InMapping` | 非负 `int`；启用通道时必须大于 `0` | 非负整数输入框；用候选 `TelemetryKey` 关联遥测目录的 `Unit`，不设置统一最大值 |
 | `InGain` | 任意有限 `double`；`0` 不产生有效输出 | 支持正负号和小数的输入框；常用值为 `1.0` 和 `-1.0` |
 | `OutScaling`、`Proportion`、`Strength`、`Smoothing`、`DeadZone`、`Washout`、`Sensitivity`、`SensitivityStrength` | 整数 `0-100` | 范围固定为 `0-100` 的滑杆或步进框 |
 
@@ -418,6 +459,9 @@ dof.Enabled = 1;
 `Strength`、`Smoothing`、`Washout` 和 `SensitivityStrength` 是 `0-100` 的 UI 标度，
 不能标成毫秒或 Hz。各字段的精确换算、0 值行为和生效条件见
 `RaceBearSDK_API.md` 的“动态输入和滤波字段”表。
+
+`RB_DynamicInputCandidateItem` 没有 Name 或 Unit 字段。通道效果标识使用其 `Key`，
+单位和底层数据解释通过 `TelemetryKey` 关联，不把效果 Key 当作遥测 key 反查。
 
 单路变化限制的界面应使用“变化步长 / 限制强度”，避免将其误称为碰撞检测阈值。
 两项都非零才配置该限制，任意一项为零时显示“未启用”；通道关闭或无有效映射时显示
@@ -517,6 +561,38 @@ RB_Wind_SaveConfig(&wind);
 安全带使用同样的 `GetDefault/Read/Apply/Save` 流程。测试输出只在用户明确启用时
 调用；松开按钮、切换页面和退出程序时固定归零。
 
+### 安全带 CAN 保护与恢复
+
+专用硬件配置放在所选输出实例详情页，与全局安全带算法配置分开。
+单路左侧/居中仅使用左节点，单路右侧仅使用右节点；双路节点必须不同。
+专用安全带APP最低版本为2026103102，SDK会等待已配置的驱动上电传感器回零完成。
+不要在状态刷新中自动请求回零、清故障或重新启用。
+
+失联/急停后固件回绝对0，再逐轴确认下使能；页面显示释放中、已释放锁定或保护故障。
+用户确认后使用 `RB_SeatbeltCan_RequestReenable(outputIndex)` 显式恢复，
+`RB_OK`只表示请求接受，轮询 `RB_SeatbeltCan_GetState` 确认Ready。
+释放中、急停未解除、反馈缺失时不能显示恢复成功。普通RequestHoming不能解锁。
+状态不可用且控制器已复位时，需要用户显式断开并重新连接。
+
+安全带USB发送由SDK统一调度，界面不需要增加心跳、发送锁或重试线程。
+APP `2026110101` 或更新且报告对应能力时，完整RGB帧异步提交，无逐帧应答等待；
+SDK低频复核接收与完成灯带输出。旧APP保留原协议，其应答等待与电机监测分开。
+位置与灯效保留最新目标，排队过期的请求不会迟到补发。
+RGB失败不能作为电机故障恢复依据；继续读取各自状态，并保留首次异常日志。
+灯效配置帧率最高60Hz，安全带与独立RGB控制器分别安排输出，不相互降低目标帧率。
+安全带输出实例的`OutPutTime`按ms提交：最小2ms（0/1/2均生效为2ms，目标500Hz），
+4ms用于250Hz实机对比，最大1000ms。该限制作用于实际发送，采样和断流检测不降频。
+前端沿用输出实例详情页的间隔字段；提交成功不能显示为已达到指定频率或RGB已显示。
+
+关闭时先取消测试，再请求断开并等待会话结束；安全带释放最长约16.5秒的后台等待
+不能阻塞UI，也不能因窗口关闭提前卸载SDK。SDK先请求固件进入正常释放态，
+保留反馈确认全部启用节点回绝对0且下使能，再握手停止周期TPDO；前端不能自行
+提前停TPDO或撤销保护。单左/居中、单右和双路使用同一流程，仅干净的正常退出
+终态允许下次连接自动恢复，故障释放仍需显式恢复。
+正常反馈监测与RB_CAN一样先做SDO复核，固件不再因500ms缺TPDO直接锁定；
+主机失联采用5000ms期限，RGB/诊断不能延后电机失联释放。具体状态文本、失败语义和默认值见
+[API安全带章节](RaceBearSDK_API.md#815-安全带参数)。机械零位与速度须独立实测。
+
 ### 12.1 RGB 灯效页面
 
 RGB 页面至少包含设备、灯带和效果三部分：
@@ -585,6 +661,22 @@ if (RB_Can_GetOutputHealthState(outputIndex, &health) == RB_OK) {
 接受，页面继续轮询健康快照直到进入就绪/运行或再次报告故障。恢复请求由用户明确触发一次，
 UI 定时器只负责读取状态。
 
+CAN 输出页面还可以提供“空闲下使能超时”设置。该设置使用独立的
+`RB_Output_GetIdleDisableTimeoutSeconds()` / `RB_Output_SetIdleDisableTimeoutSeconds()`
+接口，不要扩展或重建 `RB_OutputConfig`。单位是秒，默认 `60`，`0` 表示关闭；
+只有 `RB_CAN`、`FM_CAN` 和 `FC_CAN` 类型有效。实际计时还要求该输出启用
+`AutoConnect`，计时从 Ready 未连接或停车完成开始。到期后 SDK 会按安全顺序
+下使能并停止后台自动初始化，下一次用户连接重新执行初始化、回零和渐入。
+这项设置不是急停，也不替代故障、失联、维护或固件升级状态机。
+
+0.6.1 起电机参数页可以使用 SDK 的公开维护接口。用户点击维护前，前端应先确认
+所有运动输出已停止，并调用 `RB_Can_BeginMotorParameterMaintenance()`；页面关闭
+或保存完成后调用 `RB_Can_EndMotorParameterMaintenance()`，等待 SDK 重新 Ready。
+波特率下拉框只显示 `500` 和 `1000 Kbit/s`，切换时由 SDK 重开 CAN 会话并重新进入
+维护。参数包导入/导出使用 `.rbmotor` 和稳定键，导入只生成草稿；同步操作只允许
+同类型电机，失败时必须提示可能部分写入。RB 伺服升级只在维护模式且输出未运行时
+启用，进度从 `RB_State_Read()` 的 `Can` 字段轮询，升级期间锁定设备切换和窗口关闭。
+
 DynamicV2 和同名运动增强配置可以使用配置包迁移：
 
 ```cpp
@@ -628,6 +720,8 @@ SimHub 等外部宿主可使用 `RB_Can_SetExternalRealtimeMode()` 和
 完整 MMF/UDP 包结构见 `RaceBearSDK_API.md`。
 
 ## 15. 仪表和屏幕页面
+
+仪表模板开发和客户 `.rbdash` 文件格式见 `RaceBearSDK_DASHBOARD_DEVELOPMENT.md`。本节只保留前端页面接入所需的调用顺序和生命周期。
 
 仪表渲染、VOCORE USB 屏幕和浏览器 Web 服务是三层独立能力：
 
@@ -730,14 +824,20 @@ if (RB_Plugin_Refresh() >= 0) {
 `RB_Plugin_StartRuntimes()` 启动后台运行态；`RB_Plugin_Launch()` 启动插件自己的
 前端。每次刷新后旧插件索引都应视为失效。
 
-日志循环读取到空字符串：
+日志由单一消费者循环读取到空字符串。缓冲大小包含UTF-8的NUL，
+`RB_BUFFER_TOO_SMALL`保留队首及最近日志类型，需扩容后重试；无效参数也不出队。
+诊断快照可能超过260字节，不能用固定短文本缓冲读取日志：
 
 ```cpp
-char line[4096]{};
-while (RB_Log_Read(line, sizeof(line)) == RB_OK && line[0] != '\0') {
-    // 显示或写入宿主日志文件。
-}
+// 完整扩容循环见API手册“日志接入”中的DrainSdkLogs()。
+// 建议起始4096字节；容量不足扩大重试，成功后显示或写文件，空串才表示队列已空。
 ```
+
+CAN USB读写与安全带诊断只记录同类异常过程的首次及真实严重升级；
+稳定正常至少5秒后静默重新允许后续故障记录，不输出正常通信或恢复成功。
+RGB内部重试成功不记录错误。前端持续读取状态快照，不能用“最近没日志”
+推断恢复，也不要在每次状态刷新时自行重复追加同一错误。日志控件和文件
+容量由宿主限制，用户操作和程序生命周期仍可记录必要事件。
 
 SDK 资源监视器可通过 `RB_Debug_OpenMonitor()` 打开，只用于诊断，不替代宿主前端。
 
@@ -745,6 +845,11 @@ SDK 资源监视器可通过 `RB_Debug_OpenMonitor()` 打开，只用于诊断�
 
 动作使用 `RB_Command_Run()`；结构化配置优先使用类型化结构体接口。无参数命令
 仍传入 `{}`。命令结果必须同时检查返回码和 JSON 内容。
+
+命令使用正式 JSON 序列化/解析器，不能按字符串子串判断成功。
+动作可能在结果写入缓冲区前已执行；返回 `RB_BUFFER_TOO_SMALL` 时不要自动重发
+激活、启动、连接等命令，先重新读取对应状态确认结果。只读 getter 的扩容重试
+不能直接套用到有副作用的命令。
 
 `RB_Data_ReadJson/WriteJson` 适用于脚本、迁移工具和高级编辑器。普通配置页面
 不应要求最终用户编辑 JSON，也不能写入局部 JSON 片段覆盖完整配置。
@@ -789,6 +894,12 @@ SDK 资源监视器可通过 `RB_Debug_OpenMonitor()` 打开，只用于诊断�
 - 动态滤波按自由度候选目录增删通道，并保存每通道参数。
 - 运动增强使用自己的配置目录，并支持每效果多路由参数。
 - CAN 输出显示机器可读健康状态，人工恢复需要明确按钮和安全提示。
+- CAN 输出空闲下使能超时可读写，默认 60 秒、`0` 关闭，只有自动连接的
+  `RB_CAN`/`FM_CAN`/`FC_CAN` 实际计时；普通输出保存不会抹掉该值。
+- 电机参数维护在停止输出后进入，波特率切换、`.rbmotor` 导入/导出、同类型
+  同步和退出维护后的重新初始化流程均有明确状态反馈。
+- RB 伺服固件升级只能在维护模式且输出未运行时启动，页面持续显示运行、完成、
+  失败和错误码，不把“已启动”当成“升级成功”。
 - 仪表模板可渲染到 VOCORE 或 Web，句柄状态、自动重连和退出关闭完整。
 - 震动按当前动态配置名称读写独立结构体。
 - 风感、安全带支持读取、应用、保存、测试和离页归零。

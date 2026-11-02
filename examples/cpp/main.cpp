@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <string>
 #include <thread>
 #include <vector>
@@ -99,16 +100,24 @@ namespace
 		}
 	}
 
-	// RB_Log_Read 每次弹出一条日志；空字符串表示当前队列已经读完。
+	// 仅RB_OK才出队；容量不足保留队首，扩容重试后再判断空队列。
 	void DrainLogs()
 	{
-		char text[4096]{};
+		std::vector<char> text(4096);
 		for (;;) {
-			const int rc = RB_Log_Read(text, static_cast<int>(sizeof(text)));
+			const int rc = RB_Log_Read(text.data(), static_cast<int>(text.size()));
+			if (rc == RB_BUFFER_TOO_SMALL) {
+				if (text.size() > static_cast<size_t>((std::numeric_limits<int>::max)()) / 2) {
+					std::puts("[SDK] Log buffer exceeds host capacity; record retained.");
+					return;
+				}
+				text.resize(text.size() * 2);
+				continue;
+			}
 			if (rc != RB_OK || text[0] == '\0') {
 				return;
 			}
-			std::printf("[SDK] %s\n", text);
+			std::printf("[SDK] %s\n", text.data());
 		}
 	}
 }

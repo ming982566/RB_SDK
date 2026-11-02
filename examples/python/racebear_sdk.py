@@ -1276,14 +1276,20 @@ class RaceBearSDK:
         raise MemoryError(f"Command result for {command!r} is larger than 1 MiB")
 
     def read_log(self) -> Optional[str]:
-        """弹出一条运行日志；队列为空时返回 None。"""
-        buffer = ctypes.create_string_buffer(4096)
-        rc = self._dll.RB_Log_Read(buffer, len(buffer))
-        if rc != RB_OK:
-            raise RaceBearError("RB_Log_Read", rc)
-        if not buffer.value:
-            return None
-        return buffer.value.decode("utf-8", errors="replace")
+        """成功读取才出队；容量不足扩容重试，空队列返回 None。"""
+        size = 4096
+        while size <= 1024 * 1024:
+            buffer = ctypes.create_string_buffer(size)
+            rc = self._dll.RB_Log_Read(buffer, len(buffer))
+            if rc == RB_BUFFER_TOO_SMALL:
+                size *= 2
+                continue
+            if rc != RB_OK:
+                raise RaceBearError("RB_Log_Read", rc)
+            if not buffer.value:
+                return None
+            return buffer.value.decode("utf-8", errors="replace")
+        raise MemoryError("SDK log exceeds the example's 1 MiB limit; record retained")
 
     def telemetry_index(self, key: str) -> int:
         """按 RaceBear 稳定 key 解析当前进程索引；持久化时保存 key。"""
