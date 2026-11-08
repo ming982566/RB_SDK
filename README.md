@@ -3,6 +3,13 @@
 RaceBear SDK is a Windows x64 C ABI SDK for building telemetry, motion,
 haptics, output, and dashboard frontend applications.
 
+## 0.6.4
+
+- The DLL reports runtime version `0.6.4`; the public header now includes
+  complete field, enum, callback, and handle comments for direct development.
+- The public ABI layout, function signatures, enum values, and object protocol
+  remain compatible with `0.6.3`.
+
 ## 0.6.3
 
 - The DLL reports runtime version `0.6.3`; the public package now includes the
@@ -142,7 +149,7 @@ Run the repository release script from `RB_SDK` after the SDK source, build
 outputs, documentation, and public repository status have been checked:
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.6.3
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.6.4
 ```
 
 The script uses the sibling `RaceBear_SDK` development directory by default.
@@ -201,7 +208,7 @@ the Microsoft Visual C++ 2015-2022 Redistributable x64.
 
 The Debug and Release package directories contain matching headers, import
 libraries, DLLs, runtime dependencies, and dashboard resources from the same
-verified 0.6.3 build.
+verified 0.6.4 build.
 
 ## Frontend Rules
 
