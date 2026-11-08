@@ -57,7 +57,7 @@ tasks during close. Offline service tests do not establish real device timing or
 - Verify overlapping RGB layers render in list-derived priority order. Reject segments exceeding
   the selected device's physical capabilities or documented logical mapping bounds; no universal 1-255 limit.
 - Verify static effects have no input selector, fixed inputs cannot be rebound, and ordinary inputs
-  come from `RB_Rgb_GetEffectInputCount/GetEffectInput`, including unsupported-source presentation.
+  come from `rb.rgb.get_effect_input_count/GetEffectInput`, including unsupported-source presentation.
 - Verify Seatbelt CAN selects the correct output instance and remains separate from global seatbelt effects.
 - Verify single left/right/center and dual active-node mapping, startup homing wait, old-firmware
   rejection, releasing/locked states, and user-initiated `RequestReenable`. Reconnect or ordinary

@@ -19,6 +19,11 @@
 #define RB_API extern "C" __declspec(dllimport)
 #endif
 
+// 旧业务入口只供 SDK 内部迁移阶段使用，不属于新的第三方公开 ABI。
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+#define RB_LEGACY_API extern "C"
+#endif
+
 #include <stdint.h>
 
 // 通用返回值。0 表示成功，负数表示失败。
@@ -1553,11 +1558,11 @@ struct RB_SystemConfig
 
 /**
  * @brief 获取 SDK 版本文本。
- * @return SDK 持有的 UTF-8、NUL 结尾字符串，例如 "0.6.4"；调用方不得修改或释放。
+ * @return SDK 持有的 UTF-8、NUL 结尾字符串，例如 "1.0.1"；调用方不得修改或释放。
  */
 RB_API const char* RB_Runtime_GetVersion();
 
-// 统一对象协议第一版；旧 ABI 全部保留，生命周期沿用 RB_Runtime_*。
+// 统一对象协议第一版；公开业务访问统一走对象入口，生命周期沿用 3 个 RB_Runtime_* 入口。
 enum RB_ObjectProtocol
 {
 	RB_OBJECT_BINARY = 1,             // 与目录 Schema 对应的公开结构体。
@@ -1650,7 +1655,9 @@ RB_API int RB_Object_GetLastError(char* buffer, int bufferSize, int* requiredByt
  * @return RB_OK 表示设置成功；RB_INVALID_ARGUMENT 表示名称无效；RB_ERROR 表示内部失败。
  * @note 必须在 RB_Runtime_Initialize() 之前调用。
  */
-RB_API int RB_Runtime_SetAppDataName(const char* name);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Runtime_SetAppDataName(const char* name);
+#endif
 
 /**
  * @brief 读取当前配置目录使用的应用名称。
@@ -1658,7 +1665,9 @@ RB_API int RB_Runtime_SetAppDataName(const char* name);
  * @param bufferSize buffer 的总容量，单位为字节且必须大于 0。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示缓冲区无效；RB_BUFFER_TOO_SMALL 表示容量不足；RB_ERROR 表示内部失败。
  */
-RB_API int RB_Runtime_GetAppDataName(char* buffer, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Runtime_GetAppDataName(char* buffer, int bufferSize);
+#endif
 
 /**
  * @brief 初始化授权服务、配置和全部后端运行态。
@@ -1680,78 +1689,102 @@ RB_API void RB_Runtime_Shutdown();
  * @return RB_OK 表示启动成功；RB_INVALID_ARGUMENT 表示间隔不合法；RB_ERROR 表示未初始化或调度线程启动失败。
  * @note 传入 2 表示约每 2 ms 计算一次；传入 1 表示约每 1 ms 计算一次。调度迟到时跳过旧周期，不连续补跑历史计算。
  */
-RB_API int RB_Runtime_StartLoop(int intervalMs);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Runtime_StartLoop(int intervalMs);
+#endif
 
 /**
  * @brief 暂停已启动的内部计算循环，但保留调度线程和当前频率。
  * @return RB_OK 表示已暂停；RB_ERROR 表示循环未启动或内部失败。
  */
-RB_API int RB_Runtime_PauseLoop();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Runtime_PauseLoop();
+#endif
 
 /**
  * @brief 恢复已暂停的内部计算循环。
  * @return RB_OK 表示已恢复；RB_ERROR 表示循环未启动或内部失败。
  */
-RB_API int RB_Runtime_ResumeLoop();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Runtime_ResumeLoop();
+#endif
 
 /**
  * @brief 停止并释放内部计算调度线程；未启动时调用也视为成功。
  * @return RB_OK 表示停止完成；RB_ERROR 表示内部失败。
  */
-RB_API int RB_Runtime_StopLoop();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Runtime_StopLoop();
+#endif
 
 /**
  * @brief 修改内部计算循环周期；循环未启动时只保存间隔，已启动时立即重建定时器。
  * @param intervalMs 计算周期间隔，单位毫秒；有效范围 1-1000 ms。
  * @return RB_OK 表示设置成功；RB_INVALID_ARGUMENT 表示间隔不合法；RB_ERROR 表示重建定时器失败。
  */
-RB_API int RB_Runtime_SetLoopIntervalMs(int intervalMs);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Runtime_SetLoopIntervalMs(int intervalMs);
+#endif
 
 /**
  * @brief 获取当前保存的内部计算循环周期间隔。
  * @return 成功时返回 1-1000 范围内的间隔，单位毫秒；内部失败时返回 RB_ERROR。
  */
-RB_API int RB_Runtime_GetLoopIntervalMs();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Runtime_GetLoopIntervalMs();
+#endif
 
 /**
  * @brief 查询内部计算调度线程是否已经启动。
  * @return 1 表示已启动，0 表示未启动；内部异常也返回 0。
  */
-RB_API int RB_Runtime_IsLoopRunning();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Runtime_IsLoopRunning();
+#endif
 
 /**
  * @brief 查询已启动的内部计算循环是否处于暂停状态。
  * @return 1 表示已暂停，0 表示未暂停或循环未启动；内部异常也返回 0。
  */
-RB_API int RB_Runtime_IsLoopPaused();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Runtime_IsLoopPaused();
+#endif
 
 /**
  * @brief 手动执行一次完整后端计算，仅供不使用内部循环的高级或调试场景。
  * @return RB_OK 表示计算成功；RB_ERROR 表示内部循环正在运行、已有计算尚未结束或本次计算失败。
  * @note 常规前端应调用 RB_Runtime_StartLoop()，不要自行定时调用本函数。
  */
-RB_API int RB_Runtime_DoCalculations();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Runtime_DoCalculations();
+#endif
 
 /**
  * @brief 原子读取前端高频刷新所需的完整运行态快照。
  * @param state 接收状态的结构体指针；SDK 会清零并填写 Size、Version 和全部成员。
  * @return RB_OK 表示读取成功；RB_INVALID_ARGUMENT 表示 state 为空；RB_ERROR 表示内部失败。
  */
-RB_API int RB_State_Read(RB_RuntimeState* state);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_State_Read(RB_RuntimeState* state);
+#endif
 
 /**
  * @brief 重新枚举当前连接的 RaceBear CANAPP 设备并刷新设备目录。
  * @return 成功时返回当前目录数量；失败返回负数。
  * @note 本阶段第三方只接入 ProtocolType=1 的 RB_CAN 设备。刷新后旧 CatalogIndex 和 EnumerationIndex 全部失效。
  */
-RB_API int RB_Can_RefreshDevices();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_RefreshDevices();
+#endif
 
 /**
  * @brief 返回最近一次 RB_Can_RefreshDevices() 建立的设备目录数量。
  * @return 大于等于 0 的设备数量；失败返回负数。
  * @note 本函数不重新扫描 USB。设备热插拔后应先显式刷新。
  */
-RB_API int RB_Can_GetDeviceCount();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_GetDeviceCount();
+#endif
 
 /**
  * @brief 读取最近一次设备目录中的一张 CANAPP 身份快照。
@@ -1760,7 +1793,9 @@ RB_API int RB_Can_GetDeviceCount();
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示参数或结构大小无效；RB_ERROR 表示目录项已失效或读取失败。
  * @note CatalogIndex 和 EnumerationIndex 只能用于当前目录快照，持久绑定必须保存 Uid。
  */
-RB_API int RB_Can_GetDeviceInfo(int catalogIndex, RB_CanDeviceInfo* info);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_GetDeviceInfo(int catalogIndex, RB_CanDeviceInfo* info);
+#endif
 
 /**
  * @brief 按稳定 MCU UID 设置一张 RB_CAN 设备的卡内逻辑索引。
@@ -1769,7 +1804,9 @@ RB_API int RB_Can_GetDeviceInfo(int catalogIndex, RB_CanDeviceInfo* info);
  * @return 0 表示写入并读回成功；负数表示设备离线、索引冲突、输出运行中或底层访问失败。
  * @note 这是明确的设备维护动作。请先断开相关输出，并由用户操作触发单次调用。
  */
-RB_API int RB_Can_SetDeviceLogicalIndex(const char* uid, int logicalIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_SetDeviceLogicalIndex(const char* uid, int logicalIndex);
+#endif
 
 /**
  * @brief 将一个 RB_CAN 输出实例稳定绑定到指定 UID 和逻辑索引。
@@ -1779,7 +1816,9 @@ RB_API int RB_Can_SetDeviceLogicalIndex(const char* uid, int logicalIndex);
  * @return 0 表示设备索引和输出绑定均已持久化；负数表示身份、协议、冲突、安全状态或写入失败。
  * @note 绑定完成后应重新刷新设备目录并读取 RB_Can_GetOutputBindingState() 确认，不要直接修改运行时枚举索引。
  */
-RB_API int RB_Can_BindOutputDevice(int outputIndex, const char* uid, int logicalIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_BindOutputDevice(int outputIndex, const char* uid, int logicalIndex);
+#endif
 
 /**
  * @brief 读取一个 CAN 输出与物理控制器的稳定绑定状态，包括独立 SEATBELT_CAN。
@@ -1788,40 +1827,64 @@ RB_API int RB_Can_BindOutputDevice(int outputIndex, const char* uid, int logical
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示参数或结构大小无效；RB_ERROR 表示输出不存在或不是有效 CAN 输出。
  * @note SEATBELT_CAN 按保存的 UID 查询缓存目录；绑定就绪不代表电机就绪或满足最低运行固件版本。
  */
-RB_API int RB_Can_GetOutputBindingState(int outputIndex, RB_CanOutputBindingState* state);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_GetOutputBindingState(int outputIndex, RB_CanOutputBindingState* state);
+#endif
 
 /** @brief 根据当前输出配置同步 CAN 控制器会话和绑定状态。 */
-RB_API int RB_Can_SyncControllerFromOutputConfig();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_SyncControllerFromOutputConfig();
+#endif
 
 /** @brief 读取 CAN 控制器状态文本。 */
-RB_API int RB_Can_GetControllerStatusText(char* buffer, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_GetControllerStatusText(char* buffer, int bufferSize);
+#endif
 
 /** @brief 读取当前 CAN 控制器管理的电机数量。 */
-RB_API int RB_Can_GetMotorCount();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_GetMotorCount();
+#endif
 
 /** @brief 读取当前 CAN 控制器管理的单个电机状态。 */
-RB_API int RB_Can_GetMotorState(int motorIndex, RB_CanMotorState* state);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_GetMotorState(int motorIndex, RB_CanMotorState* state);
+#endif
 
 /** @brief 读取全局 CAN 参数目录数量。 */
-RB_API int RB_Can_GetMotorParameterCount();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_GetMotorParameterCount();
+#endif
 
 /** @brief 设置参数维护使用的 CAN 波特率，支持 500 或 1000 Kbit/s。 */
-RB_API int RB_Can_SetMotorParameterCanBaudRate(int baudRateK);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_SetMotorParameterCanBaudRate(int baudRateK);
+#endif
 
 /** @brief 进入 CAN 电机参数维护模式，停止实时初始化/监控并保留参数 SDO 通道。 */
-RB_API int RB_Can_BeginMotorParameterMaintenance();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_BeginMotorParameterMaintenance();
+#endif
 
 /** @brief 退出 CAN 电机参数维护模式并请求重新初始化和回零。 */
-RB_API int RB_Can_EndMotorParameterMaintenance();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_EndMotorParameterMaintenance();
+#endif
 
 /** @brief 读取指定参数的显示名称。 */
-RB_API int RB_Can_GetMotorParameterName(int parameterIndex, char* buffer, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_GetMotorParameterName(int parameterIndex, char* buffer, int bufferSize);
+#endif
 
 /** @brief 读取指定电机按协议支持的参数数量。 */
-RB_API int RB_Can_GetMotorParameterCountForMotor(int motorIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_GetMotorParameterCountForMotor(int motorIndex);
+#endif
 
 /** @brief 返回当前电机的参数文件类型 RB_CAN/FM_CAN/FC_CAN/RDS_CAN；只查询定义，不访问设备。 */
-RB_API int RB_Can_GetMotorParameterProfileType(int motorIndex, char* buffer, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_GetMotorParameterProfileType(int motorIndex, char* buffer, int bufferSize);
+#endif
 
 /**
  * @brief 导出调用方提供的当前窗口原始参数值为 UTF-8 JSON .rbmotor 文件，不读取或写入设备。
@@ -1830,7 +1893,9 @@ RB_API int RB_Can_GetMotorParameterProfileType(int motorIndex, char* buffer, int
  * @param errorParameterIndex 可空；失败的 SDK 参数索引，无具体参数时为 -1。
  * @return RB_OK 成功；RB_INVALID_ARGUMENT 表示类型/数量/数值无效；RB_ERROR 表示文件操作失败。
  */
-RB_API int RB_Can_ExportMotorParameterPackage(int motorIndex, const int* values, int count, const char* packagePath, int* errorParameterIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_ExportMotorParameterPackage(int motorIndex, const int* values, int count, const char* packagePath, int* errorParameterIndex);
+#endif
 
 /**
  * @brief 完整校验同类型文件后返回参数草稿，不写设备；失败时两个输出数组保持不变。
@@ -1839,7 +1904,9 @@ RB_API int RB_Can_ExportMotorParameterPackage(int motorIndex, const int* values,
  * @param count 两个数组长度，必须等于该电机参数数量。
  * @param errorParameterIndex 可空；具体参数错误时返回 SDK 索引，其余为 -1。
  */
-RB_API int RB_Can_ImportMotorParameterPackage(int motorIndex, const char* packagePath, int* values, int* selected, int count, int* errorParameterIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_ImportMotorParameterPackage(int motorIndex, const char* packagePath, int* values, int* selected, int count, int* errorParameterIndex);
+#endif
 
 /** @brief 同步执行结果；调用前设置 Size=sizeof(RB_CanMotorParameterSyncResult)。 */
 struct RB_CanMotorParameterSyncResult
@@ -1860,37 +1927,59 @@ struct RB_CanMotorParameterSyncResult
  * @return RB_OK 成功，校验失败为 RB_INVALID_ARGUMENT，其它为设备或 SDK 错误。
  * @note 同步调用可能等待设备超时；失败可能已部分生效，不提供事务回滚。源电机不读写。
  */
-RB_API int RB_Can_SyncMotorParameters(int sourceMotorIndex, int targetMotorIndex, const int* values, const int* selected, int count, RB_CanMotorParameterSyncResult* result);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_SyncMotorParameters(int sourceMotorIndex, int targetMotorIndex, const int* values, const int* selected, int count, RB_CanMotorParameterSyncResult* result);
+#endif
 
 /** @brief 读取指定电机的参数能力位。 */
-RB_API int RB_Can_GetMotorParameterCapabilitiesForMotor(int motorIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_GetMotorParameterCapabilitiesForMotor(int motorIndex);
+#endif
 
 /** @brief 查询指定电机参数是否允许写入。 */
-RB_API int RB_Can_IsMotorParameterWritable(int motorIndex, int parameterIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_IsMotorParameterWritable(int motorIndex, int parameterIndex);
+#endif
 
 /** @brief 读取指定电机参数名称。 */
-RB_API int RB_Can_GetMotorParameterNameForMotor(int motorIndex, int parameterIndex, char* buffer, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_GetMotorParameterNameForMotor(int motorIndex, int parameterIndex, char* buffer, int bufferSize);
+#endif
 
 /** @brief 读取指定电机参数值。 */
-RB_API int RB_Can_ReadMotorParameter(int motorIndex, int parameterIndex, int* outValue);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_ReadMotorParameter(int motorIndex, int parameterIndex, int* outValue);
+#endif
 
 /** @brief 写入指定电机参数值。 */
-RB_API int RB_Can_WriteMotorParameter(int motorIndex, int parameterIndex, int value);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_WriteMotorParameter(int motorIndex, int parameterIndex, int value);
+#endif
 
 /** @brief 保存指定电机参数，可选择保存后重启电机。 */
-RB_API int RB_Can_SaveMotorParameters(int motorIndex, int rebootAfterSave);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_SaveMotorParameters(int motorIndex, int rebootAfterSave);
+#endif
 
 /** @brief 恢复指定电机参数默认值。 */
-RB_API int RB_Can_RestoreMotorParameters(int motorIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_RestoreMotorParameters(int motorIndex);
+#endif
 
 /** @brief 重启指定电机。 */
-RB_API int RB_Can_RebootMotor(int motorIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_RebootMotor(int motorIndex);
+#endif
 
 /** @brief 清除指定电机故障。 */
-RB_API int RB_Can_ClearMotorFault(int motorIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_ClearMotorFault(int motorIndex);
+#endif
 
 /** @brief 在电机参数维护模式中异步升级指定 RB 伺服驱动器固件。 */
-RB_API int RB_Can_StartServoFirmwareUpdate(int motorIndex, const char* binFilePath);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_StartServoFirmwareUpdate(int motorIndex, const char* binFilePath);
+#endif
 
 /**
  * @brief 返回指定 RB_CAN 输出当前管理的电机数量。
@@ -1898,7 +1987,9 @@ RB_API int RB_Can_StartServoFirmwareUpdate(int motorIndex, const char* binFilePa
  * @return 大于等于 0 的电机数量；参数无效或状态不可用时返回负数。
  * @note 电机目录属于该输出当前会话，重连或重新绑定后应重新取得数量。
  */
-RB_API int RB_Can_GetOutputMotorCount(int outputIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_GetOutputMotorCount(int outputIndex);
+#endif
 
 /**
  * @brief 读取指定 RB_CAN 输出中的一个电机状态。
@@ -1907,7 +1998,9 @@ RB_API int RB_Can_GetOutputMotorCount(int outputIndex);
  * @param state 接收电机状态的结构体指针。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示索引或指针无效；RB_ERROR 表示状态读取失败。
  */
-RB_API int RB_Can_GetOutputMotorState(int outputIndex, int motorIndex, RB_CanMotorState* state);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_GetOutputMotorState(int outputIndex, int motorIndex, RB_CanMotorState* state);
+#endif
 
 /**
  * @brief 读取指定 RB_CAN 输出的机器可读健康与恢复状态。
@@ -1915,7 +2008,9 @@ RB_API int RB_Can_GetOutputMotorState(int outputIndex, int motorIndex, RB_CanMot
  * @param state 接收健康快照；调用前把 Size 设为 sizeof(RB_CanOutputHealthState)。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示参数或结构大小无效；RB_ERROR 表示读取失败。
  */
-RB_API int RB_Can_GetOutputHealthState(int outputIndex, RB_CanOutputHealthState* state);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_GetOutputHealthState(int outputIndex, RB_CanOutputHealthState* state);
+#endif
 
 /**
  * @brief 向已连接并已武装的 CAN 运动输出提交一帧最新目标位置。
@@ -1925,7 +2020,9 @@ RB_API int RB_Can_GetOutputHealthState(int outputIndex, RB_CanOutputHealthState*
  * @return RB_OK 表示已提交到现有 latest-only 实时位置通道；RB_INVALID_ARGUMENT 表示参数无效；RB_ERROR 表示输出尚未 Ready、被安全状态阻断或提交失败。
  * @note 该接口只提交最新位置，不复制 CAN 协议，也不绕过现有急停、故障和自动恢复状态机。外部桥接程序必须持续发送，并在输入超时后主动发送停车位置或断开输出。
  */
-RB_API int RB_Can_SubmitPositions(int outputIndex, const int32_t* positions, int positionCount);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_SubmitPositions(int outputIndex, const int32_t* positions, int positionCount);
+#endif
 
 /**
  * @brief 设置指定 CAN 输出由外部宿主接管实时位置帧。
@@ -1934,12 +2031,16 @@ RB_API int RB_Can_SubmitPositions(int outputIndex, const int32_t* positions, int
  * @return RB_OK 表示设置成功；RB_INVALID_ARGUMENT 表示索引无效；RB_ERROR 表示会话不存在。
  * @note 仅用于 SimHub 等外部运动宿主；普通 SimRacebear 前端不应启用。
  */
-RB_API int RB_Can_SetExternalRealtimeMode(int outputIndex, int enabled);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_SetExternalRealtimeMode(int outputIndex, int enabled);
+#endif
 
 /**
  * @brief 查询指定 CAN 输出是否由外部宿主接管实时位置帧。
  */
-RB_API int RB_Can_IsExternalRealtimeMode(int outputIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_IsExternalRealtimeMode(int outputIndex);
+#endif
 
 /**
  * @brief 人工排除故障后显式清除指定输出的恢复限制并启动一次受控恢复。
@@ -1947,27 +2048,35 @@ RB_API int RB_Can_IsExternalRealtimeMode(int outputIndex);
  * @return RB_OK 表示恢复请求已接受；RB_INVALID_ARGUMENT 表示索引无效；RB_ERROR 表示安全条件或当前状态不允许恢复。
  * @note 仅由用户明确触发。返回成功不表示已经恢复运行，随后继续轮询健康快照。
  */
-RB_API int RB_Can_RequestOutputRecovery(int outputIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Can_RequestOutputRecovery(int outputIndex);
+#endif
 
 /**
  * @brief 打开 SDK 内置资源监视器窗口；重复调用会激活已经打开的窗口。
  * @return RB_OK 表示窗口已打开；RB_ERROR 表示窗口线程或窗口创建失败。
  * @note 可在 Debug 或 Release DLL 中使用。窗口只读取状态，不修改运行参数。
  */
-RB_API int RB_Debug_OpenMonitor();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Debug_OpenMonitor();
+#endif
 
 /**
  * @brief 关闭资源监视器窗口并等待其 UI 线程退出。
  * @return 无返回值。
  * @note RB_Runtime_Shutdown() 会自动调用本函数，宿主也可以提前关闭窗口。
  */
-RB_API void RB_Debug_CloseMonitor();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API void RB_Debug_CloseMonitor();
+#endif
 
 /**
  * @brief 查询资源监视器窗口是否已经打开。
  * @return 1 表示窗口已打开，0 表示窗口未打开。
  */
-RB_API int RB_Debug_IsMonitorOpen();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Debug_IsMonitorOpen();
+#endif
 
 /**
  * @brief 读取 SDK 支持的完整游戏目录。
@@ -1975,14 +2084,18 @@ RB_API int RB_Debug_IsMonitorOpen();
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示 catalog 为空；RB_ERROR 表示内部失败。
  * @note 第三方创建或选择游戏源时应使用 Items[i].GameKey，不要让用户手动输入完整游戏名。
  */
-RB_API int RB_Game_GetCatalog(RB_GameCatalog* catalog);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Game_GetCatalog(RB_GameCatalog* catalog);
+#endif
 
 /**
  * @brief 按稳定游戏 key 选择当前游戏并创建对应遥测源。
  * @param gameKey 来自 RB_GameCatalogItem::GameKey 的 UTF-8、NUL 结尾字符串。
  * @return RB_OK 表示已选择；RB_INVALID_ARGUMENT 表示 gameKey 为空或不存在；RB_ERROR 表示创建失败。
  */
-RB_API int RB_Game_SelectByKey(const char* gameKey);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Game_SelectByKey(const char* gameKey);
+#endif
 
 /**
  * @brief 按RaceBear稳定遥测key解析当前SDK运行时索引。
@@ -1990,53 +2103,79 @@ RB_API int RB_Game_SelectByKey(const char* gameKey);
  * @return 成功返回0到目录数量减1的索引；key不存在或参数无效时返回RB_INVALID_ARGUMENT。
  * @note 返回索引用于当前进程调用；持久化时保存 telemetryKey。
  */
-RB_API int RB_Telemetry_FindIndexByKey(const char* telemetryKey);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Telemetry_FindIndexByKey(const char* telemetryKey);
+#endif
 
 /**
  * @brief 按稳定遥测key取得MMF/UDP线协议FieldId。
  * @return 成功返回非负FieldId；key不存在时返回RB_INVALID_ARGUMENT。
  * @note FieldId可以写入客户游戏协议；运行时Index不能写入协议。
  */
-RB_API int RB_Telemetry_FindFieldIdByKey(const char* telemetryKey);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Telemetry_FindFieldIdByKey(const char* telemetryKey);
+#endif
 
 /** @brief 读取RaceBear遥测目录、稳定key、显示名、单位和当前源支持状态。 */
-RB_API int RB_Telemetry_GetCatalog(RB_TelemetryCatalog* catalog);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Telemetry_GetCatalog(RB_TelemetryCatalog* catalog);
+#endif
 
 /** @brief 读取指定运行时索引的原始输入遥测值；索引应通过RB_Telemetry_FindIndexByKey解析。 */
-RB_API double RB_Telemetry_GetRawValue(int telemetryIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API double RB_Telemetry_GetRawValue(int telemetryIndex);
+#endif
 
 /** @brief 读取指定运行时索引经过数据源过渡处理后的处理值。 */
-RB_API double RB_Telemetry_GetProcessedValue(int telemetryIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API double RB_Telemetry_GetProcessedValue(int telemetryIndex);
+#endif
 
 /**
  * @brief 创建并连接SDK外部游戏源，替换当前活动内置游戏源。
  * @return RB_OK表示成功；RB_INVALID_ARGUMENT表示结构版本或字段无效；RB_ERROR表示创建失败。
  */
-RB_API int RB_ExternalSource_Open(const RB_ExternalSourceDesc* desc);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_ExternalSource_Open(const RB_ExternalSourceDesc* desc);
+#endif
 
 /**
  * @brief 提交一帧完整外部遥测数据；函数只复制数据，不在调用线程执行平台计算。
  * @return RB_OK表示接收成功；RB_INVALID_ARGUMENT表示帧或值无效；RB_ERROR表示外部源未打开。
  */
-RB_API int RB_ExternalSource_SubmitFrame(const RB_ExternalTelemetryFrame* frame);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_ExternalSource_SubmitFrame(const RB_ExternalTelemetryFrame* frame);
+#endif
 
 /** @brief 读取当前外部游戏源状态。 */
-RB_API int RB_ExternalSource_GetState(RB_ExternalSourceState* state);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_ExternalSource_GetState(RB_ExternalSourceState* state);
+#endif
 
 /** @brief 关闭并释放外部游戏源；未打开时调用也安全。 */
-RB_API void RB_ExternalSource_Close();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API void RB_ExternalSource_Close();
+#endif
 
 /** @brief 注册或更新自定义游戏并持久化到CustomGamesV1.json。 */
-RB_API int RB_Game_RegisterCustom(const RB_CustomGameRegistration* registration);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Game_RegisterCustom(const RB_CustomGameRegistration* registration);
+#endif
 
 /** @brief 注销自定义游戏；内置游戏不能通过本接口删除。 */
-RB_API int RB_Game_UnregisterCustom(const char* gameKey);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Game_UnregisterCustom(const char* gameKey);
+#endif
 
 /** @brief 读取指定自定义游戏的注册和接收状态。 */
-RB_API int RB_Game_GetCustomState(const char* gameKey, RB_CustomGameState* state);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Game_GetCustomState(const char* gameKey, RB_CustomGameState* state);
+#endif
 
 /** @brief 重新读取CustomGamesV1.json并刷新游戏目录。 */
-RB_API int RB_Game_ReloadCustomRegistry();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Game_ReloadCustomRegistry();
+#endif
 
 /**
  * @brief 按固定数据 key 读取 UTF-8 JSON 包。
@@ -2045,7 +2184,9 @@ RB_API int RB_Game_ReloadCustomRegistry();
  * @param bufferSize buffer 的总容量，单位为字节且必须大于 0。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示 key 或缓冲区无效；RB_BUFFER_TOO_SMALL 表示容量不足；RB_ERROR 表示读取失败。
  */
-RB_API int RB_Data_ReadJson(const char* key, char* buffer, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Data_ReadJson(const char* key, char* buffer, int bufferSize);
+#endif
 
 /**
  * @brief 按固定配置 key 写入完整 UTF-8 JSON 配置文档。
@@ -2054,7 +2195,9 @@ RB_API int RB_Data_ReadJson(const char* key, char* buffer, int bufferSize);
  * @return RB_OK 表示写入成功；RB_INVALID_ARGUMENT 表示 key 或文本无效；RB_ERROR 表示保存失败。
  * @note 保存后是否需要执行 runtime.reloadConfig 命令，取决于对应配置的使用场景。
  */
-RB_API int RB_Data_WriteJson(const char* key, const char* jsonText);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Data_WriteJson(const char* key, const char* jsonText);
+#endif
 
 /**
  * @brief 读取指定游戏的遥测配置。
@@ -2062,7 +2205,9 @@ RB_API int RB_Data_WriteJson(const char* key, const char* jsonText);
  * @param config 接收配置的结构体指针。
  * @return RB_OK/CONFIG_SUCCESS 表示成功；负数表示失败或参数无效。
  */
-RB_API int RB_Game_ReadConfig(const char* gameName, RB_GameConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Game_ReadConfig(const char* gameName, RB_GameConfig* config);
+#endif
 
 /**
  * @brief 保存指定游戏的遥测配置。
@@ -2070,17 +2215,23 @@ RB_API int RB_Game_ReadConfig(const char* gameName, RB_GameConfig* config);
  * @param config 完整游戏配置结构体。
  * @return RB_OK/CONFIG_SUCCESS 表示成功；负数表示失败或参数无效。
  */
-RB_API int RB_Game_SaveConfig(const char* gameName, const RB_GameConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Game_SaveConfig(const char* gameName, const RB_GameConfig* config);
+#endif
 
 /**
  * @brief 重新扫描受支持游戏的安装目录和运行进程。
  * @return 大于等于 0 的安装信息数量；失败返回负数。
  * @note 扫描属于低频操作，只在启动、页面刷新或用户明确要求时调用。
  */
-RB_API int RB_Game_RefreshInstallations();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Game_RefreshInstallations();
+#endif
 
 /** @brief 返回最近一次安装扫描的条目数量；失败返回负数。 */
-RB_API int RB_Game_GetInstallCount();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Game_GetInstallCount();
+#endif
 
 /**
  * @brief 按扫描结果索引读取安装和运行状态。
@@ -2088,7 +2239,9 @@ RB_API int RB_Game_GetInstallCount();
  * @param info 接收完整安装信息的结构体指针。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示索引或指针无效。
  */
-RB_API int RB_Game_GetInstallInfo(int index, RB_GameInstallInfo* info);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Game_GetInstallInfo(int index, RB_GameInstallInfo* info);
+#endif
 
 /**
  * @brief 按稳定 gameKey 查找安装和运行状态。
@@ -2096,13 +2249,17 @@ RB_API int RB_Game_GetInstallInfo(int index, RB_GameInstallInfo* info);
  * @param info 接收安装信息的结构体指针。
  * @return RB_OK 表示找到安装目录或运行进程；RB_ERROR 表示未找到。
  */
-RB_API int RB_Game_FindInstallByKey(const char* gameKey, RB_GameInstallInfo* info);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Game_FindInstallByKey(const char* gameKey, RB_GameInstallInfo* info);
+#endif
 
 /**
  * @brief 按稳定 gameKey 读取游戏安装路径。
  * @return RB_OK、RB_BUFFER_TOO_SMALL、RB_INVALID_ARGUMENT 或 RB_ERROR。
  */
-RB_API int RB_Game_FindInstallPathByKey(const char* gameKey, char* buffer, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Game_FindInstallPathByKey(const char* gameKey, char* buffer, int bufferSize);
+#endif
 
 /**
  * @brief 按游戏目录索引和完整遥测配置创建或重新连接当前 Source。
@@ -2110,117 +2267,165 @@ RB_API int RB_Game_FindInstallPathByKey(const char* gameKey, char* buffer, int b
  * @param config 先由 RB_Game_ReadConfig() 读取并修改的完整配置。
  * @return RB_OK 表示 Source 已成功创建或连接；其他值表示配置或连接失败。
  */
-RB_API int RB_Game_AutoConnect(int catalogIndex, const RB_GameConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Game_AutoConnect(int catalogIndex, const RB_GameConfig* config);
+#endif
 
 /**
  * @brief 对当前游戏执行 SDK 内置的一键遥测配置。
  * @return RB_OK 表示游戏侧配置成功；RB_ERROR 表示当前游戏不支持或配置失败。
  */
-RB_API int RB_Game_AutoConfigureCurrent();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Game_AutoConfigureCurrent();
+#endif
 
 /**
  * @brief 为当前游戏安装 SDK 内置的游戏侧遥测插件。
  * @param gamePath UTF-8 游戏安装目录；应来自 RB_GameInstallInfo::InstallPath。
  * @return RB_OK 表示安装成功；其他值表示路径无效、不支持或安装失败。
  */
-RB_API int RB_Game_InstallCurrentPlugin(const char* gamePath);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Game_InstallCurrentPlugin(const char* gamePath);
+#endif
 
 /**
  * @brief 检查当前游戏侧配置是否与给定遥测配置匹配。
  * @return RB_OK 表示配置可用；RB_ERROR 表示缺失、不匹配或当前游戏不支持检查。
  */
-RB_API int RB_Game_CheckCurrentSideConfig(const RB_GameConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Game_CheckCurrentSideConfig(const RB_GameConfig* config);
+#endif
 
 /**
  * @brief 一次读取功能插件目录；目录刷新后旧索引失效。
  * @param catalog 接收插件目录的结构体指针；调用前零初始化。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示 catalog 为空。
  */
-RB_API int RB_Plugin_GetCatalog(RB_PluginCatalog* catalog);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Plugin_GetCatalog(RB_PluginCatalog* catalog);
+#endif
 
 /** @brief 重新扫描功能插件并返回插件数量；失败返回负数。 */
-RB_API int RB_Plugin_Refresh();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Plugin_Refresh();
+#endif
 
 /**
  * @brief 启动指定插件提供的前端程序。
  * @param pluginIndex 最近一次插件目录中的零基索引。
  * @return RB_OK 表示已启动；RB_ERROR 表示插件不可启动或启动失败。
  */
-RB_API int RB_Plugin_Launch(int pluginIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Plugin_Launch(int pluginIndex);
+#endif
 
 /**
  * @brief 启动全部功能插件后台运行态。
  * @return 大于等于 0 的已启动/已存在运行态数量；失败返回负数。
  */
-RB_API int RB_Plugin_StartRuntimes();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Plugin_StartRuntimes();
+#endif
 
 /**
  * @brief 读取系统配置；配置不存在时返回 SDK 默认值。
  */
-RB_API int RB_System_ReadConfigOrDefault(RB_SystemConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_System_ReadConfigOrDefault(RB_SystemConfig* config);
+#endif
 
 /**
  * @brief 保存系统配置。
  */
-RB_API int RB_System_SaveConfig(const RB_SystemConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_System_SaveConfig(const RB_SystemConfig* config);
+#endif
 
 /**
  * @brief 按平台索引读取平台结构和运行参数。
  */
-RB_API int RB_Platform_ReadConfigByIndex(int platformIndex, RB_PlatformConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_ReadConfigByIndex(int platformIndex, RB_PlatformConfig* config);
+#endif
 
 /**
  * @brief 按平台索引保存平台结构和运行参数。
  */
-RB_API int RB_Platform_SaveConfigByIndex(int platformIndex, const RB_PlatformConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_SaveConfigByIndex(int platformIndex, const RB_PlatformConfig* config);
+#endif
 /** @brief 导出指定平台的完整配置包。 */
-RB_API int RB_Platform_ExportPackage(int platformIndex, const char* packagePath);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_ExportPackage(int platformIndex, const char* packagePath);
+#endif
 /** @brief 导入平台配置包并覆盖包内 platformKey 对应的平台节点。 */
-RB_API int RB_Platform_ImportPackage(const char* packagePath, char* outPlatformKey, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_ImportPackage(const char* packagePath, char* outPlatformKey, int bufferSize);
+#endif
 
 /**
  * @brief 设置当前选中的平台状态缓存。
  */
-RB_API int RB_Platform_SetSelectedState(int platformIndex, const RB_PlatformConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_SetSelectedState(int platformIndex, const RB_PlatformConfig* config);
+#endif
 
 /**
  * @brief 将平台配置应用到当前运行中的平台模型。
  */
-RB_API int RB_Platform_ApplyRuntimeConfigToCurrentRig(const RB_PlatformConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_ApplyRuntimeConfigToCurrentRig(const RB_PlatformConfig* config);
+#endif
 
 /**
  * @brief 按平台索引读取 Motion 碰撞/异常保护配置。
  */
-RB_API int RB_Platform_ReadMotionProtectionConfigByIndex(int platformIndex, RB_MotionProtectionConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_ReadMotionProtectionConfigByIndex(int platformIndex, RB_MotionProtectionConfig* config);
+#endif
 
 /**
  * @brief 按平台索引保存 Motion 碰撞/异常保护配置。
  */
-RB_API int RB_Platform_SaveMotionProtectionConfigByIndex(int platformIndex, const RB_MotionProtectionConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_SaveMotionProtectionConfigByIndex(int platformIndex, const RB_MotionProtectionConfig* config);
+#endif
 
 /**
  * @brief 将 Motion 碰撞/异常保护配置热应用到当前运行中的 Rig。
  */
-RB_API int RB_Platform_ApplyMotionProtectionConfigToCurrentRig(const RB_MotionProtectionConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_ApplyMotionProtectionConfigToCurrentRig(const RB_MotionProtectionConfig* config);
+#endif
 
 /** @brief 读取六自由度结果保护 V2 配置，SDK 写入 Size/Version 和全部字段。 */
-RB_API int RB_Platform_ReadMotionProtectionConfigV2ByIndex(int platformIndex, RB_MotionProtectionConfigV2* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_ReadMotionProtectionConfigV2ByIndex(int platformIndex, RB_MotionProtectionConfigV2* config);
+#endif
 /** @brief 保存 V2 配置，Size 和 Version 必须正确，失败不部分保存。 */
-RB_API int RB_Platform_SaveMotionProtectionConfigV2ByIndex(int platformIndex, const RB_MotionProtectionConfigV2* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_SaveMotionProtectionConfigV2ByIndex(int platformIndex, const RB_MotionProtectionConfigV2* config);
+#endif
 /** @brief 热应用 V2 配置，需有效授权和当前 Rig。 */
-RB_API int RB_Platform_ApplyMotionProtectionConfigV2ToCurrentRig(const RB_MotionProtectionConfigV2* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_ApplyMotionProtectionConfigV2ToCurrentRig(const RB_MotionProtectionConfigV2* config);
+#endif
 
 /**
  * @brief 保存并应用指定平台配置到当前运行中的平台模型。
  */
-RB_API int RB_Platform_ApplyConfigToCurrentRig(int platformIndex, const RB_PlatformConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_ApplyConfigToCurrentRig(int platformIndex, const RB_PlatformConfig* config);
+#endif
 
 /**
  * @brief 返回 SDK 支持的平台数量。
  * @return 返回大于等于 0 的平台数量；初始化失败时返回 0。
  * @note 有效平台索引范围为 [0, 返回值)，索引仅用于当前 SDK 版本的目录访问。
  */
-RB_API int RB_Platform_GetCount();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_GetCount();
+#endif
 
 /**
  * @brief 按目录索引读取平台名称。
@@ -2229,7 +2434,9 @@ RB_API int RB_Platform_GetCount();
  * @param bufferSize buffer 的总字节数。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示索引或缓冲区无效。
  */
-RB_API int RB_Platform_GetName(int platformIndex, char* buffer, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_GetName(int platformIndex, char* buffer, int bufferSize);
+#endif
 
 /**
  * @brief 查询平台是否支持指定 6DOF。
@@ -2237,7 +2444,9 @@ RB_API int RB_Platform_GetName(int platformIndex, char* buffer, int bufferSize);
  * @param dofIndex DOF 索引，0-5 依次为 Sway/Surge/Heave/Yaw/Roll/Pitch。
  * @return 1 表示支持，0 表示不支持或参数无效。
  */
-RB_API int RB_Platform_IsDofSupported(int platformIndex, int dofIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_IsDofSupported(int platformIndex, int dofIndex);
+#endif
 
 /**
  * @brief 读取 L1-L7 几何参数的显示名称。
@@ -2247,7 +2456,9 @@ RB_API int RB_Platform_IsDofSupported(int platformIndex, int dofIndex);
  * @param bufferSize buffer 的总字节数。
  * @return RB_OK 表示调用成功；RB_INVALID_ARGUMENT 表示参数无效。
  */
-RB_API int RB_Platform_GetGeometryParameterName(int platformIndex, int geometryIndex, char* buffer, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_GetGeometryParameterName(int platformIndex, int geometryIndex, char* buffer, int bufferSize);
+#endif
 
 /**
  * @brief 读取 L8-L10 执行器行程参数的显示名称。
@@ -2257,29 +2468,41 @@ RB_API int RB_Platform_GetGeometryParameterName(int platformIndex, int geometryI
  * @param bufferSize buffer 的总字节数。
  * @return RB_OK 表示调用成功；RB_INVALID_ARGUMENT 表示参数无效。
  */
-RB_API int RB_Platform_GetStrokeParameterName(int platformIndex, int strokeIndex, char* buffer, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_GetStrokeParameterName(int platformIndex, int strokeIndex, char* buffer, int bufferSize);
+#endif
 
 /** @brief 读取当前持久化选择的平台零基索引；失败返回负数。 */
-RB_API int RB_Platform_ReadSelectedIndex();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_ReadSelectedIndex();
+#endif
 
 /** @brief 保存当前平台零基索引；返回 RB_OK 或错误码。 */
-RB_API int RB_Platform_SaveSelectedIndex(int platformIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_SaveSelectedIndex(int platformIndex);
+#endif
 
 /**
  * @brief 计算指定平台配置下某个 DOF 的正负预览范围。
  * @return 线性 DOF 返回毫米，旋转 DOF 返回度；不可达或参数无效时返回 0。
  */
-RB_API double RB_Platform_GetPreviewPoseLimit(int platformIndex, const RB_PlatformConfig* config, int dofIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API double RB_Platform_GetPreviewPoseLimit(int platformIndex, const RB_PlatformConfig* config, int dofIndex);
+#endif
 
 /** @brief 判断指定平台配置是否可以预览该 DOF；1=可以，0=不可达或参数无效。 */
-RB_API int RB_Platform_IsPreviewPosePossible(int platformIndex, const RB_PlatformConfig* config, int dofIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Platform_IsPreviewPosePossible(int platformIndex, const RB_PlatformConfig* config, int dofIndex);
+#endif
 
 /**
  * @brief 启用或关闭真实运行平台的手动姿态测试输入。
  * @param enabled 1=启用，0=关闭并恢复正常遥测输入。
  * @return RB_OK 表示状态已更新；RB_ERROR 表示运行平台尚未创建。
  */
-RB_API int RB_ManualPose_SetTestEnabled(int enabled);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_ManualPose_SetTestEnabled(int enabled);
+#endif
 
 /**
  * @brief 设置单个 DOF 的手动测试值。
@@ -2287,13 +2510,19 @@ RB_API int RB_ManualPose_SetTestEnabled(int enabled);
  * @param value 线性 DOF 单位 mm，旋转 DOF 单位度；应限制在 RB_Platform_GetPreviewPoseLimit() 返回范围内。
  * @return RB_OK 表示已设置；RB_INVALID_ARGUMENT 或 RB_ERROR 表示输入无效或平台不可用。
  */
-RB_API int RB_ManualPose_SetDrive(int dofIndex, double value);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_ManualPose_SetDrive(int dofIndex, double value);
+#endif
 
 /** @brief 将全部手动姿态输入复位为 0；返回 RB_OK 或 RB_ERROR。 */
-RB_API int RB_ManualPose_ResetDrive();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_ManualPose_ResetDrive();
+#endif
 
 /** @brief 读取单个 DOF 当前手动测试值；参数无效或平台不可用时返回 0。 */
-RB_API double RB_ManualPose_GetDrive(int dofIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API double RB_ManualPose_GetDrive(int dofIndex);
+#endif
 
 /**
  * @brief 按输出实例索引读取输出配置。
@@ -2302,9 +2531,13 @@ RB_API double RB_ManualPose_GetDrive(int dofIndex);
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示索引或指针无效；RB_ERROR 表示读取失败。
  * @note 编辑页面先读取完整结构体，再修改目标字段并保存，以保留未展示字段。
  */
-RB_API int RB_Output_ReadInstanceConfigByIndex(int instanceIndex, RB_OutputConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_ReadInstanceConfigByIndex(int instanceIndex, RB_OutputConfig* config);
+#endif
 /** @brief 读取指定输出实例的运行态配置缓存，不访问配置文件；适合状态栏和高频 UI 刷新。 */
-RB_API int RB_Output_GetInstanceConfigSnapshotByIndex(int instanceIndex, RB_OutputConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_GetInstanceConfigSnapshotByIndex(int instanceIndex, RB_OutputConfig* config);
+#endif
 
 /**
  * @brief 按输出实例索引保存输出配置。
@@ -2313,7 +2546,9 @@ RB_API int RB_Output_GetInstanceConfigSnapshotByIndex(int instanceIndex, RB_Outp
  * @return RB_OK 表示已保存；其他值表示参数无效或写入失败。
  * @note 修改 Port、IP、端口、CAN 索引等连接参数前，应先断开该实例。
  */
-RB_API int RB_Output_SaveInstanceConfigByIndex(int instanceIndex, const RB_OutputConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_SaveInstanceConfigByIndex(int instanceIndex, const RB_OutputConfig* config);
+#endif
 
 /**
  * @brief 按输出实例索引将输出配置应用到运行态。
@@ -2322,16 +2557,22 @@ RB_API int RB_Output_SaveInstanceConfigByIndex(int instanceIndex, const RB_Outpu
  * @return RB_OK 表示运行态已接受配置；其他值表示实例不存在或应用失败。
  * @note Apply 不表示用户要求立即连接，也不能替代 Save。
  */
-RB_API int RB_Output_ApplyInstanceConfigByIndex(int instanceIndex, const RB_OutputConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_ApplyInstanceConfigByIndex(int instanceIndex, const RB_OutputConfig* config);
+#endif
 
 /**
  * @brief 读取或保存 CAN 输出空闲下使能超时，单位秒；0 禁止自动下使能。
  * @note 不扩展 RB_OutputConfig；只有 RB_CAN/FM_CAN/FC_CAN 支持该设置，
  *       并且仅在输出配置的 AutoConnect 为 1 时执行。
  */
-RB_API int RB_Output_GetIdleDisableTimeoutSeconds(int instanceIndex, int* timeoutSeconds);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_GetIdleDisableTimeoutSeconds(int instanceIndex, int* timeoutSeconds);
+#endif
 /** @brief 设置指定 CAN 输出空闲下使能超时，单位秒；0 禁止自动下使能。 */
-RB_API int RB_Output_SetIdleDisableTimeoutSeconds(int instanceIndex, int timeoutSeconds);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_SetIdleDisableTimeoutSeconds(int instanceIndex, int timeoutSeconds);
+#endif
 
 /**
  * @brief 一次读取输出实例目录和当前可用于命令模板的输出 Key。
@@ -2339,20 +2580,26 @@ RB_API int RB_Output_SetIdleDisableTimeoutSeconds(int instanceIndex, int timeout
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示 catalog 为空。
  * @note Key 列表会随当前平台轴数和已创建功能变化，前端不要写死。
  */
-RB_API int RB_Output_GetCatalog(RB_OutputCatalog* catalog);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_GetCatalog(RB_OutputCatalog* catalog);
+#endif
 
 /**
  * @brief 返回当前输出实例数量。
  * @return 返回大于等于 0 的实例数量；初始化失败时返回 0。
  * @note 有效实例索引范围为 [0, 返回值)。
  */
-RB_API int RB_Output_GetInstanceCount();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_GetInstanceCount();
+#endif
 
 /**
  * @brief 返回 SDK 支持的输出类型数量。
  * @return 大于等于 0 的类型数量；初始化前也可以调用。
  */
-RB_API int RB_Output_GetKindCount();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_GetKindCount();
+#endif
 
 /**
  * @brief 按索引读取可传给 RB_Output_AddInstance() 的输出类型 key。
@@ -2361,177 +2608,239 @@ RB_API int RB_Output_GetKindCount();
  * @param bufferSize buffer 总字节数。
  * @return RB_OK、RB_BUFFER_TOO_SMALL 或 RB_INVALID_ARGUMENT。
  */
-RB_API int RB_Output_GetKind(int kindIndex, char* buffer, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_GetKind(int kindIndex, char* buffer, int bufferSize);
+#endif
 
 /**
  * @brief 读取安全带 CAN 默认配置。
  */
-RB_API int RB_SeatbeltCan_GetDefaultConfig(RB_SeatbeltCanConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_SeatbeltCan_GetDefaultConfig(RB_SeatbeltCanConfig* config);
+#endif
 
 /**
  * @brief 读取指定输出实例的安全带 CAN 配置。
  */
-RB_API int RB_SeatbeltCan_ReadConfig(int outputInstanceIndex, RB_SeatbeltCanConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_SeatbeltCan_ReadConfig(int outputInstanceIndex, RB_SeatbeltCanConfig* config);
+#endif
 
 /**
  * @brief 保存指定输出实例的安全带 CAN 配置。
  */
-RB_API int RB_SeatbeltCan_SaveConfig(int outputInstanceIndex, const RB_SeatbeltCanConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_SeatbeltCan_SaveConfig(int outputInstanceIndex, const RB_SeatbeltCanConfig* config);
+#endif
 
 /**
  * @brief 将安全带 CAN 配置应用到已创建但未连接的输出实例；安全带产品不依赖 SDK 主授权。
  */
-RB_API int RB_SeatbeltCan_ApplyConfig(int outputInstanceIndex, const RB_SeatbeltCanConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_SeatbeltCan_ApplyConfig(int outputInstanceIndex, const RB_SeatbeltCanConfig* config);
+#endif
 
 /**
  * @brief 读取指定安全带 CAN 输出实例的连接、回零和目标位置状态。
  */
-RB_API int RB_SeatbeltCan_GetState(int outputInstanceIndex, RB_SeatbeltCanState* state);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_SeatbeltCan_GetState(int outputInstanceIndex, RB_SeatbeltCanState* state);
+#endif
 
 /**
  * @brief 请求指定安全带 CAN 输出实例执行一次回零。
  */
-RB_API int RB_SeatbeltCan_RequestHoming(int outputInstanceIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_SeatbeltCan_RequestHoming(int outputInstanceIndex);
+#endif
 
 /** 显式重新启用已完成释放/停机的安全带会话。仍释放时拒绝提交，急停仍按下时固件拒绝恢复。
  * 仅提交异步请求，随后轮询RB_SeatbeltCan_GetState；RB_OK不表示已进入Ready。
  * 旧遥测/测试目标会作废，恢复后等待新的输入。 */
-RB_API int RB_SeatbeltCan_RequestReenable(int outputInstanceIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_SeatbeltCan_RequestReenable(int outputInstanceIndex);
+#endif
 
 /**
  * @brief 确保至少存在一个默认 Serial 输出实例。
  * @return RB_OK 表示配置已经存在或创建成功；负数表示初始化或写入失败。
  */
-RB_API int RB_Output_EnsureDefaultConfig();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_EnsureDefaultConfig();
+#endif
 
 /**
  * @brief 返回启用 AutoConnect 的输出实例数量。
  * @return 大于等于 0 的实例数量；失败按 0 处理并读取 SDK 日志。
  */
-RB_API int RB_Output_GetAutoConnectInstanceCount();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_GetAutoConnectInstanceCount();
+#endif
 
 /**
  * @brief 读取指定输出实例的稳定 key。
  * @return RB_OK、RB_BUFFER_TOO_SMALL 或 RB_INVALID_ARGUMENT。
  */
-RB_API int RB_Output_GetInstanceKey(int instanceIndex, char* buffer, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_GetInstanceKey(int instanceIndex, char* buffer, int bufferSize);
+#endif
 
 /**
  * @brief 添加输出实例。
  * @param outputKind "Serial"、"UDP"、"MMF"、"RB_CAN"、"FM_CAN"、"FC_CAN"、"RDS_CAN"、"SEATBELT_CAN"、"Sim-FAN" 或 "Vibration"。
  * @return 成功时返回新实例的零基索引；失败返回负数错误码。
  */
-RB_API int RB_Output_AddInstance(const char* outputKind);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_AddInstance(const char* outputKind);
+#endif
 
 /**
  * @brief 删除指定输出实例及其配置。
  * @note 删除前必须先断开实例；删除后后续实例索引可能变化，应刷新目录。
  */
-RB_API int RB_Output_DeleteInstanceByIndex(int instanceIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_DeleteInstanceByIndex(int instanceIndex);
+#endif
 
 /**
  * @brief 连接指定输出实例。
  * @param instanceIndex 输出实例零基索引。
  * @return RB_OK 表示连接流程已成功启动；其他值表示索引无效或启动失败。
  */
-RB_API int RB_Output_ConnectInstanceByIndex(int instanceIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_ConnectInstanceByIndex(int instanceIndex);
+#endif
 
 /**
  * @brief 查询指定输出实例是否已经连接。
  * @param instanceIndex 输出实例零基索引。
  * @return 1 表示已连接，0 表示未连接或索引无效。
  */
-RB_API int RB_Output_IsInstanceConnected(int instanceIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_IsInstanceConnected(int instanceIndex);
+#endif
 
 /**
  * @brief 查询指定实例是否已进入周期输出运行态。
  * @param instanceIndex 输出实例零基索引。
  * @return 1 表示正在周期输出；0 表示未运行或索引无效。
  */
-RB_API int RB_Output_IsInstanceRuntimeActive(int instanceIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_IsInstanceRuntimeActive(int instanceIndex);
+#endif
 
 /**
  * @brief 查询是否存在任意周期输出运行态。
  * @return 1 表示至少一个实例正在输出；0 表示全部未运行。
  */
-RB_API int RB_Output_IsAnyRuntimeActive();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_IsAnyRuntimeActive();
+#endif
 
 /**
  * @brief 断开指定输出实例。
  * @param instanceIndex 输出实例零基索引。
  * @return RB_OK 表示成功，其他值表示索引无效或断开失败。
  */
-RB_API int RB_Output_DisconnectInstanceByIndex(int instanceIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_DisconnectInstanceByIndex(int instanceIndex);
+#endif
 
 /**
  * @brief 连接全部输出实例。
  * @return 大于等于 0 表示成功发起连接的实例数量；负数表示整体操作失败。
  * @note 未授权时仅连接 `SEATBELT_CAN`、`Sim-FAN` 和 `Vibration` 独立输出；普通平台输出仍保持断开。
  */
-RB_API int RB_Output_ConnectAll();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_ConnectAll();
+#endif
 
 /**
  * @brief 只连接 AutoConnect=1 的输出实例。
  * @return 大于等于 0 表示成功发起连接的实例数量；负数表示整体操作失败。
  * @note 未授权时仅连接 `SEATBELT_CAN`、`Sim-FAN` 和 `Vibration` 独立输出；普通平台输出仍保持断开。
  */
-RB_API int RB_Output_ConnectAuto();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_ConnectAuto();
+#endif
 
 /**
  * @brief 断开全部输出实例。
  * @return 大于等于 0 表示成功发起断开的实例数量；负数表示整体操作失败。
  */
-RB_API int RB_Output_DisconnectAll();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_DisconnectAll();
+#endif
 
 /**
  * @brief 查询全部输出是否已完成断开。
  * @return 1 表示全部断开；0 表示仍有连接或正在执行断开状态机。
  */
-RB_API int RB_Output_AreAllDisconnected();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_AreAllDisconnected();
+#endif
 
 /**
  * @brief 请求全部输出按各自结束命令和状态机安全断开。
  * @return RB_OK 表示请求已提交；调用方应继续轮询 RB_Output_AreAllDisconnected()。
  */
-RB_API int RB_Output_RequestDisconnectAll();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Output_RequestDisconnectAll();
+#endif
 
 /**
  * @brief 按配置名读取 6DOF 动态配置。
  * @param profileName UTF-8 配置名，例如 "_Default"。
  * @param profile 接收完整配置的结构体指针。
  */
-RB_API int RB_Dynamic_ReadProfile(const char* profileName, RB_DynamicV2Profile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dynamic_ReadProfile(const char* profileName, RB_DynamicV2Profile* profile);
+#endif
 
 /**
  * @brief 按动态配置索引读取 6DOF 动态配置。
  */
-RB_API int RB_Dynamic_ReadProfileByIndex(int profileIndex, RB_DynamicV2Profile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dynamic_ReadProfileByIndex(int profileIndex, RB_DynamicV2Profile* profile);
+#endif
 
 /**
  * @brief 按动态配置索引保存 6DOF 动态配置。
  */
-RB_API int RB_Dynamic_SaveProfileByIndex(int profileIndex, const RB_DynamicV2Profile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dynamic_SaveProfileByIndex(int profileIndex, const RB_DynamicV2Profile* profile);
+#endif
 
 /**
  * @brief 按配置名保存 6DOF 动态配置。
  */
-RB_API int RB_Dynamic_SaveProfile(const char* profileName, const RB_DynamicV2Profile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dynamic_SaveProfile(const char* profileName, const RB_DynamicV2Profile* profile);
+#endif
 /** @brief 导出指定动态 profile 的 DynamicV2 与同名 MotionEffect 配置包。 */
-RB_API int RB_Dynamic_ExportPackage(int profileIndex, const char* packagePath);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dynamic_ExportPackage(int profileIndex, const char* packagePath);
+#endif
 /** @brief 导入动态配置包；profile 不存在时自动创建，存在时完整覆盖。 */
-RB_API int RB_Dynamic_ImportPackage(const char* packagePath, char* outProfileName, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dynamic_ImportPackage(const char* packagePath, char* outProfileName, int bufferSize);
+#endif
 
 /**
  * @brief 将动态配置应用到当前运行中的平台模型。
  */
-RB_API int RB_Dynamic_ApplyProfileToCurrentRig(const RB_DynamicV2Profile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dynamic_ApplyProfileToCurrentRig(const RB_DynamicV2Profile* profile);
+#endif
 
 /**
  * @brief 返回动态滤波配置数量。
  * @return 返回大于等于 0 的配置数量；初始化失败时返回 0。
  * @note 有效配置索引范围为 [0, 返回值)。
  */
-RB_API int RB_Dynamic_GetProfileCount();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dynamic_GetProfileCount();
+#endif
 
 /**
  * @brief 按索引读取动态滤波配置显示名称。
@@ -2540,7 +2849,9 @@ RB_API int RB_Dynamic_GetProfileCount();
  * @param bufferSize buffer 的总字节数。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示索引或缓冲区无效。
  */
-RB_API int RB_Dynamic_GetProfileName(int profileIndex, char* buffer, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dynamic_GetProfileName(int profileIndex, char* buffer, int bufferSize);
+#endif
 
 /**
  * @brief 读取指定目标 DOF 可以添加的输入通道效果目录。
@@ -2549,20 +2860,26 @@ RB_API int RB_Dynamic_GetProfileName(int profileIndex, char* buffer, int bufferS
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示索引或指针无效；RB_ERROR 表示目录读取失败。
  * @note 前端显示 Items[].Key，使用目录候选，并通过 Key 保持同一 DOF 中的输入唯一。
  */
-RB_API int RB_Dynamic_GetInputCandidateCatalog(int dofIndex, RB_DynamicInputCandidateCatalog* catalog);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dynamic_GetInputCandidateCatalog(int dofIndex, RB_DynamicInputCandidateCatalog* catalog);
+#endif
 
 /**
  * @brief 返回当前游戏绑定的动态配置索引。
  * @return 有效零基索引；无当前游戏、无绑定或读取失败时返回负数。
  */
-RB_API int RB_Dynamic_ReadCurrentGameProfileIndex();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dynamic_ReadCurrentGameProfileIndex();
+#endif
 
 /**
  * @brief 把指定动态配置索引绑定到当前游戏。
  * @param profileIndex 动态配置零基索引。
  * @return RB_OK 表示保存成功；其他值表示无当前游戏、索引无效或写入失败。
  */
-RB_API int RB_Dynamic_SaveCurrentGameProfileIndex(int profileIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dynamic_SaveCurrentGameProfileIndex(int profileIndex);
+#endif
 
 /**
  * @brief 删除指定动态配置及同名运动增强、震动配置。
@@ -2570,21 +2887,27 @@ RB_API int RB_Dynamic_SaveCurrentGameProfileIndex(int profileIndex);
  * @return RB_OK 表示删除成功；其他值表示索引无效或删除失败。
  * @note 删除后配置索引会变化，前端必须刷新配置目录。
  */
-RB_API int RB_Dynamic_DeleteProfileByIndex(int profileIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dynamic_DeleteProfileByIndex(int profileIndex);
+#endif
 
 /**
  * @brief 一次读取运动增强效果目录。
  * @param catalog 接收效果名称、说明和输出说明；调用前零初始化。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示 catalog 为空。
  */
-RB_API int RB_MotionEffect_GetCatalog(RB_EffectCatalog* catalog);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_MotionEffect_GetCatalog(RB_EffectCatalog* catalog);
+#endif
 
 /**
  * @brief 返回运动增强配置数量。
  * @return 大于等于 0 的配置数量；失败返回负数。
  * @note 运动增强拥有独立配置目录；索引只能与 RB_MotionEffect_GetProfileName() 配套使用，不能复用动态滤波索引。
  */
-RB_API int RB_MotionEffect_GetProfileCount();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_MotionEffect_GetProfileCount();
+#endif
 
 /**
  * @brief 按索引读取运动增强配置名。
@@ -2593,7 +2916,9 @@ RB_API int RB_MotionEffect_GetProfileCount();
  * @param bufferSize buffer 总字节数。
  * @return RB_OK、RB_BUFFER_TOO_SMALL 或 RB_INVALID_ARGUMENT。
  */
-RB_API int RB_MotionEffect_GetProfileName(int profileIndex, char* buffer, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_MotionEffect_GetProfileName(int profileIndex, char* buffer, int bufferSize);
+#endif
 
 /**
  * @brief 删除指定名称的运动增强配置。
@@ -2601,49 +2926,67 @@ RB_API int RB_MotionEffect_GetProfileName(int profileIndex, char* buffer, int bu
  * @return RB_OK 表示删除成功；其他值表示名称无效或删除失败。
  * @note 本函数只删除运动增强配置；动态滤波和震动配置不受影响。
  */
-RB_API int RB_MotionEffect_DeleteProfile(const char* profileName);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_MotionEffect_DeleteProfile(const char* profileName);
+#endif
 
 /**
  * @brief 按配置名读取运动增强配置。
  */
-RB_API int RB_MotionEffect_ReadProfile(const char* profileName, RB_MotionEffectProfile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_MotionEffect_ReadProfile(const char* profileName, RB_MotionEffectProfile* profile);
+#endif
 
 /**
  * @brief 按配置索引读取运动增强配置。
  */
-RB_API int RB_MotionEffect_ReadProfileByIndex(int profileIndex, RB_MotionEffectProfile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_MotionEffect_ReadProfileByIndex(int profileIndex, RB_MotionEffectProfile* profile);
+#endif
 
 /**
  * @brief 按配置名保存运动增强配置。
  */
-RB_API int RB_MotionEffect_SaveProfile(const char* profileName, const RB_MotionEffectProfile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_MotionEffect_SaveProfile(const char* profileName, const RB_MotionEffectProfile* profile);
+#endif
 
 /**
  * @brief 按配置索引保存运动增强配置。
  */
-RB_API int RB_MotionEffect_SaveProfileByIndex(int profileIndex, const RB_MotionEffectProfile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_MotionEffect_SaveProfileByIndex(int profileIndex, const RB_MotionEffectProfile* profile);
+#endif
 
 /**
  * @brief 将运动增强配置应用到当前运行中的平台模型。
  */
-RB_API int RB_MotionEffect_ApplyProfileToCurrentRig(const RB_MotionEffectProfile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_MotionEffect_ApplyProfileToCurrentRig(const RB_MotionEffectProfile* profile);
+#endif
 
 /**
  * @brief 读取指定运动增强效果的默认参数。
  */
-RB_API int RB_MotionEffect_GetDefaultConfig(int effectIndex, RB_MotionEffectConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_MotionEffect_GetDefaultConfig(int effectIndex, RB_MotionEffectConfig* config);
+#endif
 
 /**
  * @brief 一次读取震动效果目录。
  * @param catalog 接收目录的结构体指针；调用前零初始化。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示 catalog 为空。
  */
-RB_API int RB_Haptic_GetCatalog(RB_EffectCatalog* catalog);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Haptic_GetCatalog(RB_EffectCatalog* catalog);
+#endif
 
 /**
  * @brief 按配置名读取震动效果配置。
  */
-RB_API int RB_Haptic_ReadProfile(const char* profileName, RB_HapticEffectProfile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Haptic_ReadProfile(const char* profileName, RB_HapticEffectProfile* profile);
+#endif
 
 /**
  * @brief 按动态配置索引读取同名震动配置。
@@ -2652,12 +2995,16 @@ RB_API int RB_Haptic_ReadProfile(const char* profileName, RB_HapticEffectProfile
  * @return RB_OK 表示成功；其他值表示索引无效或读取失败。
  * @note 缺少同名配置时读取默认配置。
  */
-RB_API int RB_Haptic_ReadProfileByIndex(int profileIndex, RB_HapticEffectProfile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Haptic_ReadProfileByIndex(int profileIndex, RB_HapticEffectProfile* profile);
+#endif
 
 /**
  * @brief 按配置名保存震动效果配置。
  */
-RB_API int RB_Haptic_SaveProfile(const char* profileName, const RB_HapticEffectProfile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Haptic_SaveProfile(const char* profileName, const RB_HapticEffectProfile* profile);
+#endif
 
 /**
  * @brief 按动态配置索引保存同名震动配置。
@@ -2665,7 +3012,9 @@ RB_API int RB_Haptic_SaveProfile(const char* profileName, const RB_HapticEffectP
  * @param profile 要保存的完整震动配置。
  * @return RB_OK 表示保存成功；其他值表示参数无效或写入失败。
  */
-RB_API int RB_Haptic_SaveProfileByIndex(int profileIndex, const RB_HapticEffectProfile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Haptic_SaveProfileByIndex(int profileIndex, const RB_HapticEffectProfile* profile);
+#endif
 
 /**
  * @brief 将震动配置应用到当前运行态。
@@ -2673,7 +3022,9 @@ RB_API int RB_Haptic_SaveProfileByIndex(int profileIndex, const RB_HapticEffectP
  * @return RB_OK 表示应用成功；Haptic 不依赖 SDK 主授权。
  * @note Apply 不写配置文件。
  */
-RB_API int RB_Haptic_ApplyProfileToCurrentFunction(const RB_HapticEffectProfile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Haptic_ApplyProfileToCurrentFunction(const RB_HapticEffectProfile* profile);
+#endif
 
 /**
  * @brief 读取指定震动效果的默认参数。
@@ -2681,27 +3032,37 @@ RB_API int RB_Haptic_ApplyProfileToCurrentFunction(const RB_HapticEffectProfile*
  * @param config 接收默认参数的结构体指针。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示索引或指针无效。
  */
-RB_API int RB_Haptic_GetDefaultConfig(int effectIndex, RB_HapticEffectConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Haptic_GetDefaultConfig(int effectIndex, RB_HapticEffectConfig* config);
+#endif
 
 /**
  * @brief 读取默认风感配置。
  */
-RB_API int RB_Wind_GetDefaultConfig(RB_WindEffectConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Wind_GetDefaultConfig(RB_WindEffectConfig* config);
+#endif
 
 /**
  * @brief 读取当前风感配置。
  */
-RB_API int RB_Wind_ReadConfig(RB_WindEffectConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Wind_ReadConfig(RB_WindEffectConfig* config);
+#endif
 
 /**
  * @brief 保存风感配置。
  */
-RB_API int RB_Wind_SaveConfig(const RB_WindEffectConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Wind_SaveConfig(const RB_WindEffectConfig* config);
+#endif
 
 /**
  * @brief 将风感配置应用到当前运行中的风感功能；Wind 不依赖 SDK 主授权。
  */
-RB_API int RB_Wind_ApplyConfigToCurrentFunction(const RB_WindEffectConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Wind_ApplyConfigToCurrentFunction(const RB_WindEffectConfig* config);
+#endif
 
 /**
  * @brief 启用或关闭风感测试输出。
@@ -2709,27 +3070,37 @@ RB_API int RB_Wind_ApplyConfigToCurrentFunction(const RB_WindEffectConfig* confi
  * @param outputPercent 四通道统一测试输出，范围 0-100%。
  * @return RB_OK 表示测试状态已更新；Wind 不依赖 SDK 主授权。
  */
-RB_API int RB_Wind_SetTestOutput(int enabled, double outputPercent);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Wind_SetTestOutput(int enabled, double outputPercent);
+#endif
 
 /**
  * @brief 读取默认安全带配置。
  */
-RB_API int RB_Seatbelt_GetDefaultConfig(RB_SeatbeltEffectConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Seatbelt_GetDefaultConfig(RB_SeatbeltEffectConfig* config);
+#endif
 
 /**
  * @brief 读取当前安全带配置。
  */
-RB_API int RB_Seatbelt_ReadConfig(RB_SeatbeltEffectConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Seatbelt_ReadConfig(RB_SeatbeltEffectConfig* config);
+#endif
 
 /**
  * @brief 保存安全带配置。
  */
-RB_API int RB_Seatbelt_SaveConfig(const RB_SeatbeltEffectConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Seatbelt_SaveConfig(const RB_SeatbeltEffectConfig* config);
+#endif
 
 /**
  * @brief 将安全带配置应用到当前运行中的安全带功能；安全带产品不依赖 SDK 主授权。
  */
-RB_API int RB_Seatbelt_ApplyConfigToCurrentFunction(const RB_SeatbeltEffectConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Seatbelt_ApplyConfigToCurrentFunction(const RB_SeatbeltEffectConfig* config);
+#endif
 
 /**
  * @brief 启用或关闭左右安全带测试输出；安全带产品不依赖 SDK 主授权。
@@ -2738,64 +3109,112 @@ RB_API int RB_Seatbelt_ApplyConfigToCurrentFunction(const RB_SeatbeltEffectConfi
  * @param rightPercent 右通道测试输出，范围 0-100%。
  * @return RB_OK 表示测试状态已更新；其他值表示运行态不可用。
  */
-RB_API int RB_Seatbelt_SetTestOutput(int enabled, double leftPercent, double rightPercent);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Seatbelt_SetTestOutput(int enabled, double leftPercent, double rightPercent);
+#endif
 
 /** @brief 刷新 RGBAPP WinUSB 设备目录并返回设备数量。 */
-RB_API int RB_Rgb_RefreshDevices();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_RefreshDevices();
+#endif
 /** @brief 返回最近一次刷新后的 RGBAPP 设备数量。 */
-RB_API int RB_Rgb_GetDeviceCount();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_GetDeviceCount();
+#endif
 /** @brief 读取设备目录项；index 为零基目录索引。 */
-RB_API int RB_Rgb_GetDeviceInfo(int index, RB_RgbDeviceInfo* info);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_GetDeviceInfo(int index, RB_RgbDeviceInfo* info);
+#endif
 /** @brief 按稳定 MCU UID 连接 RGBAPP；RGB 产品不依赖 SDK 主授权。 */
-RB_API int RB_Rgb_Connect(const char* uid);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_Connect(const char* uid);
+#endif
 /** @brief 熄灭并断开当前 RGBAPP。 */
-RB_API void RB_Rgb_Disconnect();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API void RB_Rgb_Disconnect();
+#endif
 /** @brief 读取连接或应用配置时更新的内存快照，不访问 USB；适合 UI 页面刷新。 */
-RB_API int RB_Rgb_GetDeviceConfigSnapshot(RB_RgbDeviceConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_GetDeviceConfigSnapshot(RB_RgbDeviceConfig* config);
+#endif
 /** @brief 读取设备当前四路灯带与功率保护配置。 */
-RB_API int RB_Rgb_ReadDeviceConfig(RB_RgbDeviceConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_ReadDeviceConfig(RB_RgbDeviceConfig* config);
+#endif
 /** @brief 将灯带配置应用到设备运行态，不写 Flash；RGB 产品不依赖 SDK 主授权。 */
-RB_API int RB_Rgb_ApplyDeviceConfig(const RB_RgbDeviceConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_ApplyDeviceConfig(const RB_RgbDeviceConfig* config);
+#endif
 /** @brief 将设备当前灯带配置明确保存到 Flash。 */
-RB_API int RB_Rgb_SaveDeviceConfig();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_SaveDeviceConfig();
+#endif
 /** @brief 返回指定效果可选择的语义输入数量；静态色返回 0。 */
-RB_API int RB_Rgb_GetEffectInputCount(int effectType);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_GetEffectInputCount(int effectType);
+#endif
 /** @brief 按效果类型和候选索引读取语义输入；RPM和换挡效果返回固定输入。 */
-RB_API int RB_Rgb_GetEffectInput(int effectType, int inputIndex, RB_RgbEffectInputItem* item);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_GetEffectInput(int effectType, int inputIndex, RB_RgbEffectInputItem* item);
+#endif
 /** @brief 读取默认遥测 RGB 效果配置。 */
-RB_API int RB_Rgb_GetDefaultEffectProfile(RB_RgbEffectProfile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_GetDefaultEffectProfile(RB_RgbEffectProfile* profile);
+#endif
 /** @brief 从 ExtraEffectsV2.json 读取 RGB 效果配置。 */
-RB_API int RB_Rgb_ReadEffectProfile(RB_RgbEffectProfile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_ReadEffectProfile(RB_RgbEffectProfile* profile);
+#endif
 /** @brief 明确保存 RGB 效果配置；不会自动连接设备。 */
-RB_API int RB_Rgb_SaveEffectProfile(const RB_RgbEffectProfile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_SaveEffectProfile(const RB_RgbEffectProfile* profile);
+#endif
 /** @brief 将 RGB 效果配置应用到当前运行态；Apply 不读取或写入配置文件，且不依赖 SDK 主授权。 */
-RB_API int RB_Rgb_ApplyEffectProfile(const RB_RgbEffectProfile* profile);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_ApplyEffectProfile(const RB_RgbEffectProfile* profile);
+#endif
 /** @brief 读取内存中的 RGB 运行状态，不访问配置文件或设备。 */
-RB_API int RB_Rgb_GetState(RB_RgbState* state);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_GetState(RB_RgbState* state);
+#endif
 /** @brief 设置固件测试图案和 RGB888 颜色；RGB 产品的诊断和正常输出均不依赖 SDK 主授权。 */
-RB_API int RB_Rgb_SetTestPattern(int pattern, int red, int green, int blue);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_SetTestPattern(int pattern, int red, int green, int blue);
+#endif
 /** @brief 立即请求设备熄灭。 */
-RB_API int RB_Rgb_Blackout();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_Blackout();
+#endif
 /** @brief 主动向设备读取一次诊断快照。 */
-RB_API int RB_Rgb_ReadDiagnostics(RB_RgbDiagnostics* diagnostics);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_ReadDiagnostics(RB_RgbDiagnostics* diagnostics);
+#endif
 /**
  * @brief 按稳定 UID 异步更新 RGBAPP 的 APP 固件。
  * @param uid 24 个十六进制字符的 MCU UID；设备可处于 APP 或 IAP 模式。
  * @param binFilePath RGBAPP APP `.bin` 文件路径。SDK 在擦除前校验大小、向量地址和 CRC。
  * @return RB_OK 表示后台任务已启动；RB_INVALID_ARGUMENT 表示参数无效；RB_ERROR 表示已有任务或运行态不可用。
  */
-RB_API int RB_Rgb_StartAppFirmwareUpdate(const char* uid, const char* binFilePath);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_StartAppFirmwareUpdate(const char* uid, const char* binFilePath);
+#endif
 /**
  * @brief 按稳定 UID 异步更新 RGBAPP 的 Stage-1/IAP 固件。
  * @param uid 24 个十六进制字符的 MCU UID；目标必须当前处于 APP 模式。
  * @param binFilePath RGBAPP_IAP `.bin` 文件路径。SDK 会校验 Stage-1 向量、清单、大小和 CRC。
  * @return RB_OK 表示后台任务已启动；RB_INVALID_ARGUMENT 表示参数或镜像无效；RB_ERROR 表示设备或运行态不可用。
  */
-RB_API int RB_Rgb_StartIapFirmwareUpdate(const char* uid, const char* binFilePath);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_StartIapFirmwareUpdate(const char* uid, const char* binFilePath);
+#endif
 /** @brief 读取 RGBAPP APP 固件更新内存状态。 */
-RB_API int RB_Rgb_GetFirmwareUpdateState(RB_RgbFirmwareUpdateState* state);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_GetFirmwareUpdateState(RB_RgbFirmwareUpdateState* state);
+#endif
 /** @brief 返回 RGBAPP APP 固件更新线程当前是否运行。 */
-RB_API int RB_Rgb_IsFirmwareUpdateRunning();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Rgb_IsFirmwareUpdateRunning();
+#endif
 
 /**
  * @brief 执行统一动作命令，并可返回命令结果 JSON。
@@ -2805,7 +3224,9 @@ RB_API int RB_Rgb_IsFirmwareUpdateRunning();
  * @param resultBufferSize resultBuffer 的总容量，单位为字节；传入缓冲区时必须大于 0。
  * @return RB_OK 表示命令执行成功；RB_INVALID_ARGUMENT 表示命令或参数无效/不支持；RB_BUFFER_TOO_SMALL 表示结果缓冲区不足；RB_ERROR 表示命令执行失败。
  */
-RB_API int RB_Command_Run(const char* command, const char* argsJson, char* resultBuffer, int resultBufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Command_Run(const char* command, const char* argsJson, char* resultBuffer, int resultBufferSize);
+#endif
 
 /**
  * @brief 从 SDK 运行日志队列中弹出一条日志文本。
@@ -2815,7 +3236,9 @@ RB_API int RB_Command_Run(const char* command, const char* argsJson, char* resul
  *       无效参数不消耗日志。日志队列应由单一消费者读取，成功后再取对应类型。
  * @return RB_OK 表示读取完成；RB_INVALID_ARGUMENT 表示缓冲区无效；RB_BUFFER_TOO_SMALL 表示容量不足；RB_ERROR 表示内部失败。
  */
-RB_API int RB_Log_Read(char* buffer, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Log_Read(char* buffer, int bufferSize);
+#endif
 
 
 // VOCORE USB 仪表屏。画面发送在独立线程中执行，不阻塞 SDK 后端 Loop。
@@ -2825,7 +3248,9 @@ RB_API int RB_Log_Read(char* buffer, int bufferSize);
  * @return 大于或等于 0 表示设备数量；libusb 运行库不可用或枚举失败时返回 RB_ERROR。
  * @note SDK 目录必须同时存在 VS2019 x64 版 libusb-1.0.dll，设备需安装 VOCORE 官方 LibUSBK 驱动。
  */
-RB_API int RB_VoCore_GetDeviceCount();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_VoCore_GetDeviceCount();
+#endif
 
 /**
  * @brief 按当前枚举索引读取 VOCORE 屏幕信息。
@@ -2833,7 +3258,9 @@ RB_API int RB_VoCore_GetDeviceCount();
  * @param info 调用方结构体；调用前必须将 Size 设为 sizeof(RB_VoCoreDeviceInfo)。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示参数或索引无效；RB_ERROR 表示设备无法访问。
  */
-RB_API int RB_VoCore_GetDeviceInfo(int index, RB_VoCoreDeviceInfo* info);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_VoCore_GetDeviceInfo(int index, RB_VoCoreDeviceInfo* info);
+#endif
 
 /**
  * @brief 打开一块 VOCORE 屏幕并启动独立发送线程。
@@ -2842,14 +3269,18 @@ RB_API int RB_VoCore_GetDeviceInfo(int index, RB_VoCoreDeviceInfo* info);
  * @param handle 接收新句柄的指针；成功后由调用方负责调用 RB_VoCore_Close()。
  * @return RB_OK 表示线程已启动；RB_INVALID_ARGUMENT 表示 handle 为空；RB_ERROR 表示设备打开失败且未启用自动重连。
  */
-RB_API int RB_VoCore_Open(const char* deviceId, int autoReconnect, RB_VoCoreHandle* handle);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_VoCore_Open(const char* deviceId, int autoReconnect, RB_VoCoreHandle* handle);
+#endif
 
 /**
  * @brief 停止发送线程、释放 USB 接口并销毁 VOCORE 句柄。
  * @param handle RB_VoCore_Open() 返回的句柄；nullptr 会被忽略。
  * @note 调用后句柄立即失效；不得与同一句柄的其他接口并发调用。
  */
-RB_API void RB_VoCore_Close(RB_VoCoreHandle handle);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API void RB_VoCore_Close(RB_VoCoreHandle handle);
+#endif
 
 /**
  * @brief 异步提交一帧完整画面，尚未发送的旧帧会被最新帧覆盖。
@@ -2863,8 +3294,10 @@ RB_API void RB_VoCore_Close(RB_VoCoreHandle handle);
  * @param rotation 顺时针旋转角度，只允许 0、90、180、270。
  * @return RB_OK 表示画面已进入最新帧队列；RB_INVALID_ARGUMENT 表示尺寸、格式或句柄无效；RB_LICENSE_REQUIRED 表示授权输出已锁定。
  */
-RB_API int RB_VoCore_SubmitFrame(RB_VoCoreHandle handle, const void* pixels, int dataSize,
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_VoCore_SubmitFrame(RB_VoCoreHandle handle, const void* pixels, int dataSize,
 	int width, int height, int stride, int pixelFormat, int rotation);
+#endif
 
 /**
  * @brief 设置 VOCORE 背光亮度。
@@ -2872,7 +3305,9 @@ RB_API int RB_VoCore_SubmitFrame(RB_VoCoreHandle handle, const void* pixels, int
  * @param brightness 亮度，范围 0-255；命令由发送线程异步执行。
  * @return RB_OK 表示设置已排队；RB_INVALID_ARGUMENT 表示句柄或亮度无效。
  */
-RB_API int RB_VoCore_SetBrightness(RB_VoCoreHandle handle, int brightness);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_VoCore_SetBrightness(RB_VoCoreHandle handle, int brightness);
+#endif
 
 /**
  * @brief 运行时启用或关闭设备自动重连。
@@ -2880,7 +3315,9 @@ RB_API int RB_VoCore_SetBrightness(RB_VoCoreHandle handle, int brightness);
  * @param enabled 1=启用，0=关闭。
  * @return RB_OK 表示设置完成；RB_INVALID_ARGUMENT 表示句柄无效。
  */
-RB_API int RB_VoCore_SetAutoReconnect(RB_VoCoreHandle handle, int enabled);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_VoCore_SetAutoReconnect(RB_VoCoreHandle handle, int enabled);
+#endif
 
 /**
  * @brief 读取 VOCORE 连接状态、实际 FPS 和帧统计。
@@ -2888,20 +3325,30 @@ RB_API int RB_VoCore_SetAutoReconnect(RB_VoCoreHandle handle, int enabled);
  * @param state 调用方结构体；调用前必须将 Size 设为 sizeof(RB_VoCoreState)。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示句柄、结构体或 Size 无效。
  */
-RB_API int RB_VoCore_GetState(RB_VoCoreHandle handle, RB_VoCoreState* state);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_VoCore_GetState(RB_VoCoreHandle handle, RB_VoCoreState* state);
+#endif
 
 /** @brief 启动浏览器仪表 HTTP 服务。 */
-RB_API int RB_DashboardWeb_Open(const RB_DashboardWebConfig* config, RB_DashboardWebHandle* handle);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_DashboardWeb_Open(const RB_DashboardWebConfig* config, RB_DashboardWebHandle* handle);
+#endif
 
 /** @brief 停止浏览器仪表服务并释放所有客户端连接。 */
-RB_API void RB_DashboardWeb_Close(RB_DashboardWebHandle handle);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API void RB_DashboardWeb_Close(RB_DashboardWebHandle handle);
+#endif
 
 /** @brief 异步提交一帧 BGRA8888 画面；尚未编码的旧帧会被覆盖。 */
-RB_API int RB_DashboardWeb_SubmitFrame(RB_DashboardWebHandle handle, const void* pixels, int dataSize,
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_DashboardWeb_SubmitFrame(RB_DashboardWebHandle handle, const void* pixels, int dataSize,
 	int width, int height, int stride, int pixelFormat, int rotation);
+#endif
 
 /** @brief 读取 Web 服务、客户端和编码统计。 */
-RB_API int RB_DashboardWeb_GetState(RB_DashboardWebHandle handle, RB_DashboardWebState* state);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_DashboardWeb_GetState(RB_DashboardWebHandle handle, RB_DashboardWebState* state);
+#endif
 
 /**
  * @brief 使用SDK内置模板生成一帧BGRA8888仪表画面。
@@ -2914,41 +3361,65 @@ RB_API int RB_DashboardWeb_GetState(RB_DashboardWebHandle handle, RB_DashboardWe
  * @return RB_OK表示生成成功；RB_INVALID_ARGUMENT表示参数、尺寸或模板无效；RB_ERROR表示GDI资源创建失败。
  * @note 本函数只生成画面，不执行USB发送；生成结果可直接交给RB_VoCore_SubmitFrame()。
  */
-RB_API int RB_Dashboard_RenderFrame(const RB_RuntimeState* state, void* pixels, int width, int height, int stride, int templateIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dashboard_RenderFrame(const RB_RuntimeState* state, void* pixels, int width, int height, int stride, int templateIndex);
+#endif
 
 /** @brief 重新扫描内置和用户 .rbdash 模板；返回模板数量或负数错误码。 */
-RB_API int RB_Dashboard_RefreshPackages();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dashboard_RefreshPackages();
+#endif
 
 /** @brief 返回最近一次扫描得到的客户仪表模板数量。 */
-RB_API int RB_Dashboard_GetPackageCount();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dashboard_GetPackageCount();
+#endif
 
 /** @brief 按目录索引读取客户仪表模板信息。 */
-RB_API int RB_Dashboard_GetPackageInfo(int index, RB_DashboardPackageInfo* info);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dashboard_GetPackageInfo(int index, RB_DashboardPackageInfo* info);
+#endif
 
 /** @brief 按稳定模板 ID 打开客户仪表并创建缓存渲染句柄。 */
-RB_API int RB_Dashboard_OpenPackage(const char* packageId, RB_DashboardPackageHandle* handle);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dashboard_OpenPackage(const char* packageId, RB_DashboardPackageHandle* handle);
+#endif
 
 /** @brief 关闭客户仪表句柄并释放图片、字体和绑定缓存。 */
-RB_API void RB_Dashboard_ClosePackage(RB_DashboardPackageHandle handle);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API void RB_Dashboard_ClosePackage(RB_DashboardPackageHandle handle);
+#endif
 
 /** @brief 设置客户仪表当前页面。 */
-RB_API int RB_Dashboard_SetPackagePage(RB_DashboardPackageHandle handle, int pageIndex);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dashboard_SetPackagePage(RB_DashboardPackageHandle handle, int pageIndex);
+#endif
 
 /** @brief 使用客户仪表模板生成一帧 BGRA8888 画面。 */
-RB_API int RB_Dashboard_RenderPackageFrame(RB_DashboardPackageHandle handle, const RB_RuntimeState* state,
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dashboard_RenderPackageFrame(RB_DashboardPackageHandle handle, const RB_RuntimeState* state,
 	void* pixels, int width, int height, int stride);
+#endif
 
 /** @brief 读取客户仪表句柄状态和渲染统计。 */
-RB_API int RB_Dashboard_GetPackageState(RB_DashboardPackageHandle handle, RB_DashboardPackageState* state);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dashboard_GetPackageState(RB_DashboardPackageHandle handle, RB_DashboardPackageState* state);
+#endif
 
 /** @brief 将外部 .rbdash 文件导入当前 AppDataName 的用户仪表目录。 */
-RB_API int RB_Dashboard_ImportPackage(const char* sourcePath, char* packageIdBuffer, int packageIdBufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dashboard_ImportPackage(const char* sourcePath, char* packageIdBuffer, int packageIdBufferSize);
+#endif
 
 /** @brief 删除当前 AppDataName 用户目录中的指定模板；内置模板不能删除。 */
-RB_API int RB_Dashboard_DeletePackage(const char* packageId);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dashboard_DeletePackage(const char* packageId);
+#endif
 
 /** @brief 返回当前 AppDataName 的用户仪表目录 UTF-8 路径。 */
-RB_API int RB_Dashboard_GetUserPackageDirectory(char* buffer, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Dashboard_GetUserPackageDirectory(char* buffer, int bufferSize);
+#endif
 
 
 
@@ -2958,7 +3429,9 @@ RB_API int RB_Dashboard_GetUserPackageDirectory(char* buffer, int bufferSize);
  * @brief 枚举当前系统可用串口的数量。
  * @return 成功时返回大于或等于 0 的端口数量；内部失败时返回 RB_ERROR。
  */
-RB_API int RB_Serial_GetAvailablePortCount();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_GetAvailablePortCount();
+#endif
 
 /**
  * @brief 按枚举索引读取一个串口的完整设备信息。
@@ -2966,13 +3439,17 @@ RB_API int RB_Serial_GetAvailablePortCount();
  * @param info 接收信息的结构体指针；SDK 会先清零整个结构体。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示 info 为空；RB_ERROR 表示索引无效或枚举失败。
  */
-RB_API int RB_Serial_GetAvailablePortInfo(int index, RB_SerialPortInfo* info);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_GetAvailablePortInfo(int index, RB_SerialPortInfo* info);
+#endif
 
 /**
  * @brief 获取 SDK 内部串口库版本文本。
  * @return 串口库持有的 NUL 结尾字符串；调用方不得修改或释放。
  */
-RB_API const char* RB_Serial_GetVersion();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API const char* RB_Serial_GetVersion();
+#endif
 
 // 串口对象生命周期和连接。
 
@@ -2981,7 +3458,9 @@ RB_API const char* RB_Serial_GetVersion();
  * @return 成功时返回有效 RB_SerialHandle；内存分配或内部初始化失败时返回 nullptr。
  * @note 每个成功创建的句柄最终都必须交给 RB_Serial_Destroy()。
  */
-RB_API RB_SerialHandle RB_Serial_Create();
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API RB_SerialHandle RB_Serial_Create();
+#endif
 
 /**
  * @brief 断开事件、关闭端口并销毁串口对象。
@@ -2989,7 +3468,9 @@ RB_API RB_SerialHandle RB_Serial_Create();
  * @return 无返回值。
  * @note 调用后句柄立即失效，不得再次使用；销毁时不得有并发读写或回调注册操作。
  */
-RB_API void RB_Serial_Destroy(RB_SerialHandle handle);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API void RB_Serial_Destroy(RB_SerialHandle handle);
+#endif
 
 /**
  * @brief 使用 8 数据位、无校验、1 停止位、无流控和 4096 字节读缓冲初始化串口参数。
@@ -2999,7 +3480,9 @@ RB_API void RB_Serial_Destroy(RB_SerialHandle handle);
  * @return RB_OK 表示参数已设置；RB_INVALID_ARGUMENT 表示句柄或端口名无效；RB_ERROR 表示内部失败。
  * @note 本函数只配置对象，不会打开串口；随后调用 RB_Serial_Open()。
  */
-RB_API int RB_Serial_Init(RB_SerialHandle handle, const char* portName, int baudRate);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_Init(RB_SerialHandle handle, const char* portName, int baudRate);
+#endif
 
 /**
  * @brief 使用完整通信参数初始化串口对象。
@@ -3014,28 +3497,36 @@ RB_API int RB_Serial_Init(RB_SerialHandle handle, const char* portName, int baud
  * @return RB_OK 表示参数已设置；RB_INVALID_ARGUMENT 表示句柄或端口名无效；RB_ERROR 表示参数设置失败。
  * @note 本函数只配置对象，不会打开串口；随后调用 RB_Serial_Open()。
  */
-RB_API int RB_Serial_InitEx(RB_SerialHandle handle, const char* portName, int baudRate, int parity, int dataBits, int stopBits, int flowControl, unsigned int readBufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_InitEx(RB_SerialHandle handle, const char* portName, int baudRate, int parity, int dataBits, int stopBits, int flowControl, unsigned int readBufferSize);
+#endif
 
 /**
  * @brief 按已初始化的参数打开串口。
  * @param handle 已通过 RB_Serial_Init() 或 RB_Serial_InitEx() 配置的有效句柄。
  * @return RB_OK 表示打开成功；RB_INVALID_ARGUMENT 表示句柄无效；RB_ERROR 表示设备打开失败。
  */
-RB_API int RB_Serial_Open(RB_SerialHandle handle);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_Open(RB_SerialHandle handle);
+#endif
 
 /**
  * @brief 关闭串口连接但保留对象及其配置。
  * @param handle 有效串口句柄；nullptr 会被忽略。
  * @return 无返回值。
  */
-RB_API void RB_Serial_Close(RB_SerialHandle handle);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API void RB_Serial_Close(RB_SerialHandle handle);
+#endif
 
 /**
  * @brief 查询串口当前是否已打开。
  * @param handle 有效串口句柄。
  * @return 1 表示已打开，0 表示未打开、句柄无效或内部失败。
  */
-RB_API int RB_Serial_IsOpen(RB_SerialHandle handle);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_IsOpen(RB_SerialHandle handle);
+#endif
 
 // 串口读写。此组函数成功时返回字节数，失败时返回负数，不使用“0 表示成功”的 RB_Result 约定。
 
@@ -3046,7 +3537,9 @@ RB_API int RB_Serial_IsOpen(RB_SerialHandle handle);
  * @param size 请求写入的字节数，必须大于 0。
  * @return 大于或等于 0 表示实际写入字节数；负数表示参数、连接或写入失败，可调用 RB_Serial_GetLastError() 查询原因。
  */
-RB_API int RB_Serial_Write(RB_SerialHandle handle, const void* data, int size);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_Write(RB_SerialHandle handle, const void* data, int size);
+#endif
 
 /**
  * @brief 按当前超时配置读取最多 size 字节；异步模式下从内部队列读取并等待所需数据。
@@ -3055,7 +3548,9 @@ RB_API int RB_Serial_Write(RB_SerialHandle handle, const void* data, int size);
  * @param size 缓冲区容量及请求字节数，必须大于 0。
  * @return 大于或等于 0 表示实际读取字节数；负数表示参数、连接或读取失败。
  */
-RB_API int RB_Serial_Read(RB_SerialHandle handle, void* data, int size);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_Read(RB_SerialHandle handle, void* data, int size);
+#endif
 
 /**
  * @brief 非强制满量读取当前可用数据，最多读取 size 字节。
@@ -3064,7 +3559,9 @@ RB_API int RB_Serial_Read(RB_SerialHandle handle, void* data, int size);
  * @param size 缓冲区容量，必须大于 0。
  * @return 正数表示读取字节数，0 表示当前无数据，负数表示参数、连接或读取失败。
  */
-RB_API int RB_Serial_ReadSome(RB_SerialHandle handle, void* data, int size);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_ReadSome(RB_SerialHandle handle, void* data, int size);
+#endif
 
 /**
  * @brief 读取当前已经可用的全部数据，但最多写入 size 字节。
@@ -3073,7 +3570,9 @@ RB_API int RB_Serial_ReadSome(RB_SerialHandle handle, void* data, int size);
  * @param size 缓冲区容量，必须大于 0。
  * @return 正数表示读取字节数，0 表示当前无数据，负数表示参数、连接或读取失败。
  */
-RB_API int RB_Serial_ReadAll(RB_SerialHandle handle, void* data, int size);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_ReadAll(RB_SerialHandle handle, void* data, int size);
+#endif
 
 /**
  * @brief 读取到指定分隔符或缓冲区上限，并在结果末尾写入 NUL；分隔符不写入结果。
@@ -3083,14 +3582,18 @@ RB_API int RB_Serial_ReadAll(RB_SerialHandle handle, void* data, int size);
  * @param delimiter 行结束分隔符，例如 '\n'。
  * @return 大于或等于 0 表示结果文本字节数，不包含 NUL；负数表示参数、连接或读取失败。
  */
-RB_API int RB_Serial_ReadLine(RB_SerialHandle handle, void* data, int size, char delimiter);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_ReadLine(RB_SerialHandle handle, void* data, int size, char delimiter);
+#endif
 
 /**
  * @brief 获取当前可立即读取的字节数；异步模式下返回内部队列长度。
  * @param handle 已打开的有效串口句柄。
  * @return 当前可读字节数；0 可能表示暂无数据，也可能表示句柄无效、端口未打开或查询失败。
  */
-RB_API unsigned int RB_Serial_GetReadBufferUsedLen(RB_SerialHandle handle);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API unsigned int RB_Serial_GetReadBufferUsedLen(RB_SerialHandle handle);
+#endif
 
 // 串口事件。
 
@@ -3102,14 +3605,18 @@ RB_API unsigned int RB_Serial_GetReadBufferUsedLen(RB_SerialHandle handle);
  * @return RB_OK 表示注册成功；RB_INVALID_ARGUMENT 表示句柄或回调为空；RB_ERROR 表示注册失败。
  * @note userData 指向的对象必须至少存活到断开回调或销毁串口对象。
  */
-RB_API int RB_Serial_ConnectReadEvent(RB_SerialHandle handle, RB_SerialReadCallback callback, void* userData);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_ConnectReadEvent(RB_SerialHandle handle, RB_SerialReadCallback callback, void* userData);
+#endif
 
 /**
  * @brief 断开串口可读事件回调并释放内部适配器。
  * @param handle 有效串口句柄。
  * @return RB_OK 表示断开成功；RB_INVALID_ARGUMENT 表示句柄无效；RB_ERROR 表示断开失败。
  */
-RB_API int RB_Serial_DisconnectReadEvent(RB_SerialHandle handle);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_DisconnectReadEvent(RB_SerialHandle handle);
+#endif
 
 /**
  * @brief 注册系统串口热插拔事件回调。
@@ -3118,14 +3625,18 @@ RB_API int RB_Serial_DisconnectReadEvent(RB_SerialHandle handle);
  * @param userData 调用方上下文指针，SDK 不解析并在回调时原样传回，可为 nullptr。
  * @return RB_OK 表示注册成功；RB_INVALID_ARGUMENT 表示句柄或回调为空；RB_ERROR 表示注册失败。
  */
-RB_API int RB_Serial_ConnectHotPlugEvent(RB_SerialHandle handle, RB_SerialHotPlugCallback callback, void* userData);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_ConnectHotPlugEvent(RB_SerialHandle handle, RB_SerialHotPlugCallback callback, void* userData);
+#endif
 
 /**
  * @brief 断开系统串口热插拔事件回调并释放内部适配器。
  * @param handle 有效串口句柄。
  * @return RB_OK 表示断开成功；RB_INVALID_ARGUMENT 表示句柄无效；RB_ERROR 表示断开失败。
  */
-RB_API int RB_Serial_DisconnectHotPlugEvent(RB_SerialHandle handle);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_DisconnectHotPlugEvent(RB_SerialHandle handle);
+#endif
 
 // 串口常用参数、重连和错误信息。
 
@@ -3135,7 +3646,9 @@ RB_API int RB_Serial_DisconnectHotPlugEvent(RB_SerialHandle handle);
  * @param operateMode RB_SerialOperateMode 中的值。
  * @return RB_OK 表示设置成功；RB_INVALID_ARGUMENT 表示句柄无效；RB_ERROR 表示内部失败。
  */
-RB_API int RB_Serial_SetOperateMode(RB_SerialHandle handle, int operateMode);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_SetOperateMode(RB_SerialHandle handle, int operateMode);
+#endif
 
 /**
  * @brief 启用或关闭串口断线自动重连。
@@ -3143,14 +3656,18 @@ RB_API int RB_Serial_SetOperateMode(RB_SerialHandle handle, int operateMode);
  * @param enabled 0 表示关闭，非 0 表示启用。
  * @return RB_OK 表示设置成功；RB_INVALID_ARGUMENT 表示句柄无效；RB_ERROR 表示内部失败。
  */
-RB_API int RB_Serial_SetAutoReconnectEnabled(RB_SerialHandle handle, int enabled);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_SetAutoReconnectEnabled(RB_SerialHandle handle, int enabled);
+#endif
 
 /**
  * @brief 查询串口自动重连是否启用。
  * @param handle 有效串口句柄。
  * @return 1 表示启用，0 表示关闭、句柄无效或内部失败。
  */
-RB_API int RB_Serial_IsAutoReconnectEnabled(RB_SerialHandle handle);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_IsAutoReconnectEnabled(RB_SerialHandle handle);
+#endif
 
 /**
  * @brief 设置自动重连尝试间隔。
@@ -3158,21 +3675,27 @@ RB_API int RB_Serial_IsAutoReconnectEnabled(RB_SerialHandle handle);
  * @param milliseconds 重连间隔，单位毫秒。
  * @return RB_OK 表示设置成功；RB_INVALID_ARGUMENT 表示句柄无效；RB_ERROR 表示内部失败。
  */
-RB_API int RB_Serial_SetAutoReconnectInterval(RB_SerialHandle handle, unsigned int milliseconds);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_SetAutoReconnectInterval(RB_SerialHandle handle, unsigned int milliseconds);
+#endif
 
 /**
  * @brief 获取自动重连尝试间隔。
  * @param handle 有效串口句柄。
  * @return 重连间隔，单位毫秒；句柄无效或内部失败时返回 0。
  */
-RB_API unsigned int RB_Serial_GetAutoReconnectInterval(RB_SerialHandle handle);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API unsigned int RB_Serial_GetAutoReconnectInterval(RB_SerialHandle handle);
+#endif
 
 /**
  * @brief 不等待下一次自动重连周期，立即执行一次重连尝试。
  * @param handle 有效串口句柄。
  * @return RB_OK 表示重连成功；RB_INVALID_ARGUMENT 表示句柄无效；RB_ERROR 表示重连失败。
  */
-RB_API int RB_Serial_TryReconnectNow(RB_SerialHandle handle);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_TryReconnectNow(RB_SerialHandle handle);
+#endif
 
 /**
  * @brief 设置串口读写超时参数。
@@ -3180,7 +3703,9 @@ RB_API int RB_Serial_TryReconnectNow(RB_SerialHandle handle);
  * @param config 非空超时配置指针，各字段语义与 Windows COMMTIMEOUTS 对应。
  * @return RB_OK 表示设置成功；RB_INVALID_ARGUMENT 表示句柄或 config 为空；RB_ERROR 表示内部失败。
  */
-RB_API int RB_Serial_SetTimeoutConfig(RB_SerialHandle handle, const RB_SerialTimeoutConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_SetTimeoutConfig(RB_SerialHandle handle, const RB_SerialTimeoutConfig* config);
+#endif
 
 /**
  * @brief 读取串口当前读写超时参数。
@@ -3188,7 +3713,9 @@ RB_API int RB_Serial_SetTimeoutConfig(RB_SerialHandle handle, const RB_SerialTim
  * @param config 接收超时配置的非空结构体指针。
  * @return RB_OK 表示读取成功；RB_INVALID_ARGUMENT 表示句柄或 config 为空；RB_ERROR 表示内部失败。
  */
-RB_API int RB_Serial_GetTimeoutConfig(RB_SerialHandle handle, RB_SerialTimeoutConfig* config);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_GetTimeoutConfig(RB_SerialHandle handle, RB_SerialTimeoutConfig* config);
+#endif
 
 /**
  * @brief 设置串口 DTR 控制线状态。
@@ -3196,7 +3723,9 @@ RB_API int RB_Serial_GetTimeoutConfig(RB_SerialHandle handle, RB_SerialTimeoutCo
  * @param set 0 表示清除 DTR，非 0 表示置位 DTR。
  * @return RB_OK 表示操作已提交；RB_INVALID_ARGUMENT 表示句柄无效；RB_ERROR 表示内部失败。
  */
-RB_API int RB_Serial_SetDtr(RB_SerialHandle handle, int set);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_SetDtr(RB_SerialHandle handle, int set);
+#endif
 
 /**
  * @brief 设置串口 RTS 控制线状态。
@@ -3204,7 +3733,9 @@ RB_API int RB_Serial_SetDtr(RB_SerialHandle handle, int set);
  * @param set 0 表示清除 RTS，非 0 表示置位 RTS。
  * @return RB_OK 表示操作已提交；RB_INVALID_ARGUMENT 表示句柄无效；RB_ERROR 表示内部失败。
  */
-RB_API int RB_Serial_SetRts(RB_SerialHandle handle, int set);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_SetRts(RB_SerialHandle handle, int set);
+#endif
 
 /**
  * @brief 获取该串口对象最近一次底层操作的错误码。
@@ -3212,7 +3743,9 @@ RB_API int RB_Serial_SetRts(RB_SerialHandle handle, int set);
  * @return 有效句柄时返回串口库错误码，0 通常表示无错误；句柄无效返回 RB_INVALID_ARGUMENT，内部异常返回 RB_ERROR。
  * @note 返回值属于串口库错误码域，不应按 RB_Result 解释。
  */
-RB_API int RB_Serial_GetLastError(RB_SerialHandle handle);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_GetLastError(RB_SerialHandle handle);
+#endif
 
 /**
  * @brief 获取该串口对象最近一次底层操作的错误说明。
@@ -3221,4 +3754,6 @@ RB_API int RB_Serial_GetLastError(RB_SerialHandle handle);
  * @param bufferSize buffer 的总容量，单位为字节且必须大于 0。
  * @return RB_OK 表示读取成功；RB_INVALID_ARGUMENT 表示句柄或缓冲区无效；RB_BUFFER_TOO_SMALL 表示容量不足；RB_ERROR 表示内部失败。
  */
-RB_API int RB_Serial_GetLastErrorMsg(RB_SerialHandle handle, char* buffer, int bufferSize);
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+RB_LEGACY_API int RB_Serial_GetLastErrorMsg(RB_SerialHandle handle, char* buffer, int bufferSize);
+#endif

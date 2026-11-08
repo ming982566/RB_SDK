@@ -30,7 +30,7 @@ platform outputs, and other protected surfaces only; do not use it as a
 global switch for RGB, seatbelt, Haptic, or Wind pages.
 
 For the optional unified object ABI, read `docs/RaceBearSDK_OBJECT_API.md` first.
-Protocol v1 registers 9 state/draft objects, 29 native synchronous service domains, and 20 asynchronous actions; all legacy exports remain.
+Protocol v1 registers 9 state/draft objects, 29 native synchronous service domains, and 20 asynchronous actions. The public DLL exposes only the 10 unified ABI entries.
 Use the directory's actual coverage, caller-owned buffers, revision-checked shared drafts,
 and retained task results. High-frequency telemetry uses a binary whole-frame snapshot.
 Use `docs/RaceBearSDK_SERVICE_API.md` to map all 265 public business operations to native
@@ -56,7 +56,7 @@ Keep the implementation scoped to the requested pages and SDK-defined configurat
 For each requested workflow, record the page/container, public APIs, writable and preserved
 fields, dependencies, implementation state, and actual validation evidence. Treat planning,
 code complete, build passed, offline passed, and hardware passed as distinct facts.
-Do not turn every public helper or legacy export into a button or equate API counts with completion.
+Do not turn every service operation into a button or equate API counts with completion.
 
 Read [references/feature-routing.md](references/feature-routing.md) to map each page to the correct public API family and authoritative documentation section.
 
@@ -91,7 +91,7 @@ Read [references/dashboard-output.md](references/dashboard-output.md) whenever t
 - Build the adapter from `include/RaceBearSDK.h` and the documented public exports.
 - Persist stable keys and IDs; treat runtime telemetry indexes, catalog rows, device enumeration indexes, and refreshed plugin indexes as snapshot-local values.
 - Identify an RB_CAN device by `Uid` and its unique logical index. `CatalogIndex` and `EnumerationIndex` remain valid only for the current device snapshot.
-- Identify an RGBAPP by `RB_RgbDeviceInfo::Uid`; keep device-directory indexes snapshot-local. Populate ordinary effect inputs through `RB_Rgb_GetEffectInputCount/GetEffectInput` for the selected effect type; reserve the full telemetry catalog for expert diagnostics.
+- Identify an RGBAPP by the `Uid` field in the RGB device service result; keep device-directory indexes snapshot-local. Populate ordinary effect inputs through the RGB service operations for the selected effect type; reserve the full telemetry catalog for expert diagnostics.
 - Model RGB lighting as independent segmented layers. Show 1-based inclusive start/end LED controls, convert them to `StartPixel/PixelCount`, and expose the effect's applicable fields. Reordering layers determines priority. Respect both device physical capabilities and documented logical bounds.
 - Keep each configuration catalog's index in its own domain, even when displayed names match.
 - Let the SDK-owned loop perform motion calculations; UI timers read state and update presentation.

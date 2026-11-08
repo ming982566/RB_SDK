@@ -4,6 +4,8 @@
 采用对象 ABI 时可通过 [同步服务目录](RaceBearSDK_SERVICE_API.md) 的 CAN/输出/安全带服务
 调用本文相同业务；同步分派成功仍须检查业务返回值。维护、固件、UID、重新启用和授权规则不变，
 不得因通用入口而跳过维护状态机或自动重试动作。
+本文代码中的 `rb.can.*`、`rb.output.*` 和 `rb.seatbeltcan.*` 是服务操作 key 的概念记法；
+实际调用必须通过对应 `rb.service.*` 的 `RB_ObjectNativeCall` 完成，参数顺序和签名以服务目录为准。
 
 当前公开工作流覆盖 `ProtocolType == 1` 的 `RB_CAN`：
 
@@ -42,11 +44,11 @@ SDK通过独立控制端点恢复接收边界并读取故障快照，旧APP仍�
 安全带单/双路、释放、急停与恢复仍使用本节的专用流程，不能仅凭电机类型
 推断其需要更快的反馈周期。
 
-通过 `RB_Can_GetOutputBindingState` 读取安全带输出保存的UID、逻辑索引及目录身份；
+通过 `rb.can.get_output_binding_state` 读取安全带输出保存的UID、逻辑索引及目录身份；
 公开 `RB_OutputConfig` 不包含 `CANUid` 字段。查询不创建平台CAN会话、不打开USB。
 已绑定UID离线时保留原身份，不把同索引的其它设备当作目标。
 绑定就绪只表示身份匹配；旧APP也可进入宿主维护流程，是否可以正常运行仍由
-最低固件要求和 `RB_SeatbeltCan_GetState` 决定。安全带的释放和急停状态使用
+最低固件要求和 `rb.seatbeltcan.get_state` 决定。安全带的释放和急停状态使用
 安全带专用状态接口，不从平台逐卡急停确认字段推断。
 
 安全带连接初始化期间会立即启动独立主机心跳，覆盖保护配置、PDO映射和NMT启动等
@@ -150,7 +152,7 @@ Abort/Reset，则命令流完整，跳过此清理；仍返回原期限失败并
 `boundary recovery snapshot transport=EP0`是故障现场的补充证据：
 `droppedRxBytes`仅表示恢复时清理的固件残留字节，不能当成该主机请求的完整传输量。
 正常输出不触发此请求或日志；故障过程仍按首次门控。
-恢复快照正文可超过260字节。宿主必须按`RB_Log_Read`的容量不足合同扩容重试，
+恢复快照正文可超过260字节。宿主必须按`rb.log.read`的容量不足合同扩容重试，
 保留完整原文；不能把缓冲不足返回的空串视为没有日志或恢复没有执行。
 完整读取示例见API手册“日志接入”。此修复恢复诊断证据，不代表原始USB停顿已解决。
 
@@ -179,8 +181,8 @@ USB写入及排队异常附`appFirmware`、`identityProtocol`、`capabilities`�
 继续运行。RGB完整重试成功、正常释放和恢复成功不输出诊断。日志安静不代表
 故障已恢复，应继续读取真实状态；此去重只影响日志，不改变任何保护时限或动作。
 
-轮询 `RB_SeatbeltCan_GetState` 展示释放中与锁定；用户排障、解除急停后显式调用
-`RB_SeatbeltCan_RequestReenable`，请求接受不代表已恢复。重连和RequestHoming
+轮询 `rb.seatbeltcan.get_state` 展示释放中与锁定；用户排障、解除急停后显式调用
+`rb.seatbeltcan.request_reenable`，请求接受不代表已恢复。重连和RequestHoming
 都不能解除故障保护。正常断开会后台等待释放，最长约16.5秒；确认所有有效节点
 回0且下使能后，才由固件停止周期TPDO。释放未完成或故障时保留反馈与保护，
 不因主动停报重新判为运行故障。仅干净的正常退出终态允许下次连接自动恢复；
@@ -213,11 +215,11 @@ RB_CAN 页面会使用以下几类标识：
 ## 2. 初始化和线程边界
 
 ```cpp
-if (RB_Runtime_SetAppDataName("YourProductName") != RB_OK)
+if (rb.runtime.set_app_data_name("YourProductName") != RB_OK)
     return false;
 if (RB_Runtime_Initialize() != RB_OK)
     return false;
-if (RB_Runtime_StartLoop(2) != RB_OK) {
+if (rb.runtime.start(2) != RB_OK) {
     RB_Runtime_Shutdown();
     return false;
 }
@@ -234,10 +236,10 @@ if (RB_Runtime_StartLoop(2) != RB_OK) {
 
 ```cpp
 int rbCanOutputIndex = -1;
-const int outputCount = RB_Output_GetInstanceCount();
+const int outputCount = rb.output.get_instance_count();
 for (int i = 0; i < outputCount; ++i) {
     RB_OutputConfig config{};
-    if (RB_Output_ReadInstanceConfigByIndex(i, &config) == RB_OK &&
+    if (rb.output.read_instance_config_by_index(i, &config) == RB_OK &&
         std::strcmp(config.OutputKind, "RB_CAN") == 0) {
         rbCanOutputIndex = i;
         break;
@@ -245,7 +247,7 @@ for (int i = 0; i < outputCount; ++i) {
 }
 
 if (rbCanOutputIndex < 0) {
-    rbCanOutputIndex = RB_Output_AddInstance("RB_CAN");
+    rbCanOutputIndex = rb.output.add_instance("RB_CAN");
 }
 ```
 
@@ -254,7 +256,7 @@ if (rbCanOutputIndex < 0) {
 ## 4. 刷新和显示设备目录
 
 ```cpp
-const int count = RB_Can_RefreshDevices();
+const int count = rb.can.refresh_devices();
 if (count < 0) {
     // 显示刷新失败并读取 SDK 日志。
     return;
@@ -263,7 +265,7 @@ if (count < 0) {
 for (int i = 0; i < count; ++i) {
     RB_CanDeviceInfo info{};
     info.Size = sizeof(info);
-    if (RB_Can_GetDeviceInfo(i, &info) != RB_OK)
+    if (rb.can.get_device_info(i, &info) != RB_OK)
         continue;
 
     if (info.ProtocolType != 1) {
@@ -276,7 +278,7 @@ for (int i = 0; i < count; ++i) {
 }
 ```
 
-`RB_Can_GetDeviceCount()` 返回最近一次刷新得到的数量，不重新扫描 USB。刷新后使用新的目录项，并按 UID 恢复选择。
+`rb.can.get_device_count()` 返回最近一次刷新得到的数量，不重新扫描 USB。刷新后使用新的目录项，并按 UID 恢复选择。
 
 设备只有满足下列条件时才适合绑定：
 
@@ -296,9 +298,9 @@ for (int i = 0; i < count; ++i) {
 const char* uid = selectedDevice.Uid;
 const int newLogicalIndex = 2;
 
-const int rc = RB_Can_SetDeviceLogicalIndex(uid, newLogicalIndex);
+const int rc = rb.can.set_device_logical_index(uid, newLogicalIndex);
 if (rc == 0) {
-    RB_Can_RefreshDevices();
+    rb.can.refresh_devices();
 }
 ```
 
@@ -316,36 +318,36 @@ if (rc == 0) {
 通常应直接使用绑定接口。它把目标逻辑索引写入设备，并将稳定 UID 和逻辑索引持久化到对应输出配置。
 
 ```cpp
-if (RB_Output_IsInstanceRuntimeActive(rbCanOutputIndex)) {
+if (rb.output.is_instance_runtime_active(rbCanOutputIndex)) {
     // 等待输出完全停止后再允许绑定。
     return;
 }
 
-const int rc = RB_Can_BindOutputDevice(
+const int rc = rb.can.bind_output_device(
     rbCanOutputIndex,
     selectedDevice.Uid,
     requestedLogicalIndex);
 
 if (rc == 0) {
-    RB_Can_RefreshDevices();
+    rb.can.refresh_devices();
 
     RB_CanOutputBindingState binding{};
     binding.Size = sizeof(binding);
-    if (RB_Can_GetOutputBindingState(rbCanOutputIndex, &binding) == RB_OK &&
+    if (rb.can.get_output_binding_state(rbCanOutputIndex, &binding) == RB_OK &&
         binding.BindingStatus == RB_CAN_BINDING_READY) {
         // 绑定确认完成。
     }
 }
 ```
 
-`RB_OutputConfig::CANindex` 是兼容字段；稳定 UID 绑定通过 `RB_Can_BindOutputDevice()` 完成。
+`RB_OutputConfig::CANindex` 是兼容字段；稳定 UID 绑定通过 `rb.can.bind_output_device()` 完成。
 
 多张设备拥有相同旧逻辑索引时，仍然按以下顺序处理：
 
 1. 刷新设备目录；
 2. 用户按 UID 选中目标设备；
 3. 输入当前未被占用的新逻辑索引；
-4. 调用 `RB_Can_BindOutputDevice()`；
+4. 调用 `rb.can.bind_output_device()`；
 5. 再次刷新并读取绑定状态。
 
 整个过程无需拔掉另一张重复索引的设备；目标设备始终通过 UID 确认。
@@ -355,7 +357,7 @@ if (rc == 0) {
 ```cpp
 RB_CanOutputBindingState binding{};
 binding.Size = sizeof(binding);
-if (RB_Can_GetOutputBindingState(rbCanOutputIndex, &binding) == RB_OK) {
+if (rb.can.get_output_binding_state(rbCanOutputIndex, &binding) == RB_OK) {
     switch (binding.BindingStatus) {
     case RB_CAN_BINDING_UNBOUND:
         break;
@@ -385,17 +387,17 @@ if (RB_Can_GetOutputBindingState(rbCanOutputIndex, &binding) == RB_OK) {
 ## 8. 连接和断开
 
 ```cpp
-const int connectRc = RB_Output_ConnectInstanceByIndex(rbCanOutputIndex);
+const int connectRc = rb.output.connect_instance_by_index(rbCanOutputIndex);
 if (connectRc != RB_OK && connectRc != RB_LICENSE_REQUIRED) {
     // 显示连接失败和 SDK 日志。
 }
 
 // 页面刷新只读取状态。
-const int connected = RB_Output_IsInstanceConnected(rbCanOutputIndex);
-const int active = RB_Output_IsInstanceRuntimeActive(rbCanOutputIndex);
+const int connected = rb.output.is_instance_connected(rbCanOutputIndex);
+const int active = rb.output.is_instance_runtime_active(rbCanOutputIndex);
 
 // 用户断开。
-RB_Output_DisconnectInstanceByIndex(rbCanOutputIndex);
+rb.output.disconnect_instance_by_index(rbCanOutputIndex);
 ```
 
 连接调用成功表示流程已经启动，不保证电机立即进入运行。继续读取绑定、健康和电机状态，直到 SDK 报告就绪、运行或明确故障。
@@ -403,10 +405,10 @@ RB_Output_DisconnectInstanceByIndex(rbCanOutputIndex);
 ## 9. 读取单输出电机状态
 
 ```cpp
-const int motorCount = RB_Can_GetOutputMotorCount(rbCanOutputIndex);
+const int motorCount = rb.can.get_output_motor_count(rbCanOutputIndex);
 for (int i = 0; i < motorCount; ++i) {
     RB_CanMotorState motor{};
-    if (RB_Can_GetOutputMotorState(rbCanOutputIndex, i, &motor) == RB_OK) {
+    if (rb.can.get_output_motor_state(rbCanOutputIndex, i, &motor) == RB_OK) {
         // 显示 NodeId、AxisKey、Online、Homed、Ready、Fault、
         // StatusWord、ErrorCode、Temperature 和 OperationMode。
     }
@@ -420,7 +422,7 @@ for (int i = 0; i < motorCount; ++i) {
 ```cpp
 RB_CanOutputHealthState health{};
 health.Size = sizeof(health);
-if (RB_Can_GetOutputHealthState(rbCanOutputIndex, &health) == RB_OK) {
+if (rb.can.get_output_health_state(rbCanOutputIndex, &health) == RB_OK) {
     // RuntimeStatus 和 FaultReason 用于机器判断。
     // StatusText、USB/CAN 计数和延迟用于诊断显示。
 }
@@ -435,7 +437,7 @@ if (RB_Can_GetOutputHealthState(rbCanOutputIndex, &health) == RB_OK) {
 - 当前没有其它维护动作。
 
 ```cpp
-const int rc = RB_Can_RequestOutputRecovery(rbCanOutputIndex);
+const int rc = rb.can.request_output_recovery(rbCanOutputIndex);
 ```
 
 `RB_OK` 表示 SDK 已接受一次恢复请求。页面继续轮询健康状态，恢复接口等待下一次用户明确操作。
@@ -454,8 +456,8 @@ RBH1,<Axis1a>,<Axis2a>,<Axis3a>,<Axis4a>
 
 ```cpp
 int32_t positions[] = { 0, 21845, 43690, 65535 };
-if (RB_Can_SetExternalRealtimeMode(outputIndex, 1) == RB_OK)
-    RB_Can_SubmitPositions(outputIndex, positions, 4);
+if (rb.can.set_external_realtime_mode(outputIndex, 1) == RB_OK)
+    rb.can.submit_positions(outputIndex, positions, 4);
 ```
 
 调用约束：
@@ -469,7 +471,7 @@ if (RB_Can_SetExternalRealtimeMode(outputIndex, 1) == RB_OK)
 退出或切回 SDK 内部位置计算前，应先停止外部输入，提交停车位置，断开或确认输出安全后调用：
 
 ```cpp
-RB_Can_SetExternalRealtimeMode(outputIndex, 0);
+rb.can.set_external_realtime_mode(outputIndex, 0);
 ```
 
 ## 12. 电机参数维护和 RB 伺服升级
@@ -477,17 +479,17 @@ RB_Can_SetExternalRealtimeMode(outputIndex, 0);
 参数维护必须由用户明确触发。前端先停止所有承载运动的输出，再进入维护：
 
 ```cpp
-if (RB_Can_BeginMotorParameterMaintenance() == RB_OK) {
+if (rb.can.begin_motor_parameter_maintenance() == RB_OK) {
     // 读取当前电机目录和类型。
     // 需要时切换 500/1000 Kbit/s，SDK 会重开会话并重新进入维护。
     // 读取、写入、保存、导入/导出或同步参数。
-    RB_Can_EndMotorParameterMaintenance();
+    rb.can.end_motor_parameter_maintenance();
 }
 ```
 
 进入维护后 SDK 会暂停自动初始化和监控，并安全下使能相关节点。参数页面应
-使用 `RB_Can_GetMotorParameterCountForMotor()`、`RB_Can_GetMotorParameterProfileType()`
-和 `RB_Can_IsMotorParameterWritable()` 动态建表，不把显示名称、界面行号或
+使用 `rb.can.get_motor_parameter_count_for_motor()`、`rb.can.get_motor_parameter_profile_type()`
+和 `rb.can.is_motor_parameter_writable()` 动态建表，不把显示名称、界面行号或
 聚合电机索引写入文件。`.rbmotor` 导入/导出只处理 UTF-8 文件，导入先生成
 草稿；确认后再调用单项写入和保存。同步要求源、目标为同一类型且都在维护模式，
 失败可能部分生效，页面必须提示用户重新读取确认。
@@ -499,12 +501,12 @@ if (RB_Can_BeginMotorParameterMaintenance() == RB_OK) {
 RB 伺服固件升级使用：
 
 ```cpp
-if (RB_Can_StartServoFirmwareUpdate(motorIndex, utf8BinPath) == RB_OK) {
+if (rb.can.start_servo_firmware_update(motorIndex, utf8BinPath) == RB_OK) {
     RB_RuntimeState runtime{};
-    RB_State_Read(&runtime);
+    rb.runtime.state(&runtime);
     while (runtime.Can.FirmwareUpdateRunning) {
         // 读取进度、状态文本和错误码，刷新 UI。
-        RB_State_Read(&runtime);
+        rb.runtime.state(&runtime);
     }
 }
 ```
@@ -528,10 +530,10 @@ if (RB_Can_StartServoFirmwareUpdate(motorIndex, utf8BinPath) == RB_OK) {
 ## 14. 安全退出
 
 ```cpp
-RB_Output_RequestDisconnectAll();
+rb.output.request_disconnect_all();
 
 // 使用宿主定时器和有界等待，保持 UI 线程可响应。
-for (int i = 0; i < 300 && !RB_Output_AreAllDisconnected(); ++i) {
+for (int i = 0; i < 300 && !rb.output.are_all_disconnected(); ++i) {
     Sleep(10);
 }
 

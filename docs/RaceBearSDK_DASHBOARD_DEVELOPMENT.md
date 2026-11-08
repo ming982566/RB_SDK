@@ -2,27 +2,29 @@
 
 本文面向使用 RaceBear SDK 开发仪表、USB 屏幕、浏览器仪表或宿主窗口预览的应用开发者。文档说明从模板制作、数据绑定、渲染到输出部署的完整流程。
 
-本文以 SDK `0.6.4` 的公开 C ABI 为准。函数的精确签名、结构体布局、返回值和字段容量仍以同一版本的 `include/RaceBearSDK.h` 为最终依据。
+本文以 SDK `1.0.1` 的公开 C ABI 为准。函数的精确签名、结构体布局、返回值和字段容量仍以同一版本的 `include/RaceBearSDK.h` 为最终依据；仪表接入使用对象协议和服务目录，不直接导入旧业务符号。
 采用对象 ABI 时，本文 Dashboard/VOCORE/Web 操作可用 [同步服务映射](RaceBearSDK_SERVICE_API.md)。
 像素指针和句柄通过 NATIVE_CALL 同步借用，不转 JSON、不进入对象任务队列；
 原业务对帧的复制、最新帧替换、授权和关闭规则不变。不能把本机指针封套发送到网页或网络。
+本文示例中的 `rb.dashboard.*`、`rb.vocore.*` 和 `rb.dashboardweb.*` 是服务操作 key 的概念记法；
+实际调用必须先 Resolve 对应 `rb.service.*`，再用 `RB_ObjectNativeCall` 按目录签名分派。
 
 ## 1. 能力边界
 
 仪表链路由三个独立层组成：
 
 ```text
-RB_State_Read()
+rb.runtime.state()
         |
         v
 仪表渲染器
   |              |
-  |              +--> RB_Dashboard_RenderFrame()
-  |              +--> RB_Dashboard_RenderPackageFrame()
+  |              +--> rb.dashboard.render_frame()
+  |              +--> rb.dashboard.render_package_frame()
   |
   +--> 调用方窗口、纹理或视频编码器
-  +--> RB_VoCore_SubmitFrame()
-  +--> RB_DashboardWeb_SubmitFrame()
+  +--> rb.vocore.submit_frame()
+  +--> rb.dashboardweb.submit_frame()
 ```
 
 SDK 负责读取运行态、解析稳定数据绑定、生成 BGRA8888 像素帧、管理客户模板和提供 VOCORE/Web 输出后端。宿主应用负责窗口布局、刷新定时器、输出目标选择、错误提示和生命周期管理。
@@ -46,7 +48,7 @@ SDK 负责读取运行态、解析稳定数据绑定、生成 BGRA8888 像素帧
 
 ## 2. 选择仪表类型
 
-内置模板适合快速集成。使用 `RB_Dashboard_RenderFrame()` 时只需要传入运行态、目标画布和模板枚举值，不需要维护模板文件。
+内置模板适合快速集成。使用 `rb.dashboard.render_frame()` 时只需要传入运行态、目标画布和模板枚举值，不需要维护模板文件。
 
 ```cpp
 RB_DASHBOARD_TEMPLATE_GT          // AIM MXS 风格
@@ -55,7 +57,7 @@ RB_DASHBOARD_TEMPLATE_M_STRIP    // SimpleDash 风格
 RB_DASHBOARD_TEMPLATE_FORD_GT    // Ford GT 风格
 ```
 
-客户模板适合需要自行决定布局、颜色、字体、页面和数据绑定的产品。客户模板使用 `RB_Dashboard_RefreshPackages()` 扫描，按稳定 `PackageId` 打开，并通过 `RB_Dashboard_RenderPackageFrame()` 渲染。
+客户模板适合需要自行决定布局、颜色、字体、页面和数据绑定的产品。客户模板使用 `rb.dashboard.refresh_packages()` 扫描，按稳定 `PackageId` 打开，并通过 `rb.dashboard.render_package_frame()` 渲染。
 
 内置模板保存的是模板枚举值；客户模板保存的是 `PackageId`。目录索引只在当前扫描快照内有效，不能写入产品配置作为长期标识。
 
@@ -71,9 +73,9 @@ RB_DASHBOARD_TEMPLATE_FORD_GT    // Ford GT 风格
 初始化顺序：
 
 ```cpp
-RB_Runtime_SetAppDataName("MyDashboardApp");
+rb.runtime.set_app_data_name("MyDashboardApp");
 RB_Runtime_Initialize();
-RB_Runtime_StartLoop(2); // 单位为 ms；仪表刷新不跟随这个周期
+rb.runtime.start(2); // 单位为 ms；仪表刷新不跟随这个周期
 ```
 
 仪表刷新建议由宿主自己的 16-33 ms 定时器驱动。SDK 后端循环可以按 1-2 ms 计算，但不应让每个后端 Tick 都生成一张仪表画面。
@@ -205,20 +207,20 @@ RB_Runtime_StartLoop(2); // 单位为 ms；仪表刷新不跟随这个周期
 SDK 扫描两个位置：
 
 - 内置客户模板：DLL 同级 `DashboardAssets/RaceBear/Custom`；
-- 用户模板：通常为 `Documents/<AppDataName>/Dashboards`，实际路径通过 `RB_Dashboard_GetUserPackageDirectory()` 查询。
+- 用户模板：通常为 `Documents/<AppDataName>/Dashboards`，实际路径通过 `rb.dashboard.get_user_package_directory()` 查询。
 
 启动或用户点击刷新时：
 
 ```cpp
-const int count = RB_Dashboard_RefreshPackages();
+const int count = rb.dashboard.refresh_packages();
 if (count < 0) {
     // 读取日志或向用户显示刷新失败。
 }
 
-for (int i = 0; i < RB_Dashboard_GetPackageCount(); ++i) {
+for (int i = 0; i < rb.dashboard.get_package_count(); ++i) {
     RB_DashboardPackageInfo info{};
     info.Size = sizeof(info);
-    if (RB_Dashboard_GetPackageInfo(i, &info) == RB_OK) {
+    if (rb.dashboard.get_package_info(i, &info) == RB_OK) {
         // 只把 info.Valid == 1 的模板放入可选列表。
         // 持久化 info.PackageId，不持久化 i。
     }
@@ -231,17 +233,17 @@ for (int i = 0; i < RB_Dashboard_GetPackageCount(); ++i) {
 
 ```cpp
 char packageId[RB_TEXT_SMALL]{};
-int rc = RB_Dashboard_ImportPackage(
+int rc = rb.dashboard.import_package(
     sourcePathUtf8,
     packageId,
     static_cast<int>(sizeof(packageId)));
 
 if (rc == RB_OK) {
-    RB_Dashboard_RefreshPackages();
+    rb.dashboard.refresh_packages();
     // 使用返回的 packageId 重新定位模板。
 }
 
-RB_Dashboard_DeletePackage(packageId);
+rb.dashboard.delete_package(packageId);
 ```
 
 导入接口会把文件复制到当前 AppDataName 的用户目录并重新校验。删除接口只允许删除已扫描到的用户模板，不能删除 DLL 随附的内置模板。
@@ -250,20 +252,20 @@ RB_Dashboard_DeletePackage(packageId);
 
 ```cpp
 RB_DashboardPackageHandle package = nullptr;
-if (RB_Dashboard_OpenPackage(packageId, &package) == RB_OK) {
-    RB_Dashboard_SetPackagePage(package, 0);
-    // 在刷新定时器中重复调用 RB_Dashboard_RenderPackageFrame。
+if (rb.dashboard.open_package(packageId, &package) == RB_OK) {
+    rb.dashboard.set_package_page(package, 0);
+    // 在刷新定时器中重复调用 rb.dashboard.render_package_frame。
 
     RB_DashboardPackageState packageState{};
     packageState.Size = sizeof(packageState);
-    RB_Dashboard_GetPackageState(package, &packageState);
+    rb.dashboard.get_package_state(package, &packageState);
 
-    RB_Dashboard_ClosePackage(package);
+    rb.dashboard.close_package(package);
     package = nullptr;
 }
 ```
 
-选择另一个模板前先关闭旧句柄。`RB_Dashboard_ClosePackage()` 之后句柄立即失效，不得继续读状态或渲染。
+选择另一个模板前先关闭旧句柄。`rb.dashboard.close_package()` 之后句柄立即失效，不得继续读状态或渲染。
 
 ## 8. BGRA8888 渲染
 
@@ -284,8 +286,8 @@ std::vector<unsigned char> pixels(
     static_cast<size_t>(stride) * height);
 
 RB_RuntimeState runtime{};
-if (RB_State_Read(&runtime) == RB_OK &&
-    RB_Dashboard_RenderFrame(
+if (rb.runtime.state(&runtime) == RB_OK &&
+    rb.dashboard.render_frame(
         &runtime,
         pixels.data(),
         width,
@@ -299,7 +301,7 @@ if (RB_State_Read(&runtime) == RB_OK &&
 客户模板只替换渲染函数：
 
 ```cpp
-RB_Dashboard_RenderPackageFrame(
+rb.dashboard.render_package_frame(
     package,
     &runtime,
     pixels.data(),
@@ -327,8 +329,8 @@ VOCORE 设备每块屏幕使用一个独立句柄和发送线程。
 
 ```cpp
 RB_VoCoreHandle screen = nullptr;
-if (RB_VoCore_Open(deviceIdUtf8, 1, &screen) == RB_OK) {
-    const int rc = RB_VoCore_SubmitFrame(
+if (rb.vocore.open(deviceIdUtf8, 1, &screen) == RB_OK) {
+    const int rc = rb.vocore.submit_frame(
         screen,
         pixels.data(),
         static_cast<int>(pixels.size()),
@@ -340,9 +342,9 @@ if (RB_VoCore_Open(deviceIdUtf8, 1, &screen) == RB_OK) {
 }
 ```
 
-设备枚举使用 `RB_VoCore_GetDeviceCount()` 和 `RB_VoCore_GetDeviceInfo()`。如果屏幕可能在程序启动后才插入，可以传入空 `deviceId` 并启用 `autoReconnect=1`，然后通过 `RB_VoCore_GetState()` 显示等待设备、重连和发送统计。
+设备枚举使用 `rb.vocore.get_device_count()` 和 `rb.vocore.get_device_info()`。如果屏幕可能在程序启动后才插入，可以传入空 `deviceId` 并启用 `autoReconnect=1`，然后通过 `rb.vocore.get_state()` 显示等待设备、重连和发送统计。
 
-`RB_VoCore_SubmitFrame()` 会复制调用方的像素数据，返回后调用方可以复用缓冲区。未发送的旧帧会被新帧覆盖，不能把 `PendingFrame` 当成必须清零的发送确认。
+`rb.vocore.submit_frame()` 会复制调用方的像素数据，返回后调用方可以复用缓冲区。未发送的旧帧会被新帧覆盖，不能把 `PendingFrame` 当成必须清零的发送确认。
 
 设备状态页面建议显示：
 
@@ -365,10 +367,10 @@ config.JpegQuality = 85;
 config.MaxFps = 30;
 
 RB_DashboardWebHandle web = nullptr;
-if (RB_DashboardWeb_Open(&config, &web) == RB_OK) {
+if (rb.dashboardweb.open(&config, &web) == RB_OK) {
     RB_DashboardWebState state{};
     state.Size = sizeof(state);
-    if (RB_DashboardWeb_GetState(web, &state) == RB_OK) {
+    if (rb.dashboardweb.get_state(web, &state) == RB_OK) {
         // 在宿主 UI 中显示 state.Url。
     }
 }
@@ -377,7 +379,7 @@ if (RB_DashboardWeb_Open(&config, &web) == RB_OK) {
 在刷新定时器中提交同一张像素帧：
 
 ```cpp
-RB_DashboardWeb_SubmitFrame(
+rb.dashboardweb.submit_frame(
     web,
     pixels.data(),
     static_cast<int>(pixels.size()),
@@ -390,7 +392,7 @@ RB_DashboardWeb_SubmitFrame(
 
 `AllowRemote=1` 会监听本地网络接口，首次运行可能触发 Windows 防火墙提示。只需要本机预览时保持为 0。
 
-通过 `RB_DashboardWeb_GetState()` 读取 `Url`、`ClientCount`、`ActualFps`、`SubmittedFrames`、`EncodedFrames`、`DroppedFrames` 和 `LastErrorText`。慢客户端不会让旧帧无限排队，尚未编码的旧帧会被最新提交覆盖。
+通过 `rb.dashboardweb.get_state()` 读取 `Url`、`ClientCount`、`ActualFps`、`SubmittedFrames`、`EncodedFrames`、`DroppedFrames` 和 `LastErrorText`。慢客户端不会让旧帧无限排队，尚未编码的旧帧会被最新提交覆盖。
 
 ## 12. 刷新频率、线程和最新帧策略
 
@@ -398,18 +400,18 @@ RB_DashboardWeb_SubmitFrame(
 
 | 工作 | 线程和频率 |
 | --- | --- |
-| SDK 运动和遥测计算 | SDK 自有 `RB_Runtime_StartLoop()` 线程。 |
-| `RB_State_Read()` | 宿主状态或仪表线程，通常 30-60 Hz。 |
+| SDK 运动和遥测计算 | SDK 自有 `rb.runtime.start()` 线程。 |
+| `rb.runtime.state()` | 宿主状态或仪表线程，通常 30-60 Hz。 |
 | 仪表渲染 | 独立 16-33 ms 定时器，默认 30 FPS。 |
 | VOCORE/Web 提交 | 与仪表渲染线程串行提交，后端异步发送或编码。 |
 | 目录刷新和模板导入 | 用户操作或页面打开时，不能高频轮询。 |
 | 状态统计 | UI 定时器读取，不在输出回调中直接修改 UI。 |
 
-不要在仪表线程调用 `RB_Runtime_DoCalculations()`，也不要使用 1-2 ms 的 SDK 后端周期驱动 GDI、图片解码或网络编码。
+不要在仪表线程调用 `rb.runtime.do_calculations()`，也不要使用 1-2 ms 的 SDK 后端周期驱动 GDI、图片解码或网络编码。
 
 每一帧的推荐流程是：
 
-1. 调用 `RB_State_Read()` 获取一个完整快照；
+1. 调用 `rb.runtime.state()` 获取一个完整快照；
 2. 使用同一份快照渲染内置或客户模板；
 3. 把完整帧提交给需要的输出目标；
 4. 立即进入下一次刷新，不等待 `PendingFrame` 归零；
@@ -423,17 +425,17 @@ RB_DashboardWeb_SubmitFrame(
 
 ```cpp
 if (web != nullptr) {
-    RB_DashboardWeb_Close(web);
+    rb.dashboardweb.close(web);
     web = nullptr;
 }
 
 if (screen != nullptr) {
-    RB_VoCore_Close(screen);
+    rb.vocore.close(screen);
     screen = nullptr;
 }
 
 if (package != nullptr) {
-    RB_Dashboard_ClosePackage(package);
+    rb.dashboard.close_package(package);
     package = nullptr;
 }
 
@@ -472,9 +474,9 @@ RB_Runtime_Shutdown();
 
 出现黑屏或画面异常时按以下顺序检查：
 
-1. `RB_State_Read()` 是否成功；
+1. `rb.runtime.state()` 是否成功；
 2. `stride >= width * 4` 且像素缓冲区容量正确；
-3. `RB_Dashboard_RenderFrame()` 或 `RB_Dashboard_RenderPackageFrame()` 返回值；
+3. `rb.dashboard.render_frame()` 或 `rb.dashboard.render_package_frame()` 返回值；
 4. 客户模板 `Valid`、`FormatVersion` 和 `PageCount`；
 5. VOCORE 的屏幕尺寸、旋转和 `DevicePresent`；
 6. Web 的 `Open`、端口和浏览器访问地址；
@@ -533,7 +535,7 @@ V1 模板应只使用 V1 字段。后续格式升级必须保持旧模板可以�
 
 ### 为什么模板已经导出，SDK 仍然拒绝？
 
-设计器只负责生成文件，SDK 还会检查格式版本、ID、尺寸、元素数量、图片大小、Data URI 类型和字段范围。使用 `RB_Dashboard_GetPackageInfo()` 查看 `Valid` 和 `Description`。
+设计器只负责生成文件，SDK 还会检查格式版本、ID、尺寸、元素数量、图片大小、Data URI 类型和字段范围。使用 `rb.dashboard.get_package_info()` 查看 `Valid` 和 `Description`。
 
 ### 为什么保存目录索引会导致升级后模板错乱？
 

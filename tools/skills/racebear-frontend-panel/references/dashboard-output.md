@@ -1,65 +1,23 @@
 # Dashboard And Output
 
-Use `docs/RaceBearSDK_FRONTEND_GUIDE.md` section 15 for the integration workflow and `docs/RaceBearSDK_DASHBOARD_DEVELOPMENT.md` for the complete package format, renderer, designer, VOCORE, Web output, threading, and deployment contract. The dashboard chapters in `docs/RaceBearSDK_API.md` remain the API reference.
+Treat dashboards as a separate pipeline from backend calculation:
 
-## Pipeline
+1. Read `rb.runtime.state` or `rb.telemetry.snapshot`.
+2. Use `rb.service.dashboard` to enumerate or open a built-in or customer package.
+3. Use the dashboard service to render BGRA8888 into a caller-owned buffer.
+4. Submit the latest frame through `rb.service.vocore`, `rb.service.dashboardweb`, or the host window.
 
-The same dashboard, VOCORE and Web operations are available through native object services
-listed in `docs/RaceBearSDK_SERVICE_API.md`. Pass pixel pointers synchronously, retain the
-original handle/frame lifetime and latest-frame rules, and never serialize the native packet.
-The generic task queue is not a pixel-delivery channel.
+Dashboard and device operations use `RB_OBJECT_NATIVE_CALL`. The service directory defines the
+pixel pointer, stride, dimensions, handle ownership and return values. Native packets are local
+to the process and must never be sent to a browser or network peer.
 
-Treat rendering and delivery as separate operations:
+Keep one owned package handle per selected package and close it before replacement or page exit.
+Keep one VOCORE handle per screen. Submit frames asynchronously; the SDK keeps the newest pending
+frame and does not require the frontend to implement a per-pixel USB loop.
 
-1. Read the latest `RB_RuntimeState`.
-2. Render an SDK built-in template with `RB_Dashboard_RenderFrame()`, or open a package by stable `PackageId` and use `RB_Dashboard_RenderPackageFrame()`.
-3. Present BGRA8888 in the host window and/or submit the same latest frame to VOCORE or Dashboard Web.
-4. Read each output handle's state on a slower status timer.
-5. Close every handle before runtime shutdown.
+Drive rendering from a 16-33 ms host timer. Do not couple rendering to the backend calculation
+cadence. Read service state for connection, client, FPS, replacement/drop counts and errors.
 
-Use a dedicated 16-33 ms render timer for typical dashboards. VOCORE and Web accept latest-frame replacement, so rendering can continue with the newest frame while an earlier frame is pending.
-
-## Customer Packages
-
-- `.rbdash` V1 is a UTF-8 without BOM JSON file with PNG/JPEG Data URI images.
-- Bind elements only to SDK-recognized stable `rb.*` data keys.
-- Persist `PackageId`, not the package catalog index.
-- Refresh the package catalog after import or delete, then relocate the selection by `PackageId`.
-- Close the previous `RB_DashboardPackageHandle` when selection changes or the page exits.
-- If active VOCORE/Web outputs still use the package after preview navigation, keep it owned by
-  the rendering service until the last consumer stops; hiding a preview is not an output stop request.
-- Treat the format as declarative visual data, limited to recognized bindings and packaged assets rather than executable or system-control capabilities.
-
-## Designer
-
-The bundled designer lives at `tools/DashboardDesigner/index.html`. It runs as local HTML/CSS/JavaScript; `Start-DashboardDesigner.cmd` opens the file in the default browser and does not require Python, Node, an HTTP server, or a third-party runtime.
-
-For designer UI work:
-
-- provide catalog-backed data-binding dropdowns instead of free-text keys;
-- make selection state visible and support multi-selection, alignment, distribution, layer order, duplication, deletion, undo/redo, zoom, and responsive canvas sizing where the current format supports them;
-- ensure every palette component renders immediately after insertion and remains selectable;
-- include common vehicle widgets such as circular needle gauges, digital values, shift lights, warning lamps, gear, lap/time, fuel, temperatures, tire state, pedals, steering, bars, arcs, text, and images;
-- export a valid single-file `.rbdash` and clearly show the SDK import/user package destination described by the current API.
-
-Describe the available component model, fonts/assets, animations, masks, conditional visibility, and test data before committing to pixel-perfect reproduction of a complex production cluster.
-
-## VOCORE
-
-- Enumerate devices and open by `DeviceId`.
-- Keep one `RB_VoCoreHandle` per screen and close it explicitly.
-- Use `RB_VoCore_SetAutoReconnect()` for the selected policy.
-- Keep the handle alive across temporary unplug events when automatic reconnect is enabled.
-- Read `RB_VoCore_GetState()` for connection, reconnect, actual FPS, dropped/replaced frames, and last libusb error.
-- Deploy `libusb-1.0.dll` beside the host EXE when VOCORE is used.
-
-## Browser Dashboard
-
-- Store the returned `RB_DashboardWebHandle`.
-- Submit current frames asynchronously and read `RB_DashboardWeb_GetState()` for service/client/encoding status.
-- Bind only to the intended interface and port; treat LAN exposure as a deployment decision.
-- Close the Web handle before SDK shutdown.
-
-## Assets
-
-Deploy `DashboardAssets/RaceBear` with its directory structure beside `RaceBearSDK.dll` when using Ford GT or bundled customer assets. When assets are missing, show an actionable diagnostic instead of presenting an incomplete render as successful.
+Close in this order: stop the frame timer, stop new service calls, close Web and VOCORE handles,
+close the package, then stop the runtime and shut down the SDK. A nonempty pixel buffer, a successful
+service dispatch, or a mock screen does not prove that a physical display showed the frame.

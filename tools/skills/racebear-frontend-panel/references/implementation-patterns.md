@@ -133,14 +133,15 @@ and captured draft Revision, Poll until terminal, expand according to PayloadByt
 Poll success and task ResultCode are distinct. A polling deadline is not cancellation.
 For shared object drafts, Write conflicts require rereading and merging; do not automatically
 rebase and replay an entire stale structure. See `docs/RaceBearSDK_OBJECT_API.md`.
-The legacy command guidance below still applies to `RB_Command_Run`.
+Synchronous service calls remain separate from object tasks; use the generated service directory
+for their domain, operation key, signature and argument order.
 
 Use a real JSON library from the host stack. Serialize user input as data; parse the command
 response and inspect both the native result and documented JSON business result. Retain error
 stage/code without logging activation codes, tokens or complete sensitive response bodies.
 
 Read-only data getters can grow buffers and retry within a bounded capacity when documented.
-Do not apply that pattern blindly to `RB_Command_Run`: an action may already have run before
+Do not apply that pattern blindly to an Invoke action: it may already have run before
 the result copy returns `RB_BUFFER_TOO_SMALL`. Preallocate an appropriate result buffer and
 send the command once. On a too-small response, show an unconfirmed result and reread the
 relevant state; only repeat an action when its idempotence or outcome is known.
@@ -186,7 +187,7 @@ established; it does not implement the entire asynchronous host close coordinato
 Seatbelt CAN protection is an output-instance workflow. Single left/center uses only the left
 node; single right uses only the right node. Show startup homing wait, releasing, disabled lock,
 and fault lock separately. Never request homing or re-enable from a polling/reconnect callback.
-After user confirmation, call `RB_SeatbeltCan_RequestReenable` and poll GetState until Ready;
+After user confirmation, call `rb.seatbeltcan.request_reenable` and poll GetState until Ready;
 request acceptance is not physical success. A fault lock may still be releasing and reject
 the request. Keep diagnostics visible. Account for up to about 16.5 seconds of backend release
 waiting during disconnect without blocking UI or unloading the SDK prematurely.
