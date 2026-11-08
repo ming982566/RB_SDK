@@ -95,14 +95,15 @@ enum RB_Limits
 	RB_MAX_DASHBOARD_PACKAGES = 128 // 客户仪表目录最大返回数量。
 };
 
+// RGB 效果类型。EffectType 字段使用这些稳定枚举值。
 enum RB_RgbEffectType
 {
-	RB_RGB_EFFECT_STATIC = 0,
-	RB_RGB_EFFECT_RPM_BAR = 1,
-	RB_RGB_EFFECT_SHIFT_FLASH = 2,
-	RB_RGB_EFFECT_TELEMETRY_THRESHOLD = 3,
-	RB_RGB_EFFECT_PULSE = 4,
-	RB_RGB_EFFECT_STATUS_COLOR = 5,
+	RB_RGB_EFFECT_STATIC = 0, // 静态颜色。
+	RB_RGB_EFFECT_RPM_BAR = 1, // 按转速填充灯带。
+	RB_RGB_EFFECT_SHIFT_FLASH = 2, // 换挡时闪烁。
+	RB_RGB_EFFECT_TELEMETRY_THRESHOLD = 3, // 遥测值超过阈值时点亮。
+	RB_RGB_EFFECT_PULSE = 4, // 按事件或遥测值产生脉冲。
+	RB_RGB_EFFECT_STATUS_COLOR = 5, // 按状态选择颜色。
 	RB_RGB_EFFECT_TELEMETRY_BLINK = 6, // 任意遥测值达到阈值后闪烁。
 	RB_RGB_EFFECT_AUDIO_VOLUME = 7 // 按电脑当前播放声音的音量驱动亮度和点亮数量。
 };
@@ -124,14 +125,15 @@ enum RB_RgbEffectInputFlags
 	RB_RGB_INPUT_FLAG_DERIVED = 1 << 2      // SDK统一计算的派生效果值。
 };
 
-// RGB效果显示目标。安全带联动目标依赖已就绪的联动控制器。
+// RGB 效果显示目标。安全带联动目标依赖已就绪的联动控制器。
 enum RB_RgbEffectDisplayMode
 {
-	RB_RGB_DISPLAY_INDEPENDENT = 0,
-	RB_RGB_DISPLAY_SEATBELT_LINK = 1,
-	RB_RGB_DISPLAY_BOTH = 2
+	RB_RGB_DISPLAY_INDEPENDENT = 0, // 仅输出到 RGB 灯带。
+	RB_RGB_DISPLAY_SEATBELT_LINK = 1, // 仅联动安全带目标。
+	RB_RGB_DISPLAY_BOTH = 2 // 同时输出到 RGB 和安全带联动目标。
 };
 
+// RGB 区段填充方向。
 enum RB_RgbFillMode
 {
 	RB_RGB_FILL_FORWARD = 0,    // 从区段起点向终点填充。
@@ -139,13 +141,14 @@ enum RB_RgbFillMode
 	RB_RGB_FILL_CENTER_OUT = 2  // 从区段中心向两侧填充。
 };
 
+// RGB 测试图案类型。
 enum RB_RgbTestPattern
 {
-	RB_RGB_TEST_OFF = 0,
-	RB_RGB_TEST_SOLID = 1,
-	RB_RGB_TEST_COLOR_WIPE = 2,
-	RB_RGB_TEST_RAINBOW = 3,
-	RB_RGB_TEST_OUTPUT_IDENTIFY = 4
+	RB_RGB_TEST_OFF = 0, // 关闭测试。
+	RB_RGB_TEST_SOLID = 1, // 全灯带固定颜色。
+	RB_RGB_TEST_COLOR_WIPE = 2, // 逐像素颜色擦除。
+	RB_RGB_TEST_RAINBOW = 3, // 彩虹循环。
+	RB_RGB_TEST_OUTPUT_IDENTIFY = 4 // 依次点亮各输出路以识别物理端口。
 };
 
 // 自定义游戏遥测传输方式。MMF仅支持同机Windows进程，UDP支持跨进程和跨主机。
@@ -165,9 +168,9 @@ enum RB_CustomGameInputMode
 // 安全带输入模式。当前遥测算法始终可用；HID 和混合模式要求宿主提供对应 HID 输入源。
 enum RB_SeatbeltInputMode
 {
-	RB_SEATBELT_INPUT_TELEMETRY = 0,
-	RB_SEATBELT_INPUT_HID = 1,
-	RB_SEATBELT_INPUT_MIXED = 2
+	RB_SEATBELT_INPUT_TELEMETRY = 0, // 仅使用 SDK 遥测计算。
+	RB_SEATBELT_INPUT_HID = 1, // 仅使用宿主提供的 HID 输入。
+	RB_SEATBELT_INPUT_MIXED = 2 // 按 SDK 约定合并遥测和 HID 输入。
 };
 
 // 直接6DOF选项，可按位组合。
@@ -355,84 +358,86 @@ struct RB_CanOutputBindingState
 	char StatusText[RB_TEXT_MEDIUM];             // 绑定或运行状态文本。
 };
 
+// CAN 输出会话运行状态。
 enum RB_CanRuntimeStatus
 {
-	RB_CAN_RUNTIME_STARTING = 0,
-	RB_CAN_RUNTIME_READY = 1,
-	RB_CAN_RUNTIME_RUNNING = 2,
-	RB_CAN_RUNTIME_DEGRADED = 3,
-	RB_CAN_RUNTIME_RECOVERING = 4,
-	RB_CAN_RUNTIME_SAFE_LOCKED = 5,
-	RB_CAN_RUNTIME_MAINTENANCE = 6
+	RB_CAN_RUNTIME_STARTING = 0, // 正在建立设备会话。
+	RB_CAN_RUNTIME_READY = 1, // 已连接并满足输出前置条件。
+	RB_CAN_RUNTIME_RUNNING = 2, // 正在周期输出。
+	RB_CAN_RUNTIME_DEGRADED = 3, // 可继续运行但存在降级或丢包。
+	RB_CAN_RUNTIME_RECOVERING = 4, // 正在执行故障恢复。
+	RB_CAN_RUNTIME_SAFE_LOCKED = 5, // 安全锁定，禁止继续输出。
+	RB_CAN_RUNTIME_MAINTENANCE = 6 // 参数维护或固件维护模式。
 };
 
+// CAN 输出进入降级、恢复或安全锁定时的主要原因。
 enum RB_CanFaultReason
 {
-	RB_CAN_FAULT_NONE = 0,
-	RB_CAN_FAULT_DEVICE_OFFLINE = 1,
-	RB_CAN_FAULT_IDENTITY_CONFLICT = 2,
-	RB_CAN_FAULT_USB_TRANSPORT = 3,
-	RB_CAN_FAULT_BUS_OFF = 4,
-	RB_CAN_FAULT_NODE_OFFLINE = 5,
-	RB_CAN_FAULT_DRIVE = 6,
-	RB_CAN_FAULT_ESTOP = 7,
-	RB_CAN_FAULT_RECOVERY_BUDGET = 8,
-	RB_CAN_FAULT_FIRMWARE_MAINTENANCE = 9,
-	RB_CAN_FAULT_CONFIGURATION = 10
+	RB_CAN_FAULT_NONE = 0, // 无故障。
+	RB_CAN_FAULT_DEVICE_OFFLINE = 1, // 物理控制器离线。
+	RB_CAN_FAULT_IDENTITY_CONFLICT = 2, // UID 或逻辑索引冲突。
+	RB_CAN_FAULT_USB_TRANSPORT = 3, // USB 传输失败。
+	RB_CAN_FAULT_BUS_OFF = 4, // CAN 控制器进入 Bus-Off。
+	RB_CAN_FAULT_NODE_OFFLINE = 5, // 一个或多个节点离线。
+	RB_CAN_FAULT_DRIVE = 6, // 驱动器报告故障。
+	RB_CAN_FAULT_ESTOP = 7, // 急停仍处于锁存状态。
+	RB_CAN_FAULT_RECOVERY_BUDGET = 8, // 自动恢复次数或时间预算耗尽。
+	RB_CAN_FAULT_FIRMWARE_MAINTENANCE = 9, // 固件或参数维护占用会话。
+	RB_CAN_FAULT_CONFIGURATION = 10 // 输出配置或绑定无效。
 };
 
 // 无人值守宿主使用的版本化健康快照；新增字段时通过 Size 建立新版本。
 struct RB_CanOutputHealthState
 {
-	unsigned int Size;
-	int RuntimeStatus;
-	int FaultReason;
-	unsigned long long SessionGeneration;
-	unsigned long long RecoveryGeneration;
-	unsigned int RetryCount;
-	unsigned int RetryBudget;
-	unsigned int NextRetryDelayMs;
-	int DeviceConnected;
-	int DeviceOpened;
-	int Armed;
-	int OutputActive;
-	int RequiresHumanIntervention;
-	unsigned int LastSuccessfulReadAgeMs;
-	unsigned int LastSuccessfulWriteAgeMs;
-	unsigned int UsbWriteFailures;
-	unsigned int RealtimeBatchesSubmitted;
-	unsigned int RealtimeBatchesReplaced;
-	unsigned int RealtimeBatchesWritten;
-	unsigned int MaxReliableQueueDepth;
-	unsigned int RealtimeLatencyP50Ms;
-	unsigned int RealtimeLatencyP95Ms;
-	unsigned int RealtimeLatencyP99Ms;
-	unsigned int RealtimeLatencyMaxMs;
-	unsigned int CanTxOverflows;
-	unsigned int CanRxOverflows;
-	unsigned int UsbTxOverflows;
-	unsigned int UsbRxOverflows;
-	unsigned int UsbRxResyncs;
-	unsigned int ReliableAccepted;
-	unsigned int ReliableDeduplicated;
-	unsigned int ReliableRejected;
-	unsigned int FirmwareRealtimeReplaced;
-	unsigned int CanTxQueueDepth;
-	unsigned int CanTxQueueMaxDepth;
-	unsigned int MotionCommandAgeMs;
-	unsigned int BusOffCount;
-	int BusOffActive;
-	char StatusText[RB_TEXT_MEDIUM];
-	unsigned int ReservedLegacyPadding;
-	unsigned int CurrentSafetyQueueDepth;
-	unsigned int CurrentControlQueueDepth;
-	unsigned int CurrentReliableQueueDepth;
-	unsigned int MaxSafetyQueueDepth;
-	unsigned int MaxControlQueueDepth;
-	unsigned int CanTxAccepted;
-	unsigned int ControlAccepted;
-	unsigned int ControlDeduplicated;
-	unsigned int ControlRejected;
+	unsigned int Size;                           // 调用前设为 sizeof(RB_CanOutputHealthState)。
+	int RuntimeStatus;                           // RB_CanRuntimeStatus 中的值。
+	int FaultReason;                             // RB_CanFaultReason 中的值。
+	unsigned long long SessionGeneration;        // 设备会话代次，每次重连递增。
+	unsigned long long RecoveryGeneration;       // 恢复流程代次，每次启动恢复递增。
+	unsigned int RetryCount;                     // 当前连续自动恢复尝试次数。
+	unsigned int RetryBudget;                    // 当前会话允许的自动恢复次数上限。
+	unsigned int NextRetryDelayMs;               // 距离下一次自动恢复尝试的毫秒数。
+	int DeviceConnected;                         // 1=设备在 USB 总线上，0=离线。
+	int DeviceOpened;                            // 1=SDK 已打开设备句柄。
+	int Armed;                                   // 1=输出已满足武装条件。
+	int OutputActive;                            // 1=当前正在发送周期位置。
+	int RequiresHumanIntervention;               // 1=需要用户排除故障后显式恢复。
+	unsigned int LastSuccessfulReadAgeMs;       // 最近成功读取距当前的毫秒数。
+	unsigned int LastSuccessfulWriteAgeMs;      // 最近成功写入距当前的毫秒数。
+	unsigned int UsbWriteFailures;              // USB OUT 写失败累计数。
+	unsigned int RealtimeBatchesSubmitted;       // 实时批次提交累计数。
+	unsigned int RealtimeBatchesReplaced;        // latest-only 通道被新批次替换的累计数。
+	unsigned int RealtimeBatchesWritten;         // 已实际写入设备的实时批次累计数。
+	unsigned int MaxReliableQueueDepth;          // 可靠控制队列历史最大深度。
+	unsigned int RealtimeLatencyP50Ms;           // 实时写延迟 P50，单位毫秒。
+	unsigned int RealtimeLatencyP95Ms;           // 实时写延迟 P95，单位毫秒。
+	unsigned int RealtimeLatencyP99Ms;           // 实时写延迟 P99，单位毫秒。
+	unsigned int RealtimeLatencyMaxMs;           // 实时写延迟最大值，单位毫秒。
+	unsigned int CanTxOverflows;                 // CAN 发送队列溢出累计数。
+	unsigned int CanRxOverflows;                 // CAN 接收队列溢出累计数。
+	unsigned int UsbTxOverflows;                 // USB 发送队列溢出累计数。
+	unsigned int UsbRxOverflows;                 // USB 接收队列溢出累计数。
+	unsigned int UsbRxResyncs;                   // USB 接收流重新同步累计数。
+	unsigned int ReliableAccepted;               // 可靠控制包接受累计数。
+	unsigned int ReliableDeduplicated;           // 可靠控制包去重累计数。
+	unsigned int ReliableRejected;               // 可靠控制包拒绝累计数。
+	unsigned int FirmwareRealtimeReplaced;       // 固件侧实时帧被新帧替换累计数。
+	unsigned int CanTxQueueDepth;                // 当前 CAN 发送队列深度。
+	unsigned int CanTxQueueMaxDepth;             // CAN 发送队列历史最大深度。
+	unsigned int MotionCommandAgeMs;             // 当前 Motion 命令年龄，单位毫秒。
+	unsigned int BusOffCount;                    // CAN Bus-Off 累计次数。
+	int BusOffActive;                            // 1=当前处于 Bus-Off。
+	char StatusText[RB_TEXT_MEDIUM];             // 面向前端的健康状态文本。
+	unsigned int ReservedLegacyPadding;          // 固定旧 ABI 前缀的保留对齐字段。
+	unsigned int CurrentSafetyQueueDepth;        // 当前安全优先队列深度。
+	unsigned int CurrentControlQueueDepth;       // 当前普通控制队列深度。
+	unsigned int CurrentReliableQueueDepth;      // 当前可靠控制队列深度。
+	unsigned int MaxSafetyQueueDepth;             // 安全队列历史最大深度。
+	unsigned int MaxControlQueueDepth;           // 普通控制队列历史最大深度。
+	unsigned int CanTxAccepted;                  // CAN 发送包接受累计数。
+	unsigned int ControlAccepted;                // 控制包接受累计数。
+	unsigned int ControlDeduplicated;            // 控制包去重累计数。
+	unsigned int ControlRejected;                // 控制包拒绝累计数。
 	unsigned int ReservedHealthV2Padding;         // 固定旧 336 字节 ABI 前缀中的尾部对齐空间。
 	int UsbDiagnosticsSupported;                 // 当前 APP 是否声明 USB 链路 V4 诊断能力。
 	int UsbDiagnosticsAvailable;                 // 当前会话是否已收到至少一份有效 V4 诊断。
@@ -490,24 +495,25 @@ struct RB_SeatbeltState
 	double TestRightPercent;                     // 右测试输出百分比。
 };
 
+// RGB 灯效引擎运行状态。计数器在当前 SDK 生命周期内单调累计。
 struct RB_RgbState
 {
-	int Size;
-	int Version;
-	int Enabled;
-	int Connected;
-	char DeviceUid[RB_TEXT_SMALL];
-	int ActiveLayerCount;
-	int LogicalPixelCount;
-	unsigned int GeneratedFrames;
-	unsigned int SubmittedFrames;
-	unsigned int SentFrames;
-	unsigned int DroppedFrames;
-	unsigned int FailedFrames;
-	int LastError;
-	unsigned int EstimatedCurrentMa;
-	unsigned int PowerScalePermille;
-	double LastTelemetryValue[RB_RGB_EFFECT_LAYER_COUNT];
+	int Size;                                    // 调用前设为 sizeof(RB_RgbState)。
+	int Version;                                 // 结构体版本，当前为 2。
+	int Enabled;                                 // 灯效引擎是否启用。
+	int Connected;                               // RGB 设备是否已连接。
+	char DeviceUid[RB_TEXT_SMALL];              // 当前设备稳定 UID。
+	int ActiveLayerCount;                        // 当前启用的效果层数。
+	int LogicalPixelCount;                      // 当前配置的逻辑像素总数。
+	unsigned int GeneratedFrames;               // SDK 已生成的灯效帧数。
+	unsigned int SubmittedFrames;               // 已提交到发送队列的帧数。
+	unsigned int SentFrames;                    // 已成功发送到设备的帧数。
+	unsigned int DroppedFrames;                 // latest-only 队列中被覆盖的帧数。
+	unsigned int FailedFrames;                  // 发送失败的帧数。
+	int LastError;                              // 最近一次 RGB 设备或传输错误码。
+	unsigned int EstimatedCurrentMa;            // 按当前像素估算的电流，单位 mA。
+	unsigned int PowerScalePermille;            // 功率缩放比例，1000 表示 100%。
+	double LastTelemetryValue[RB_RGB_EFFECT_LAYER_COUNT]; // 每个效果层最近一次输入值。
 };
 
 // 后端运行态总快照。前端高频读取此结构体即可刷新主状态 UI。
@@ -646,6 +652,7 @@ struct RB_CustomGameMmfBlockHeader
 };
 #pragma pack(pop)
 
+// 自定义游戏遥测包协议常量。
 enum RB_CustomTelemetryProtocol
 {
 	RB_CUSTOM_PACKET_MAGIC = 0x4D544252,         // 小端字节序文本RBTM。
@@ -776,6 +783,7 @@ struct RB_PluginInfo
 	int Launchable;                                 // 1=插件提供可启动的前端程序，0=仅后台运行。
 };
 
+// 功能插件目录。
 struct RB_PluginCatalog
 {
 	int Size;                                       // 结构体字节数，由 SDK 写入。
@@ -915,6 +923,7 @@ struct RB_DashboardWebConfig
 	int MaxFps;                                    // 最大编码帧率，范围 1-60。
 };
 
+// 浏览器仪表服务运行状态。
 struct RB_DashboardWebState
 {
 	int Size;                                      // 调用前设为 sizeof(RB_DashboardWebState)。
@@ -931,6 +940,7 @@ struct RB_DashboardWebState
 	char LastErrorText[RB_TEXT_LARGE];             // UTF-8 错误说明。
 };
 
+// 浏览器仪表服务句柄，由 RB_DashboardWeb_Open 创建并由 RB_DashboardWeb_Close 释放。
 typedef void* RB_DashboardWebHandle;
 
 // 客户自定义仪表目录项。模板 ID 是配置持久化和打开模板的稳定标识。
@@ -966,6 +976,7 @@ struct RB_DashboardPackageState
 	char LastErrorText[RB_TEXT_LARGE];              // 最近加载或渲染错误。
 };
 
+// 客户仪表模板句柄，由 RB_DashboardPackage_Open 创建并由 RB_DashboardPackage_Close 释放。
 typedef void* RB_DashboardPackageHandle;
 
 // 游戏安装信息。用于首页启动/停止游戏和安装路径显示。
@@ -1071,56 +1082,61 @@ struct RB_MotionProtectionConfigV2
 // UI 无关的平台预览图元。SDK 计算真实 Rig 几何，调用方把回调映射到自己的绘图库。
 struct RB_DrawPointF
 {
-	float X;
-	float Y;
+	float X;                                      // 横坐标。
+	float Y;                                      // 纵坐标。
 };
 
+// 浮点绘制矩形，坐标单位由调用方绘图上下文定义。
 struct RB_DrawRectF
 {
-	float Left;
-	float Top;
-	float Right;
-	float Bottom;
+	float Left;                                  // 左边界。
+	float Top;                                   // 上边界。
+	float Right;                                 // 右边界。
+	float Bottom;                                // 下边界。
 };
 
+// 平台预览绘制样式。
 enum RB_PlatformPreviewStyle
 {
 	RB_PLATFORM_PREVIEW_DEBUG = 0,                 // 参数窗口完整调试视图。
 	RB_PLATFORM_PREVIEW_COMPACT = 1                // 主页面小预览视图。
 };
 
+// 绘制文本对齐标志，可按位组合水平和垂直方向。
 enum RB_DrawTextAlign
 {
-	RB_DRAW_TEXT_LEFT = 0,
-	RB_DRAW_TEXT_CENTER = 1,
-	RB_DRAW_TEXT_RIGHT = 2,
-	RB_DRAW_TEXT_VCENTER = 4,
-	RB_DRAW_TEXT_BOTTOM = 8
+	RB_DRAW_TEXT_LEFT = 0, // 水平左对齐。
+	RB_DRAW_TEXT_CENTER = 1, // 水平居中。
+	RB_DRAW_TEXT_RIGHT = 2, // 水平右对齐。
+	RB_DRAW_TEXT_VCENTER = 4, // 垂直居中。
+	RB_DRAW_TEXT_BOTTOM = 8 // 垂直底部对齐。
 };
 
+// 矩形渐变方向。
 enum RB_DrawGradientMode
 {
-	RB_DRAW_GRADIENT_HORIZONTAL = 0,
-	RB_DRAW_GRADIENT_VERTICAL = 1
+	RB_DRAW_GRADIENT_HORIZONTAL = 0, // 从左到右渐变。
+	RB_DRAW_GRADIENT_VERTICAL = 1 // 从上到下渐变。
 };
 
+// UI 无关的绘图回调表。SDK 只在同步调用期间使用这些函数指针。
 struct RB_DrawCallbacks
 {
 	int Size;                                      // 必须设为 sizeof(RB_DrawCallbacks)。
 	int Version;                                   // 当前固定为 1。
 	void* UserData;                                // SDK 原样回传给每个回调。
-	void (*SetBrushColor)(void* userData, unsigned int color);
-	void (*SetLineWidth)(void* userData, float width);
-	void (*SetFontSize)(void* userData, int size);
-	void (*SetTextAlign)(void* userData, int align);
-	void (*EnableSmoothing)(void* userData, int enabled);
-	void (*Clear)(void* userData, unsigned int color);
-	void (*GradientFill)(void* userData, const RB_DrawRectF* rect, unsigned int color1, unsigned int color2, int mode);
-	void (*DrawLine)(void* userData, float x1, float y1, float x2, float y2);
-	void (*FillEllipse)(void* userData, const RB_DrawRectF* rect);
-	void (*FillPolygon)(void* userData, const RB_DrawPointF* points, int count);
-	void (*DrawPolygon)(void* userData, const RB_DrawPointF* points, int count);
-	void (*DrawString)(void* userData, const wchar_t* text, int count, const RB_DrawRectF* rect);
+	void (*SetBrushColor)(void* userData, unsigned int color); // 设置后续填充颜色，格式 0xAARRGGBB。
+	void (*SetLineWidth)(void* userData, float width); // 设置线宽。
+	void (*SetFontSize)(void* userData, int size); // 设置文本字号。
+	void (*SetTextAlign)(void* userData, int align); // 设置 RB_DrawTextAlign 对齐标志。
+	void (*EnableSmoothing)(void* userData, int enabled); // 开关抗锯齿。
+	void (*Clear)(void* userData, unsigned int color); // 清空当前画布。
+	void (*GradientFill)(void* userData, const RB_DrawRectF* rect, unsigned int color1, unsigned int color2, int mode); // 填充渐变矩形。
+	void (*DrawLine)(void* userData, float x1, float y1, float x2, float y2); // 绘制线段。
+	void (*FillEllipse)(void* userData, const RB_DrawRectF* rect); // 填充椭圆。
+	void (*FillPolygon)(void* userData, const RB_DrawPointF* points, int count); // 填充多边形。
+	void (*DrawPolygon)(void* userData, const RB_DrawPointF* points, int count); // 绘制多边形边框。
+	void (*DrawString)(void* userData, const wchar_t* text, int count, const RB_DrawRectF* rect); // 绘制 UTF-16 文本。
 };
 
 // 输出实例配置。
@@ -1149,59 +1165,62 @@ struct RB_OutputConfig
 	char EndTime[RB_TEXT_SMALL];                   // EndString 延迟，十进制毫秒文本，例如 "0"。
 };
 
+// 安全带 CAN 通道模式。
 enum RB_SeatbeltCanChannelMode
 {
-	RB_SEATBELT_CAN_SINGLE = 1,
-	RB_SEATBELT_CAN_DUAL = 2
+	RB_SEATBELT_CAN_SINGLE = 1, // 单通道输出。
+	RB_SEATBELT_CAN_DUAL = 2 // 左右双通道输出。
 };
 
+// 安全带单通道映射目标。
 enum RB_SeatbeltCanSingleChannel
 {
-	RB_SEATBELT_CAN_SINGLE_LEFT = 0,
-	RB_SEATBELT_CAN_SINGLE_RIGHT = 1,
-	RB_SEATBELT_CAN_SINGLE_CENTER = 2
+	RB_SEATBELT_CAN_SINGLE_LEFT = 0, // 使用左节点。
+	RB_SEATBELT_CAN_SINGLE_RIGHT = 1, // 使用右节点。
+	RB_SEATBELT_CAN_SINGLE_CENTER = 2 // 使用公共中间信号，按协议从左节点发送。
 };
 
 // RB 57 安全带 CAN 输出配置。驱动器参数由 RB 专用上位机设置，SDK 只管理输出绑定和安全边界。
 struct RB_SeatbeltCanConfig
 {
-	int Size;
-	int Version;
+	int Size;                                      // 调用前设为 sizeof(RB_SeatbeltCanConfig)。
+	int Version;                                   // 结构体版本，当前为 1。
 	int ChannelMode;                              // RB_SEATBELT_CAN_SINGLE / RB_SEATBELT_CAN_DUAL。
 	int SingleChannel;                            // 单路信号：0=左，1=右，2=中间公共信号；单路中间通过左节点发送。
-	int LeftNodeId;
-	int RightNodeId;
-	char LeftOutputKey[RB_TEXT_SMALL];
-	char RightOutputKey[RB_TEXT_SMALL];
-	int LeftReverse;
-	int RightReverse;
-	double LeftReductionRatio;
-	double RightReductionRatio;
-	int LeftPositionMin;
-	int LeftPositionMax;
-	int RightPositionMin;
-	int RightPositionMax;
-	int HomingOnConnect;
-	int HomingMethod;
-	int HomingTimeoutMs;
+	int LeftNodeId;                               // 左侧安全带驱动节点 ID。
+	int RightNodeId;                              // 右侧安全带驱动节点 ID。
+	char LeftOutputKey[RB_TEXT_SMALL];            // 左侧输出实例稳定 key。
+	char RightOutputKey[RB_TEXT_SMALL];           // 右侧输出实例稳定 key。
+	int LeftReverse;                              // 左侧位置方向是否反向。
+	int RightReverse;                             // 右侧位置方向是否反向。
+	double LeftReductionRatio;                    // 左侧减速/行程换算比例。
+	double RightReductionRatio;                   // 右侧减速/行程换算比例。
+	int LeftPositionMin;                          // 左侧允许的最小目标位置。
+	int LeftPositionMax;                          // 左侧允许的最大目标位置。
+	int RightPositionMin;                         // 右侧允许的最小目标位置。
+	int RightPositionMax;                         // 右侧允许的最大目标位置。
+	int HomingOnConnect;                          // 连接后是否自动回零。
+	int HomingMethod;                             // 设备协议使用的回零方法编号。
+	int HomingTimeoutMs;                          // 单次回零等待上限，单位毫秒。
 };
 
+// 安全带 CAN 输出实例的连接、回零和目标位置状态。
 struct RB_SeatbeltCanState
 {
-	int Size;
-	int Version;
-	int Connected;
-	int Ready;
-	int Homing;
-	int Homed;
-	int Fault;
-	int LastError;
-	int ChannelMode;
-	int LeftNodeId;
-	int RightNodeId;
-	int32_t LeftTargetPosition;
-	int32_t RightTargetPosition;
-	char StatusText[RB_TEXT_MEDIUM];
+	int Size;                                      // 调用前设为 sizeof(RB_SeatbeltCanState)。
+	int Version;                                   // 结构体版本，当前为 1。
+	int Connected;                                 // 1=输出会话已连接。
+	int Ready;                                     // 1=设备和节点满足输出条件。
+	int Homing;                                    // 1=正在回零。
+	int Homed;                                     // 1=左右通道均已回零。
+	int Fault;                                     // 1=当前存在故障或安全锁定。
+	int LastError;                                 // 最近一次设备或传输错误码。
+	int ChannelMode;                               // RB_SeatbeltCanChannelMode。
+	int LeftNodeId;                                // 当前左节点 ID。
+	int RightNodeId;                               // 当前右节点 ID。
+	int32_t LeftTargetPosition;                    // 最近一次左通道目标位置。
+	int32_t RightTargetPosition;                   // 最近一次右通道目标位置。
+	char StatusText[RB_TEXT_MEDIUM];               // 面向前端的状态文本。
 };
 
 // 动态滤波单个输入的滤波参数。
@@ -1221,6 +1240,7 @@ struct RB_FilterEffect
 	int SensitivityStrength;                       // 范围0-100；单路限速强度，非零越大越慢，0关闭，仅Sensitivity>0时有效。
 };
 
+// 动态配置中的单个输入通道。
 struct RB_DynamicInputEffect
 {
 	int Enabled;                                   // 1=启用该输入通道，0=保留配置但不参与计算。
@@ -1239,15 +1259,17 @@ struct RB_DynamicInputCandidateItem
 	char TelemetryKey[RB_TEXT_SMALL];              // 稳定遥测 key，用于诊断和跨运行解析。
 };
 
+// 单个目标 DOF 的动态输入候选目录。
 struct RB_DynamicInputCandidateCatalog
 {
 	int Size;                                      // 结构体字节数，由 SDK 写入。
 	int Version;                                   // 当前为 1。
 	int DofIndex;                                  // 本目录对应的目标 DOF，范围 0-7。
 	int Count;                                     // Items 中有效候选数量。
-	RB_DynamicInputCandidateItem Items[RB_DYNAMIC_MAX_CANDIDATES];
+	RB_DynamicInputCandidateItem Items[RB_DYNAMIC_MAX_CANDIDATES]; // 候选输入数组。
 };
 
+// 单个目标 DOF 的动态输入配置。
 struct RB_DynamicDofEffect
 {
 	int Enabled;                                   // 1=启用整个 DOF，0=禁用该 DOF 的全部输入。
@@ -1255,6 +1277,7 @@ struct RB_DynamicDofEffect
 	RB_DynamicInputEffect Inputs[RB_DYNAMIC_MAX_INPUTS]; // 输入数组。
 };
 
+// DynamicV2 完整配置，包含 6DOF 和两个附加映射槽位。
 struct RB_DynamicV2Profile
 {
 	int Size;                                      // 结构体字节数，由 SDK 写入。
@@ -1262,6 +1285,7 @@ struct RB_DynamicV2Profile
 	RB_DynamicDofEffect Dofs[RB_DYNAMIC_DOF_COUNT]; // 动态 6DOF/附加槽位配置。
 };
 
+// 单个运动增强效果的输出路由。
 struct RB_MotionEffectOutputRoute
 {
 	int Enabled;                                   // 1=启用该输出路由。
@@ -1273,6 +1297,7 @@ struct RB_MotionEffectOutputRoute
 	double Duration;                               // 当前路由单次持续时间，单位秒。
 };
 
+// 单个运动增强效果配置。
 struct RB_MotionEffectConfig
 {
 	int Enabled;                                   // 是否启用该运动增强效果。
@@ -1292,6 +1317,7 @@ struct RB_MotionEffectConfig
 	double Direction;                              // 旧版方向参数。
 };
 
+// 运动增强效果配置集合。
 struct RB_MotionEffectProfile
 {
 	int Size;                                      // 结构体字节数，由 SDK 写入。
@@ -1299,6 +1325,7 @@ struct RB_MotionEffectProfile
 	RB_MotionEffectConfig Effects[RB_MOTION_EFFECT_COUNT]; // 运动增强效果数组。
 };
 
+// 单个震动效果配置。
 struct RB_HapticEffectConfig
 {
 	int Enabled;                                   // 是否启用该震动效果。
@@ -1314,6 +1341,7 @@ struct RB_HapticEffectConfig
 	double Direction;                              // 输出方向。
 };
 
+// 震动效果配置集合。
 struct RB_HapticEffectProfile
 {
 	int Size;                                      // 结构体字节数，由 SDK 写入。
@@ -1321,6 +1349,7 @@ struct RB_HapticEffectProfile
 	RB_HapticEffectConfig Effects[RB_HAPTIC_EFFECT_COUNT]; // 震动效果数组。
 };
 
+// 风感效果配置。
 struct RB_WindEffectConfig
 {
 	int Size;                                      // 结构体字节数，由 SDK 写入。
@@ -1335,6 +1364,7 @@ struct RB_WindEffectConfig
 	double ChannelOffsetPercent[RB_WIND_CHANNEL_COUNT]; // Wind1-Wind4 偏移补偿，-100% 到 100%，0=不补偿。
 };
 
+// 安全带效果配置；该产品计算和输出不依赖 SDK 主授权。
 struct RB_SeatbeltEffectConfig
 {
 	int Size;                                      // 结构体字节数，由 SDK 写入。
@@ -1372,72 +1402,76 @@ struct RB_SeatbeltEffectConfig
 	char SpeedInputKey[RB_TEXT_SMALL];             // 低速门限输入稳定 key，默认 rb.vehicle.speed。
 };
 
+// RGB 设备单路灯带配置。
 struct RB_RgbStripConfig
 {
-	int Enabled;
-	int ColorOrder;
-	int Reversed;
-	int Brightness;
-	int LedCount;
-	int LogicalStart;
+	int Enabled;                                  // 1=启用该输出路。
+	int ColorOrder;                               // 控制器颜色顺序枚举，按设备协议解释。
+	int Reversed;                                 // 1=像素顺序反向。
+	int Brightness;                               // 本路亮度，范围 0-255。
+	int LedCount;                                 // 本路物理灯数。
+	int LogicalStart;                             // 本路在逻辑像素空间中的起始位置。
 };
 
+// RGB 设备全局配置及四路灯带配置。
 struct RB_RgbDeviceConfig
 {
-	int Size;
-	int Version;
-	int GlobalBrightness;
-	int CurrentLimitMa;
-	int PixelCurrentMa;
-	int HostTimeoutMs;
-	RB_RgbStripConfig Strips[RB_RGB_OUTPUT_COUNT];
+	int Size;                                     // 调用前设为 sizeof(RB_RgbDeviceConfig)。
+	int Version;                                  // 结构体版本，当前为 1。
+	int GlobalBrightness;                         // 全局亮度，范围 0-255。
+	int CurrentLimitMa;                           // 总电流限制，单位 mA。
+	int PixelCurrentMa;                           // 单像素估算电流，单位 mA。
+	int HostTimeoutMs;                            // 主机帧超时，单位毫秒；超时后设备进入安全黑屏。
+	RB_RgbStripConfig Strips[RB_RGB_OUTPUT_COUNT]; // 四路灯带配置。
 };
 
+// RGB 设备枚举信息。
 struct RB_RgbDeviceInfo
 {
-	int Size;
-	int Version;
-	char Uid[RB_TEXT_SMALL];
-	unsigned int FirmwareVersion;
-	unsigned int Capabilities;
-	int MaxOutputs;
-	int MaxLedsPerOutput;
-	int Connected;
+	int Size;                                     // 调用前设为 sizeof(RB_RgbDeviceInfo)。
+	int Version;                                  // 结构体版本，当前为 1。
+	char Uid[RB_TEXT_SMALL];                      // 设备稳定 UID。
+	unsigned int FirmwareVersion;                 // 设备固件版本号。
+	unsigned int Capabilities;                    // 设备能力位。
+	int MaxOutputs;                               // 最大输出路数。
+	int MaxLedsPerOutput;                         // 单路最大像素数。
+	int Connected;                                // 1=当前已连接。
 	int IapMode;                  // 1 表示设备停在 IAP，只能用于 APP 固件更新。
 };
 
+// RGB 设备链路与渲染诊断计数。
 struct RB_RgbDiagnostics
 {
-	int Size;
-	int Version;
-	unsigned int UptimeMs;
-	unsigned int CommittedFrames;
-	unsigned int DisplayedFrames;
-	unsigned int RejectedFrames;
-	unsigned int UsbRxOverflowCount;
-	unsigned int DmaErrorCount;
-	unsigned int TimeoutBlackoutCount;
-	unsigned int DisconnectBlackoutCount;
-	unsigned int EstimatedCurrentMa;
-	unsigned int PowerScalePermille;
-	unsigned int ActivePixels;
-	int OutputBusy;
-	int UsbConfigured;
-	int UsbSuspended;
-	int LastBlackoutReason;
+	int Size;                                     // 调用前设为 sizeof(RB_RgbDiagnostics)。
+	int Version;                                  // 结构体版本，当前为 1。
+	unsigned int UptimeMs;                        // 设备运行时间，单位毫秒。
+	unsigned int CommittedFrames;                 // 已提交给设备的帧数。
+	unsigned int DisplayedFrames;                 // 设备确认显示的帧数。
+	unsigned int RejectedFrames;                  // 设备拒绝的帧数。
+	unsigned int UsbRxOverflowCount;              // USB 接收溢出累计数。
+	unsigned int DmaErrorCount;                   // 设备 DMA 错误累计数。
+	unsigned int TimeoutBlackoutCount;            // 帧超时触发黑屏累计数。
+	unsigned int DisconnectBlackoutCount;         // 断连触发黑屏累计数。
+	unsigned int EstimatedCurrentMa;              // 当前估算电流，单位 mA。
+	unsigned int PowerScalePermille;              // 当前功率缩放比例，1000 表示 100%。
+	unsigned int ActivePixels;                    // 当前有效逻辑像素数。
+	int OutputBusy;                               // 1=设备输出通道忙。
+	int UsbConfigured;                            // 1=USB 已进入 Configured 状态。
+	int UsbSuspended;                             // 1=USB 当前处于挂起。
+	int LastBlackoutReason;                       // 最近一次安全黑屏原因枚举。
 };
 
 // RGBAPP APP 固件异步更新状态。前端轮询此结构时只读取内存，不访问固件文件或 USB。
 struct RB_RgbFirmwareUpdateState
 {
-	int Size;
+	int Size;                                     // 调用前设为 sizeof(RB_RgbFirmwareUpdateState)。
 	int Version;                 // 当前为 1。
-	int Running;
-	int Complete;
-	int Success;
+	int Running;                                  // 1=固件更新正在执行。
+	int Complete;                                 // 1=本次更新已结束。
+	int Success;                                  // 1=更新成功。
 	int Progress;                // 0-100。
 	int ErrorCode;               // 0 成功；负数为 RGB 控制器错误。
-	char DeviceUid[RB_TEXT_SMALL];
+	char DeviceUid[RB_TEXT_SMALL];                // 本次更新目标设备 UID。
 };
 
 // RGB效果语义输入项。调用 RB_Rgb_GetEffectInput() 填充。
@@ -1456,40 +1490,43 @@ struct RB_RgbEffectInputItem
 	double DefaultThreshold;               // 选择该输入时建议使用的触发阈值。
 };
 
+// RGB 效果配置中的单个层。
 struct RB_RgbEffectLayerConfig
 {
-	int Enabled;
-	int EffectType;
-	char TelemetryKey[RB_TEXT_SMALL];
-	int TelemetryIndex;
-	int OutputMask;
-	int StartPixel;
-	int PixelCount;
-	int Priority;
-	unsigned int ColorA;
-	unsigned int ColorB;
-	double MinValue;
-	double MaxValue;
-	double Threshold;
-	double BrightnessPercent;
-	double SpeedHz;
-	int Invert;
+	int Enabled;                                  // 1=启用该层。
+	int EffectType;                               // RB_RgbEffectType。
+	char TelemetryKey[RB_TEXT_SMALL];             // 稳定遥测或派生效果 key。
+	int TelemetryIndex;                           // 当前运行时遥测索引，不能持久化。
+	int OutputMask;                               // 输出路位掩码，位 0-3 对应四路灯带。
+	int StartPixel;                               // 每路相对起始像素。
+	int PixelCount;                               // 每路参与效果的像素数。
+	int Priority;                                 // 层合成优先级，数值越大越优先。
+	unsigned int ColorA;                          // 主颜色，格式 0xRRGGBB。
+	unsigned int ColorB;                          // 辅助颜色，格式 0xRRGGBB。
+	double MinValue;                              // 输入映射下限。
+	double MaxValue;                              // 输入映射上限。
+	double Threshold;                             // 阈值型效果的触发阈值。
+	double BrightnessPercent;                     // 该层亮度，范围 0-100%。
+	double SpeedHz;                               // 动画或闪烁速度，单位 Hz。
+	int Invert;                                   // 1=反转阈值或输入条件。
 	double BlinkDutyPercent; // 闪烁周期内保持点亮的百分比，范围0-100。
 	int FillMode;            // RB_RgbFillMode，仅 RPM 条使用。
 	int DisplayMode;         // RB_RgbEffectDisplayMode，默认独立 RGB。
 };
 
+// RGB 灯效完整配置。
 struct RB_RgbEffectProfile
 {
-	int Size;
+	int Size;                                     // 调用前设为 sizeof(RB_RgbEffectProfile)。
 	int Version;                             // 结构体版本，当前为 3。
-	int Enabled;
-	int FrameRateHz;
-	double MasterBrightnessPercent;
-	int LayerCount;
-	RB_RgbEffectLayerConfig Layers[RB_RGB_EFFECT_LAYER_COUNT];
+	int Enabled;                                  // 1=启用灯效引擎。
+	int FrameRateHz;                              // 目标帧率，单位 Hz。
+	double MasterBrightnessPercent;               // 总亮度，范围 0-100%。
+	int LayerCount;                               // Layers 中有效层数量。
+	RB_RgbEffectLayerConfig Layers[RB_RGB_EFFECT_LAYER_COUNT]; // 固定大小的效果层数组。
 };
 
+// 宿主全局系统配置。
 struct RB_SystemConfig
 {
 	int Size;                                      // 结构体字节数，由 SDK 写入。
@@ -1516,7 +1553,7 @@ struct RB_SystemConfig
 
 /**
  * @brief 获取 SDK 版本文本。
- * @return SDK 持有的 UTF-8、NUL 结尾字符串，例如 "0.6.3"；调用方不得修改或释放。
+ * @return SDK 持有的 UTF-8、NUL 结尾字符串，例如 "0.6.4"；调用方不得修改或释放。
  */
 RB_API const char* RB_Runtime_GetVersion();
 
@@ -2293,6 +2330,7 @@ RB_API int RB_Output_ApplyInstanceConfigByIndex(int instanceIndex, const RB_Outp
  *       并且仅在输出配置的 AutoConnect 为 1 时执行。
  */
 RB_API int RB_Output_GetIdleDisableTimeoutSeconds(int instanceIndex, int* timeoutSeconds);
+/** @brief 设置指定 CAN 输出空闲下使能超时，单位秒；0 禁止自动下使能。 */
 RB_API int RB_Output_SetIdleDisableTimeoutSeconds(int instanceIndex, int timeoutSeconds);
 
 /**
