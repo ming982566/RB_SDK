@@ -3,6 +3,14 @@
 RaceBear SDK is a Windows x64 C ABI SDK for building telemetry, motion,
 haptics, output, and dashboard frontend applications.
 
+## 0.6.3
+
+- The DLL reports runtime version `0.6.3`; the public package now includes the
+  unified object ABI guide and complete public synchronous service directory.
+- Third-party frontends can discover stable object, service, operation, command,
+  and telemetry keys from the public docs and `Describe`; legacy exports remain
+  compatible.
+
 ## 0.6.2
 
 - The DLL reports runtime version `0.6.2`; existing structure layouts and calling
@@ -81,6 +89,8 @@ haptics, output, and dashboard frontend applications.
 | `bin/x64/Debug` | Matching Debug DLL, import library, optional VOCORE dependency, and dashboard assets |
 | `bin/x64/Release` | Matching Release DLL, import library, optional VOCORE dependency, and dashboard assets |
 | `docs/RaceBearSDK_FRONTEND_GUIDE.md` | Page-by-page frontend workflow and configuration ownership rules |
+| `docs/RaceBearSDK_OBJECT_API.md` | Unified object ABI, stable key taxonomy, objects, commands, buffers, and lifecycle |
+| `docs/RaceBearSDK_SERVICE_API.md` | Public synchronous service operations, signatures, argument order, and business contracts |
 | `docs/RaceBearSDK_AI_DEVELOPMENT.md` | AI development entry point, implementation stages, coverage and delivery checks |
 | `docs/RaceBearSDK_FRONTEND_UI_SPEC.md` | Page containers, controls, drafts, background tasks and UI acceptance |
 | `docs/RaceBearSDK_API.md` | API reference, structures, units, deployment, and examples |
@@ -132,7 +142,7 @@ Run the repository release script from `RB_SDK` after the SDK source, build
 outputs, documentation, and public repository status have been checked:
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.6.2
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.6.3
 ```
 
 The script uses the sibling `RaceBear_SDK` development directory by default.
@@ -191,7 +201,7 @@ the Microsoft Visual C++ 2015-2022 Redistributable x64.
 
 The Debug and Release package directories contain matching headers, import
 libraries, DLLs, runtime dependencies, and dashboard resources from the same
-verified 0.6.2 build.
+verified 0.6.3 build.
 
 ## Frontend Rules
 

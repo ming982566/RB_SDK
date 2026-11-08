@@ -74,6 +74,8 @@ function Copy-SdkPackage {
     Copy-Item (Join-Path $SdkSourceRoot 'include\RaceBearSDK.h') (Join-Path $publishRoot 'include\RaceBearSDK.h') -Force
     Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_API.md') (Join-Path $publishRoot 'docs\RaceBearSDK_API.md') -Force
     Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_FRONTEND_GUIDE.md') (Join-Path $publishRoot 'docs\RaceBearSDK_FRONTEND_GUIDE.md') -Force
+    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_OBJECT_API.md') (Join-Path $publishRoot 'docs\RaceBearSDK_OBJECT_API.md') -Force
+    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_SERVICE_API.md') (Join-Path $publishRoot 'docs\RaceBearSDK_SERVICE_API.md') -Force
     Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_DASHBOARD_DEVELOPMENT.md') (Join-Path $publishRoot 'docs\RaceBearSDK_DASHBOARD_DEVELOPMENT.md') -Force
     Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_RB_CAN_GUIDE.md') (Join-Path $publishRoot 'docs\RaceBearSDK_RB_CAN_GUIDE.md') -Force
     Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_AI_DEVELOPMENT.md') (Join-Path $publishRoot 'docs\RaceBearSDK_AI_DEVELOPMENT.md') -Force
@@ -178,7 +180,7 @@ function New-ReleaseStage {
         '^bin\\x64\\(Debug|Release)\\DashboardAssets\\RaceBear\\[^\\]+\\[^\\]+\.(png|ttf|rbdash)$',
         '^bin\\x64\\(Debug|Release)\\DashboardAssets\\RaceBear\\[^\\]+\\[^\\]+\\[^\\]+\.(png|ttf|rbdash)$',
         '^include\\RaceBearSDK\.h$',
-        '^docs\\(RaceBearSDK_API|RaceBearSDK_FRONTEND_GUIDE|RaceBearSDK_DASHBOARD_DEVELOPMENT|RaceBearSDK_RB_CAN_GUIDE|RaceBearSDK_AI_DEVELOPMENT|RaceBearSDK_FRONTEND_UI_SPEC|RELEASE_PROCESS)\.md$',
+        '^docs\\(RaceBearSDK_API|RaceBearSDK_FRONTEND_GUIDE|RaceBearSDK_OBJECT_API|RaceBearSDK_SERVICE_API|RaceBearSDK_DASHBOARD_DEVELOPMENT|RaceBearSDK_RB_CAN_GUIDE|RaceBearSDK_AI_DEVELOPMENT|RaceBearSDK_FRONTEND_UI_SPEC|RELEASE_PROCESS)\.md$',
         '^examples\\README\.md$',
         '^examples\\(cpp|python)\\[^\\]+\.(cpp|h|py|md|txt)$',
         '^examples\\cpp\\simhub_udp_bridge\\[^\\]+\.(cpp|h|md|txt)$',
