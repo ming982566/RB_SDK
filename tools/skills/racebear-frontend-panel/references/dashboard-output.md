@@ -4,6 +4,11 @@ Use `docs/RaceBearSDK_FRONTEND_GUIDE.md` section 15 for the integration workflow
 
 ## Pipeline
 
+The same dashboard, VOCORE and Web operations are available through native object services
+listed in `docs/RaceBearSDK_SERVICE_API.md`. Pass pixel pointers synchronously, retain the
+original handle/frame lifetime and latest-frame rules, and never serialize the native packet.
+The generic task queue is not a pixel-delivery channel.
+
 Treat rendering and delivery as separate operations:
 
 1. Read the latest `RB_RuntimeState`.

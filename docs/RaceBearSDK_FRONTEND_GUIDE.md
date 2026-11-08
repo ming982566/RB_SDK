@@ -9,6 +9,29 @@
 `RaceBearSDK_API.md`。实现 RB_CAN 设备页时请同时参考
 `RaceBearSDK_RB_CAN_GUIDE.md`。本文重点说明如何把这些接口正确组合成可用软件。
 
+### 统一对象入口的适用范围
+
+可选的新接入方式见 [统一对象 ABI](RaceBearSDK_OBJECT_API.md)：
+用 7 个 `RB_Object_*` 访问 9 个状态/草稿对象、29 个同步服务域、20 个异步动作。
+游戏/平台/CAN、串口和仪表等剩余公开能力可走 NATIVE_CALL；逐项映射见
+[同步服务目录](RaceBearSDK_SERVICE_API.md)。旧接入方式保持有效，
+后文原接口的参数、业务失败、所有权和线程规则同样适用于对应同步服务。
+服务是同进程本机协议，不能直接传入浏览器或跨进程；不为每个操作建立 UI 按钮。
+
+查找 `rb.*` 的入口是对象协议第 0 节：先区分对象 key、服务操作 key、异步命令和
+遥测字段 key，再按第 2 节选状态/草稿对象、第 5 节选命令，或从同步服务目录选操作。
+服务表给出输入参数顺序、返回类型与原业务合同；结构体成员见同包公开头。
+第三方只依赖目录中公开的 265 项服务操作，不能把 firstParty=true 的操作当作公开功能。
+完整 SDK 包的 `examples/object_api/main.cpp` 可用于学习目录查询、默认配置和运行态流程；
+读取这些文档及使用对象 ABI 不需要 SimRacebear 模块、私有源码或内部服务登记文件。
+
+新遥测对象只读整帧，配置对象是共享且带修订号的草稿；Binary/JSON Write 不隐式 Save/Apply。
+NATIVE_CALL Write 同步执行业务并单独返回业务值，没有草稿修订/异步任务语义。
+多个页面基于同版本写入会产生冲突，应重读合并。旧接口或外部文件更新后需显式 reload
+才导入新草稿。异步任务必须检查终态 ResultCode 并消费结果；轮询超时不表示取消。
+独立产品仍先设置 AppDataName（可走运行态服务），所有宿主调用线程停止后才能 Shutdown。
+本指南其它章节针对原类型化接口的读写规则不自动变成对象草稿协议。
+
 ### AI 辅助开发入口
 
 从零开发一个第三方前端时，先读取
@@ -16,6 +39,11 @@
 页面导航、功能应放入的容器、控件类型、编辑草稿、任务反馈、多语言和视觉验收见
 [前端产品与交互规范](RaceBearSDK_FRONTEND_UI_SPEC.md)。本文负责 SDK 接入流程，
 两份新文档负责产品组织和完整交付，不能以接入了若干 API 代替用户工作流完成。
+
+RGB、安全带、Haptic 和 Wind 可以作为不依赖 SDK 主授权的独立产品接入。未授权时仍初始化并运行
+这些效果链；前端应单独显示它们的连接、输出和故障状态。普通 Motion 和平台输出继续根据
+`RB_LicenseSnapshot.OutputAllowed` 显示锁定状态，不要用主授权状态阻止 RGB、安全带、Haptic
+或 Wind 页面的配置、测试和连接操作。
 
 SDK 源稿中的 `tools/skills/racebear-frontend-panel` 是面向支持 Skill 或可复用指令
 的 AI 编码工具的前端接入包。它把本文的页面流程与公开头、API 手册、仪表专题和
@@ -257,19 +285,25 @@ RB_Command_Run("license.activate",
 RB_Command_Run("license.deactivate", "{}", result, resultSize);
 ```
 
-未授权时不要强制关闭宿主程序。配置、目录、原始遥测、状态和激活页面仍可用；SDK 会停止专有计算并安全断开真实输出。
+未授权时不要强制关闭宿主程序。配置、目录、原始遥测、状态和激活页面仍可用；SDK
+会停止受保护的 Motion 计算并安全处理普通真实输出，RGBAPP、`SEATBELT_CAN`、
+Haptic 和 Wind 继续按独立产品合同运行。
 
 锁定状态建议按下面规则呈现：
 
-- `state.License.OutputAllowed == 0` 时禁用 Apply、测试启用和连接按钮，但保留保存、复位和断开按钮。
-- `RB_State_Read()` 仍然成功，受保护的最终遥测、6DOF、执行器和附加效果结果为 0。
+- `state.License.OutputAllowed == 0` 时只对 Motion、平台和普通输出禁用 Apply、测试启用和连接；RGBAPP、`SEATBELT_CAN`、Haptic 和 Wind 页面仍允许对应操作。
+- `RB_State_Read()` 仍然成功，受保护的 Motion 最终遥测、6DOF 和执行器结果为 0；Haptic、Wind、RGB 和安全带状态继续反映真实运行值。
 - 运行态 Apply、测试启用或输出连接返回 `RB_LICENSE_REQUIRED` 时，显示授权提示，不要重试循环调用。
 - `RB_Telemetry_GetRawValue()` 可继续用于遥测诊断；`RB_Telemetry_GetProcessedValue()` 在锁定状态返回 0。
-- 授权恢复由 SDK 自动从零淡入，前端不需要重建第二套过渡。
-所有真实连接和手动测试按钮还应检查 `state.License.OutputAllowed`。
+- 授权恢复由 SDK 自动从零淡入，前端不需要重建第二套 Motion 过渡。
+普通受保护连接和手动测试按钮还应检查 `state.License.OutputAllowed`；
+RGB、Haptic、Wind 和安全带按钮按各自设备和安全状态处理。
 
 上述门控适用于受保护运行接口；具体 API 有独立合同的例外按其合同处理。
-例如 `RB_Rgb_SetTestPattern()` 是不依赖运行输出授权的硬件诊断测试；
+例如 RGBAPP 的连接、正常效果、设备配置和 `RB_Rgb_SetTestPattern()` 都不依赖运行输出授权；
+安全带效果、测试输出和 `SEATBELT_CAN` 专用连接也不依赖运行输出授权；
+Haptic 的配置 Apply、`Vibration` 输出配置和连接也不依赖运行输出授权；
+Wind 的配置 Apply、测试输出和状态读取也不依赖运行输出授权；
 不能以一个全局禁用逻辑误锁全部工具、读取、诊断和复位。
 
 ## 7. 游戏和遥测页面
@@ -575,8 +609,10 @@ RB_Wind_SaveConfig(&wind);
 状态不可用且控制器已复位时，需要用户显式断开并重新连接。
 
 安全带USB发送由SDK统一调度，界面不需要增加心跳、发送锁或重试线程。
+驱动仍有未完成OUT请求时，SDK会在后台完成取消和端点恢复，界面只需继续轮询
+真实状态；不要在UI线程或宿主线程中增加Abort、重试、补发历史位置或RGB包。
 APP `2026110101` 或更新且报告对应能力时，完整RGB帧异步提交，无逐帧应答等待；
-SDK低频复核接收与完成灯带输出。旧APP保留原协议，其应答等待与电机监测分开。
+SDK仅在异常诊断请求时复核接收与完成灯带输出。旧APP保留原协议，其应答等待与电机监测分开。
 位置与灯效保留最新目标，排队过期的请求不会迟到补发。
 RGB失败不能作为电机故障恢复依据；继续读取各自状态，并保留首次异常日志。
 灯效配置帧率最高60Hz，安全带与独立RGB控制器分别安排输出，不相互降低目标帧率。

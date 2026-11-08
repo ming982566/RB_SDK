@@ -11,8 +11,8 @@
 // 5. Call RB_Runtime_Shutdown() once before process exit. Shutdown automatically stops the runtime loop.
 // 6. All char buffers are UTF-8. wchar_t* parameters are Windows UTF-16.
 // 7. For full integration steps, examples, return-value rules, and field units, read RaceBearSDK_API.md.
-// 8. When License.OutputAllowed is 0, protected calculated fields are zeroed and runtime Apply/test/connect APIs return RB_LICENSE_REQUIRED.
-//    Configuration, catalogs, raw telemetry, license actions, serial utilities, disconnect, and reset APIs remain available.
+// 8. When License.OutputAllowed is 0, protected Motion fields are zeroed and protected runtime Apply/test/connect APIs return RB_LICENSE_REQUIRED.
+//    RGB, seatbelt, Haptic, and Wind product APIs remain available under their own device and safety contracts.
 #ifdef RACEBEARSDK_EXPORTS
 #define RB_API extern "C" __declspec(dllexport)
 #else
@@ -31,7 +31,7 @@ enum RB_Result
 	RB_LICENSE_REQUIRED = -4      // 当前授权无效或试用已到期，受保护运行功能不可用。
 };
 
-// SDK 授权状态。授权无效时 SDK 不退出宿主程序，但停止专有计算并锁定运行态 Apply、测试和输出连接。
+// SDK 授权状态。授权无效时 SDK 不退出宿主程序，但停止受保护 Motion 计算并锁定普通平台运行态 Apply、测试和连接。
 enum RB_LicenseState
 {
 	RB_LICENSE_UNKNOWN = 0,        // 尚未完成授权检查。
@@ -1516,9 +1516,96 @@ struct RB_SystemConfig
 
 /**
  * @brief 获取 SDK 版本文本。
- * @return SDK 持有的 UTF-8、NUL 结尾字符串，例如 "0.6.2"；调用方不得修改或释放。
+ * @return SDK 持有的 UTF-8、NUL 结尾字符串，例如 "0.6.3"；调用方不得修改或释放。
  */
 RB_API const char* RB_Runtime_GetVersion();
+
+// 统一对象协议第一版；旧 ABI 全部保留，生命周期沿用 RB_Runtime_*。
+enum RB_ObjectProtocol
+{
+	RB_OBJECT_BINARY = 1,             // 与目录 Schema 对应的公开结构体。
+	RB_OBJECT_JSON = 2,               // UTF-8 JSON，返回字节数包含末尾 NUL。
+	RB_OBJECT_NATIVE_CALL = 3,        // 同进程同步服务请求，使用 RB_ObjectNativeCall；不是序列化协议。
+	RB_OBJECT_CONFLICT = -100,        // 草稿修订号过期，重新读取后合并。
+	RB_OBJECT_NOT_READY = -101,       // 运行态尚未初始化或正在关闭。
+	RB_OBJECT_BUSY = -102,            // 异步任务记录已满，读取并消费完成任务后重试。
+	RB_OBJECT_NOT_SUPPORTED = -103,   // 对象、格式或动作不在第一版目录中。
+	RB_OBJECT_TASK_QUEUED = 0,        // 命令等待执行。
+	RB_OBJECT_TASK_RUNNING = 1,       // 命令正在执行。
+	RB_OBJECT_TASK_COMPLETE = 2,      // 命令结束；ResultCode 表示实际执行结果。
+	RB_OBJECT_TASK_CANCELLED = 3      // 关闭时取消未开始命令。
+};
+
+// 本机同步调用封套。参数逐槽按原类型的低位字节复制，指针不转移所有权。
+// 仅 Object_Write 接受此格式；expectedRevision=0，newRevision 返回 0。
+// 服务、操作和签名必须匹配 Describe 目录；结果是原业务返回值，Write 返回传输状态。
+struct RB_ObjectNativeCall
+{
+	int Size;                        // sizeof(RB_ObjectNativeCall)。
+	int Version;                     // 当前为 1。
+	int ArgumentCount;               // 实际参数个数，0..16。
+	int PointerBytes;                // sizeof(void*)，必须与 DLL 架构一致。
+	uint64_t Signature;              // 目录中的固定类型签名校验值。
+	const char* Operation;           // 稳定操作 key，NUL 结尾；调用期间有效。
+	uint64_t Arguments[16];          // 标量、浮点、句柄和指针的本机字节；未使用槽必须为 0。
+	uint64_t* Result;                // 调用方独占的返回值槽；void 操作也必须提供，执行后为 0。
+};
+
+// 调用方先填写 Size/Version=1。读取失败也可返回所需长度，不返回内部对象指针。
+struct RB_ObjectReadInfo
+{
+	int Size;                        // sizeof(RB_ObjectReadInfo)。
+	int Version;                     // 当前为 1。
+	int PayloadBytes;                // 完整负载所需字节数；不允许截断成功。
+	int Format;                      // RB_OBJECT_BINARY 或 RB_OBJECT_JSON。
+	uint64_t Revision;               // 配置草稿修订号；其它对象为 0。
+	uint64_t Sequence;               // 遥测快照发布序号；其它对象为 0。
+	uint64_t SampleTimeUs;           // 稳定时钟微秒，仅供本进程计算时间差。
+	int Sampled;                     // 遥测是否已有实际发布；其它对象为 0。
+	int Reserved;                    // 保留为 0。
+};
+
+// 批量遥测只复制完整发布帧；下标通过 rb.telemetry.catalog 解析，不能持久化。
+struct RB_ObjectTelemetrySnapshot
+{
+	int Size;                        // sizeof(RB_ObjectTelemetrySnapshot)。
+	int Version;                     // 当前为 1。
+	int Count;                       // 有效槽位数，不超过 RB_MAX_TELEMETRY_VALUES。
+	int SourceConnected;             // 采样时 Source 是否连接。
+	int OutputAllowed;               // 处理值授权是否允许；读取时也复核失效。
+	int Reserved;                    // 保留为 0。
+	double Raw[RB_MAX_TELEMETRY_VALUES];       // 原始值，不可公开项为 0，沿用旧接口的免授权读取。
+	double Processed[RB_MAX_TELEMETRY_VALUES]; // 处理值，未授权时为 0。
+	int RawSupported[RB_MAX_TELEMETRY_VALUES]; // 本帧原始值是否受支持。
+};
+
+// 每个任务可以重复查询；只有成功读取终态结果并 consume=1 才释放任务记录。
+struct RB_ObjectTaskInfo
+{
+	int Size;                        // sizeof(RB_ObjectTaskInfo)。
+	int Version;                     // 当前为 1。
+	uint64_t TaskId;                 // 本次 DLL 生命周期内单调递增，不用于配置持久化。
+	int Status;                      // RB_OBJECT_TASK_*。
+	int ResultCode;                  // 终态时的真实命令返回码。
+	uint64_t Revision;               // 命令捕获的草稿修订号，无草稿为 0。
+	int PayloadBytes;                // 终态 JSON 结果含 NUL 的字节数，未完成为 0。
+	int Reserved;                    // 保留为 0。
+};
+
+/** @brief 读取协议目录 JSON；objectId=0 返回总目录，否则返回对象和字段描述。requiredBytes 必填，允许 nullptr/0 查询长度。 */
+RB_API int RB_Object_Describe(int objectId, char* buffer, int bufferSize, int* requiredBytes);
+/** @brief 稳定 rb.* key 解析为本次 DLL 内的访问 ID；不支持任意内存路径。 */
+RB_API int RB_Object_Resolve(const char* key, int* objectId);
+/** @brief 并发读取对象；调用方独占 buffer/info，先设置 info 的 Size/Version。nullptr/0 只查询所需容量。 */
+RB_API int RB_Object_Read(int objectId, int format, void* buffer, int bufferSize, RB_ObjectReadInfo* info);
+/** @brief 配置格式仅修改草稿并检查修订号；NATIVE_CALL 格式同步执行业务服务，expectedRevision=0。newRevision 必填。 */
+RB_API int RB_Object_Write(int objectId, int format, const void* data, int dataSize, uint64_t expectedRevision, uint64_t* newRevision);
+/** @brief 将目录内命令排入有界队列；立即返回 taskId，提交成功不代表执行成功。参数为 UTF-8 JSON 对象。 */
+RB_API int RB_Object_Invoke(const char* command, const char* argsJson, uint64_t* taskId);
+/** @brief 查询任务；consume=1 仅在完整读取终态结果后释放记录，容量不足不释放、不重发命令。 */
+RB_API int RB_Object_Poll(uint64_t taskId, int consume, char* buffer, int bufferSize, RB_ObjectTaskInfo* info);
+/** @brief 读取当前调用线程上一次对象调用的错误详情；查询不清除错误，工作线程错误请读取任务结果。 */
+RB_API int RB_Object_GetLastError(char* buffer, int bufferSize, int* requiredBytes);
 
 /**
  * @brief 设置配置目录使用的应用名称，省略调用时默认为 "SimRacebear"。
@@ -2254,7 +2341,7 @@ RB_API int RB_SeatbeltCan_ReadConfig(int outputInstanceIndex, RB_SeatbeltCanConf
 RB_API int RB_SeatbeltCan_SaveConfig(int outputInstanceIndex, const RB_SeatbeltCanConfig* config);
 
 /**
- * @brief 将安全带 CAN 配置应用到已创建但未连接的输出实例。
+ * @brief 将安全带 CAN 配置应用到已创建但未连接的输出实例；安全带产品不依赖 SDK 主授权。
  */
 RB_API int RB_SeatbeltCan_ApplyConfig(int outputInstanceIndex, const RB_SeatbeltCanConfig* config);
 
@@ -2293,7 +2380,7 @@ RB_API int RB_Output_GetInstanceKey(int instanceIndex, char* buffer, int bufferS
 
 /**
  * @brief 添加输出实例。
- * @param outputKind "Serial"、"UDP"、"MMF"、"RB_CAN"、"FM_CAN"、"FC_CAN"、"RDS_CAN"、"Sim-FAN" 或 "Vibration"。
+ * @param outputKind "Serial"、"UDP"、"MMF"、"RB_CAN"、"FM_CAN"、"FC_CAN"、"RDS_CAN"、"SEATBELT_CAN"、"Sim-FAN" 或 "Vibration"。
  * @return 成功时返回新实例的零基索引；失败返回负数错误码。
  */
 RB_API int RB_Output_AddInstance(const char* outputKind);
@@ -2341,12 +2428,14 @@ RB_API int RB_Output_DisconnectInstanceByIndex(int instanceIndex);
 /**
  * @brief 连接全部输出实例。
  * @return 大于等于 0 表示成功发起连接的实例数量；负数表示整体操作失败。
+ * @note 未授权时仅连接 `SEATBELT_CAN`、`Sim-FAN` 和 `Vibration` 独立输出；普通平台输出仍保持断开。
  */
 RB_API int RB_Output_ConnectAll();
 
 /**
  * @brief 只连接 AutoConnect=1 的输出实例。
  * @return 大于等于 0 表示成功发起连接的实例数量；负数表示整体操作失败。
+ * @note 未授权时仅连接 `SEATBELT_CAN`、`Sim-FAN` 和 `Vibration` 独立输出；普通平台输出仍保持断开。
  */
 RB_API int RB_Output_ConnectAuto();
 
@@ -2543,7 +2632,7 @@ RB_API int RB_Haptic_SaveProfileByIndex(int profileIndex, const RB_HapticEffectP
 /**
  * @brief 将震动配置应用到当前运行态。
  * @param profile 要应用的完整震动配置。
- * @return RB_OK 表示应用成功；其他值表示参数无效或运行态不可用。
+ * @return RB_OK 表示应用成功；Haptic 不依赖 SDK 主授权。
  * @note Apply 不写配置文件。
  */
 RB_API int RB_Haptic_ApplyProfileToCurrentFunction(const RB_HapticEffectProfile* profile);
@@ -2572,7 +2661,7 @@ RB_API int RB_Wind_ReadConfig(RB_WindEffectConfig* config);
 RB_API int RB_Wind_SaveConfig(const RB_WindEffectConfig* config);
 
 /**
- * @brief 将风感配置应用到当前运行中的风感功能。
+ * @brief 将风感配置应用到当前运行中的风感功能；Wind 不依赖 SDK 主授权。
  */
 RB_API int RB_Wind_ApplyConfigToCurrentFunction(const RB_WindEffectConfig* config);
 
@@ -2580,7 +2669,7 @@ RB_API int RB_Wind_ApplyConfigToCurrentFunction(const RB_WindEffectConfig* confi
  * @brief 启用或关闭风感测试输出。
  * @param enabled 1=测试，0=恢复当前运行配置。
  * @param outputPercent 四通道统一测试输出，范围 0-100%。
- * @return RB_OK 表示测试状态已更新；其他值表示运行态不可用。
+ * @return RB_OK 表示测试状态已更新；Wind 不依赖 SDK 主授权。
  */
 RB_API int RB_Wind_SetTestOutput(int enabled, double outputPercent);
 
@@ -2600,12 +2689,12 @@ RB_API int RB_Seatbelt_ReadConfig(RB_SeatbeltEffectConfig* config);
 RB_API int RB_Seatbelt_SaveConfig(const RB_SeatbeltEffectConfig* config);
 
 /**
- * @brief 将安全带配置应用到当前运行中的安全带功能。
+ * @brief 将安全带配置应用到当前运行中的安全带功能；安全带产品不依赖 SDK 主授权。
  */
 RB_API int RB_Seatbelt_ApplyConfigToCurrentFunction(const RB_SeatbeltEffectConfig* config);
 
 /**
- * @brief 启用或关闭左右安全带测试输出。
+ * @brief 启用或关闭左右安全带测试输出；安全带产品不依赖 SDK 主授权。
  * @param enabled 1=测试，0=恢复当前运行配置。
  * @param leftPercent 左通道测试输出，范围 0-100%。
  * @param rightPercent 右通道测试输出，范围 0-100%。
@@ -2619,7 +2708,7 @@ RB_API int RB_Rgb_RefreshDevices();
 RB_API int RB_Rgb_GetDeviceCount();
 /** @brief 读取设备目录项；index 为零基目录索引。 */
 RB_API int RB_Rgb_GetDeviceInfo(int index, RB_RgbDeviceInfo* info);
-/** @brief 按稳定 MCU UID 连接 RGBAPP。 */
+/** @brief 按稳定 MCU UID 连接 RGBAPP；RGB 产品不依赖 SDK 主授权。 */
 RB_API int RB_Rgb_Connect(const char* uid);
 /** @brief 熄灭并断开当前 RGBAPP。 */
 RB_API void RB_Rgb_Disconnect();
@@ -2627,7 +2716,7 @@ RB_API void RB_Rgb_Disconnect();
 RB_API int RB_Rgb_GetDeviceConfigSnapshot(RB_RgbDeviceConfig* config);
 /** @brief 读取设备当前四路灯带与功率保护配置。 */
 RB_API int RB_Rgb_ReadDeviceConfig(RB_RgbDeviceConfig* config);
-/** @brief 将灯带配置应用到设备运行态，不写 Flash。 */
+/** @brief 将灯带配置应用到设备运行态，不写 Flash；RGB 产品不依赖 SDK 主授权。 */
 RB_API int RB_Rgb_ApplyDeviceConfig(const RB_RgbDeviceConfig* config);
 /** @brief 将设备当前灯带配置明确保存到 Flash。 */
 RB_API int RB_Rgb_SaveDeviceConfig();
@@ -2641,11 +2730,11 @@ RB_API int RB_Rgb_GetDefaultEffectProfile(RB_RgbEffectProfile* profile);
 RB_API int RB_Rgb_ReadEffectProfile(RB_RgbEffectProfile* profile);
 /** @brief 明确保存 RGB 效果配置；不会自动连接设备。 */
 RB_API int RB_Rgb_SaveEffectProfile(const RB_RgbEffectProfile* profile);
-/** @brief 将 RGB 效果配置应用到当前运行态；Apply 不读取或写入配置文件。 */
+/** @brief 将 RGB 效果配置应用到当前运行态；Apply 不读取或写入配置文件，且不依赖 SDK 主授权。 */
 RB_API int RB_Rgb_ApplyEffectProfile(const RB_RgbEffectProfile* profile);
 /** @brief 读取内存中的 RGB 运行状态，不访问配置文件或设备。 */
 RB_API int RB_Rgb_GetState(RB_RgbState* state);
-/** @brief 设置固件测试图案和 RGB888 颜色；硬件诊断测试不依赖运行输出授权。 */
+/** @brief 设置固件测试图案和 RGB888 颜色；RGB 产品的诊断和正常输出均不依赖 SDK 主授权。 */
 RB_API int RB_Rgb_SetTestPattern(int pattern, int red, int green, int blue);
 /** @brief 立即请求设备熄灭。 */
 RB_API int RB_Rgb_Blackout();

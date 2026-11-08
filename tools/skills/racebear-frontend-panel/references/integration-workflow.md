@@ -19,6 +19,13 @@ Keep the backend loop independent from rendering so UI delays do not interrupt m
 
 ## Binding And ABI
 
+For native object services, see `docs/RaceBearSDK_OBJECT_API.md` and the generated
+`docs/RaceBearSDK_SERVICE_API.md`. Resolve stable domain keys, copy native scalar bits
+into zeroed slots, and keep all pointed-to data alive for the documented business lifetime.
+Do not serialize pointer packets to web/network/IPC. Service Write is synchronous, has
+no revision, and preserves the original business return domain separately from transport.
+Keep one log consumer and one coordinated writer/closer per mutable business resource.
+
 - Load the DLL that matches the header, import library, and Debug or Release configuration.
 - Match the C calling convention and exact integer, pointer, array, and structure layout.
 - Set versioned structure `Size` fields before calls that require them.
@@ -47,6 +54,13 @@ Important distinctions:
 - Dynamic, motion effect, platform, output, plugin, dashboard package, and device catalogs own separate index spaces.
 
 ## Configuration Transaction
+
+The optional object ABI uses a different transaction boundary. Read
+`docs/RaceBearSDK_OBJECT_API.md`: Write edits a shared SDK draft only, requires the Revision
+from a successful Read, and rejects stale revisions. Invoke Apply/Save captures the submitted
+draft; explicit Reload imports saved data only if that draft has not changed since submission.
+Legacy writes do not update this draft. Keep the original flow below for legacy APIs.
+Read failure must not be replaced with a fabricated default configuration.
 
 Prefer typed public structures for normal UI pages:
 
@@ -77,6 +91,12 @@ See `implementation-patterns.md` for stale-selection, debounce and late-result h
 
 ## Commands And Errors
 
+For `RB_Object_Invoke`, retain one task ID, Poll to a terminal status, inspect ResultCode,
+and consume its result. A short Poll buffer leaves the result retained, so grow and Poll again,
+never Invoke again for that reason. Up to 64 task records include completed/unconsumed results.
+No per-task cancellation is available. Stop new submissions and drain owned tasks before
+Shutdown; its worker joins before backend destruction, without a hard return-time guarantee.
+
 - Use typed APIs for structured state and configuration.
 - Use `RB_Command_Run()` for actions documented as commands and pass `{}` for no-argument commands.
 - Check both the integer return code and any returned command JSON.
@@ -91,9 +111,9 @@ See `implementation-patterns.md` for stale-selection, debounce and late-result h
 Read license presentation state from `RB_RuntimeState::License` and submit license actions through the documented command API.
 
 - Keep catalogs, configuration, raw telemetry, activation, disconnect, and reset UI available when permitted by the public contract.
-- Disable protected Apply, connection, and manual-test actions when `License.OutputAllowed == 0`.
+- Disable protected Motion and platform-output Apply, connection, and manual-test actions when `License.OutputAllowed == 0`. Keep RGBAPP, `SEATBELT_CAN`, Haptic, and Wind actions available under their own device and safety contracts.
 - Always provide an explicit stop/reset path.
-- Zero manual pose, wind, seatbelt, RGB test patterns, and other active tests on page exit, device loss, license loss, and application shutdown.
+- Zero manual pose and other protected active tests on page exit, device loss, license loss, and application shutdown. Do not clear RGB, seatbelt, Haptic, or Wind product state solely because the SDK main license is unavailable.
 
 Gate actions by their specific public contract: RGB hardware diagnostic test patterns do not
 depend on runtime output permission. Do not invent a Haptic test API or stop normal outputs

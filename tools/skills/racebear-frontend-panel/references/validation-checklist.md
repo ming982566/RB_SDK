@@ -2,6 +2,13 @@
 
 ## Contract And Deployment
 
+- For a full object migration, scan all host/native calls and inspect the linked import table:
+  allow only the three lifecycle and seven object ABI symbols.
+- Verify every native operation rejects a wrong signature without action; cover wrong
+  version/architecture/count/size, float and handle bits, callback reentry and concurrent calls.
+- Test real DLL defaults and return values as well as backend fixtures. Keep generic
+  transport success separate from business completion; preserve pointer lifetimes at shutdown.
+
 - Confirm the adapter uses only `include/RaceBearSDK.h` public exports.
 - Confirm header, DLL, LIB, and configuration all come from the same SDK build.
 - Confirm fixed structure sizes, field offsets, calling convention, buffers, callbacks, and `Size` fields in the target language.
@@ -24,6 +31,15 @@
   do not consume it. Do not interpret a buffer-too-small empty string as an empty queue.
 
 ## Catalog And Configuration
+
+When using the object ABI, additionally verify two concurrent writers cannot silently overwrite
+one another, concurrent telemetry readers receive complete frames, and stopped sampling is
+shown as stale. Reject unknown/duplicate fields, wrong types/versions and invalid whole groups.
+Verify slow tasks do not serialize snapshot reads, Apply/Save capture the submitted draft,
+Reload preserves newer edits, and failed initial reads do not create defaults.
+Fill all 64 task records, consume terminal results, and retry a short Poll buffer without
+consuming or repeating the action. Verify cancellation of queued tasks and waiting for running
+tasks during close. Offline service tests do not establish real device timing or protection.
 
 - Refresh every selector from its owning SDK catalog.
 - Restart the process and verify persistent choices are restored by stable key, ID, or name rather than runtime index.
@@ -53,8 +69,9 @@
 ## License And Safety
 
 - Test authorized, checking, missing/expired, and restored license states where fixtures permit.
-- Verify protected Apply, test, and connect actions stop when `OutputAllowed == 0`.
-- Follow API-specific exceptions, including RGB diagnostic test patterns. Configuration, diagnostics
+- Verify protected Motion/platform Apply, test, and connect actions stop when `OutputAllowed == 0`.
+- Verify RGBAPP, `SEATBELT_CAN`, Haptic, and Wind Apply, test, and connect actions remain available without the main license.
+- Follow API-specific exceptions, including RGB normal output and diagnostic test patterns. Configuration, diagnostics
   and reset tools must not all become inaccessible merely because protected output is locked.
 - Verify disconnect, reset, configuration, catalogs, raw telemetry, and activation remain available as documented.
 - Leave each manual-test page while active and verify outputs return to zero.

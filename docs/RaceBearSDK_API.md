@@ -7,6 +7,31 @@
 
 当前 SDK 版本可通过 `RB_Runtime_GetVersion()` 获取。SDK 使用 Visual Studio 2019、`v142`、x64 构建，只支持 Windows x64 进程。
 
+## 统一对象接入（协议第一版）
+
+新增 `RB_Object_Describe/Resolve/Read/Write/Invoke/Poll/GetLastError`，与现有
+版本/初始化/关闭函数组成主要 10 个接入入口。完整合同与示例见
+[统一对象 ABI](RaceBearSDK_OBJECT_API.md)。旧 268 个函数保留，新增后共 275 个公开声明。
+当前覆盖 9 个状态/草稿对象、29 个同步服务域、20 个异步动作。
+265 个公开业务操作可通过 NATIVE_CALL 格式接入；映射和签名见
+[同步服务目录](RaceBearSDK_SERVICE_API.md)。第一方兼容操作不属于第三方合同。
+运行时版本为 0.6.3，应通过导出和 Describe 协议版本检测能力。
+
+高频整帧遥测与低频状态/配置分开：Read 使用调用方缓冲区，Binary/JSON Write 只改
+配置草稿，Invoke 执行异步动作；NATIVE_CALL Write 同步执行业务，返回槽保留原业务码。
+本手册各业务接口合同同样适用于对应服务。Poll 可扩容重读结果且不重复动作，
+不能把旧 `RB_Command_Run` 的结果重试规则套到新任务协议，反之亦然。
+
+## 独立产品授权边界
+
+RGBAPP、`SEATBELT_CAN`、Haptic 和 Wind 是独立产品，计算、配置应用和对应设备输出不依赖 SDK 主授权。
+未授权时，RGB API 仍可连接设备、应用设备/效果配置并提交正常效果帧；安全带 API
+仍可应用效果配置、测试输出、配置 `SEATBELT_CAN`、连接、回零和重新启用；Haptic API
+仍可应用效果配置；Wind API 仍可应用配置、读取状态和提交测试输出。
+`RB_Output_ConnectAll()` 与 `RB_Output_ConnectAuto()` 在未授权时只处理
+`SEATBELT_CAN`、`Sim-FAN` 和 `Vibration` 实例，普通平台输出保持断开；单独连接普通输出时仍返回授权限制。Motion、VOCORE、
+Web 仪表和普通输出仍受主授权保护。
+
 ## 1. SDK 包内容
 
 接入时需要以下文件：
@@ -23,6 +48,7 @@
 | `RaceBearSDK_AI_DEVELOPMENT.md`  | AI 开发总入口、实施阶段、覆盖和交付验收                  |
 | `RaceBearSDK_FRONTEND_UI_SPEC.md` | 页面容器、控件、编辑草稿与后台任务规范                  |
 | `RaceBearSDK_DASHBOARD_DEVELOPMENT.md` | 仪表模板、数据绑定、渲染和输出开发指南             |
+| `RaceBearSDK_OBJECT_API.md` | 统一对象协议、并发、配置草稿和异步命令的第一版边界 |
 
 目标电脑需要安装 Microsoft Visual C++ 2015-2022 Redistributable x64。不使用 VOCORE 时，`RaceBearSDK.dll` 不会强制加载 `libusb-1.0.dll`。Ford GT 模板需要 `DashboardAssets/RaceBear`，缺少时其它纯绘制模板仍可使用；除这些可选运行库和资源外，其它依赖均为 Windows 系统组件。
 
@@ -152,7 +178,7 @@ SDK 0.4.4 公开游戏安装与遥测源配置、功能插件目录、平台数�
 
 SDK 0.4.5 修复 CAN 实时位置的 USB 发送队列：未发送的位置批次采用最新值覆盖，短时 USB 阻塞恢复后不会补发过期轨迹；同时修复动态配置回读时丢弃公共遥测目录所创建输入通道的问题。该版本不改变公开 ABI。
 
-SDK 0.4.6 将授权限制统一收口到 SDK。未授权或试用到期后，SDK 停止专有运动计算、安全断开输出、屏蔽受保护状态，并让运行态 Apply、手动测试和输出连接返回 `RB_LICENSE_REQUIRED`。授权恢复后，当前遥测源会从零重新淡入。
+SDK 0.4.6 将授权限制统一收口到 SDK。未授权或试用到期后，SDK 停止专有 Motion 计算、安全断开普通平台输出、屏蔽受保护状态，并让受保护运行态 Apply、手动测试和输出连接返回 `RB_LICENSE_REQUIRED`；RGB、Haptic、Wind 和安全带按各自合同继续运行。授权恢复后，当前遥测源会从零重新淡入。
 
 SDK 0.4.7 从公共遥测目录隐藏历史 SimTools 专用兼容槽位，但保留内部槽位和原始索引，避免旧配置及后续遥测索引错位。目录数组行号不再等同于遥测索引，调用方必须读取每项的 `Index`。
 
@@ -166,6 +192,8 @@ SDK 0.5.0 新增客户自定义仪表包。`.rbdash` V1 是 UTF-8 无 BOM JSON �
 
 0.5.0 版本交付时进一步公开 `RB_CAN` 的 CANAPP 设备发现、逻辑索引设置、稳定 UID 绑定、绑定状态和单输出电机状态。完整调用顺序和安全要求见 `RaceBearSDK_RB_CAN_GUIDE.md`。其它 CAN 电机协议、参数维护、固件升级和底层总线控制暂未纳入公开 API。
 
+SDK 0.6.3 将运行时版本更新为 `0.6.3`，保持已有公开结构体布局和调用约定，
+公开统一对象 ABI 文档和同步服务目录随本版交付。
 SDK 0.6.2 将运行时版本更新为 `0.6.2`，保持已有公开结构体布局和调用约定，
 新增安全带保护后显式恢复接口 `RB_SeatbeltCan_RequestReenable()`。安全带高层
 接口及单/双电机释放流程见安全带 CAN 章节；底层 SDO/PDO 和固件内部协议仍不公开。
@@ -1058,6 +1086,9 @@ USB复位/挂起、独立主机心跳超时或急停时，专用固件清除旧�
 SDK运行线程停止提交输入时也会停止心跳续期，USB失联和急停不等待该期限。
 安全带运行会话的USB发送由SDK单一后台线程分级调度，释放/急停及心跳优先；
 位置只保留最新目标，排队过期的控制请求撤销，不在恢复后补发。
+若短写请求确实仍在驱动中未完成，SDK把原OVERLAPPED、事件和缓冲区交给独立恢复
+线程处理取消、Abort、Reset及最终回收；实时写线程在此期间暂停新的Bulk OUT，
+恢复后继续最新目标。宿主不需要创建额外USB线程，也不能自行重放过期位置或RGB包。
 安全带APP `2026110101` 或更新且报告对应能力时，RGB使用完整帧异步传输，
 不等待逐帧固件应答；SDK通过低频状态区分接收与完成灯带输出。提交成功仅表示
 最新帧已缓存，不代表已显示。旧APP继续由独立RGB任务等待原协议应答，
@@ -1856,17 +1887,24 @@ const int rc = RB_Command_Run(
 以下能力属于受保护运行功能：
 
 - Source 派生/最终遥测、平台最终 6DOF 和执行器值。
-- 运动增强、震动、风感和安全带的计算结果。
-- 平台、动态滤波、运动增强、震动、风感、安全带和输出配置的运行态 Apply。
-- 手动平台测试、风感/安全带测试输出和输出连接。
+- 运动增强和平台相关计算结果。
+- 平台、动态滤波和运动增强配置的运行态 Apply。
+- 手动平台测试和普通平台输出连接。
 
 授权无效或试用到期时：
 
-- `RB_State_Read()` 仍返回 `RB_OK`，授权、游戏、Source 连接、输出连接和 CAN 状态仍可读取；受保护的数值字段统一返回 0。
+- `RB_State_Read()` 仍返回 `RB_OK`，授权、游戏、Source 连接、输出连接和 CAN 状态仍可读取；受保护的 Motion 数值字段统一返回 0，Haptic、Wind、RGB 和安全带产品状态保留真实运行值。
 - `RB_Telemetry_GetRawValue()` 仍返回游戏原始数据，`RB_Telemetry_GetProcessedValue()` 返回 0。
-- 上述运行态 Apply、测试启用和输出连接接口返回 `RB_LICENSE_REQUIRED`（`-4`）。关闭测试、测试归零和输出断开仍然允许。
-- `runtime.reloadConfig`、`output.connectAll` 和 `output.connectAuto` Command 返回 `RB_LICENSE_REQUIRED`，结果 JSON 中 `ok=false` 且 `code=-4`。
-- 已连接输出进入安全断开状态；授权恢复后，仍在连接的 Source 从零重新淡入，不直接跳到当前姿态。
+- RGBAPP 的连接、设备/效果配置 Apply、正常效果输出，以及安全带效果、测试输出、
+  `SEATBELT_CAN` 配置、连接和重新启用仍然允许，不返回 `RB_LICENSE_REQUIRED`。
+- Haptic 配置 Apply、`Vibration` 输出配置和连接仍然允许，不返回 `RB_LICENSE_REQUIRED`。
+- Wind 配置 Apply、测试输出和状态读取仍然允许，不返回 `RB_LICENSE_REQUIRED`。
+- 单独连接普通平台输出仍返回 `RB_LICENSE_REQUIRED`；`output.connectAll` 和
+  `output.connectAuto` Command 在未授权时只连接 `SEATBELT_CAN`、`Sim-FAN` 和
+  `Vibration` 独立输出并返回成功数量。
+- `runtime.reloadConfig` 仍然需要主授权，避免通过整套重载命令重新应用普通平台运行态。
+- 普通平台输出按原有安全断开策略处理；RGB、Haptic、Wind 和安全带继续按各自设备、
+  急停、释放、心跳和 USB 超时保护运行。
 
 前端应优先判断 `state.License.OutputAllowed`，并对 `RB_LICENSE_REQUIRED` 提示用户激活或等待授权恢复。不要把锁定状态下的 0 当作真实车辆或平台数据。
 

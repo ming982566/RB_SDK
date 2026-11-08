@@ -8,6 +8,20 @@
 | --- | --- | --- |
 | `cpp` | Windows 原生程序、Visual Studio、CMake | VS2019/v142、C++17 |
 | `python` | 工具、脚本、原型和数据采集 | 64 位 Python 3.8+、标准库 `ctypes` |
+| `object_api` | 统一对象 ABI：目录、同步默认值、草稿版本、异步任务与整帧遥测 | VS2019/v142、C++17；Debug/Release 链接各自匹配产物 |
+
+`object_api` 默认打印协议目录并通过同步服务读取 Wind 默认值；`--runtime` 才初始化独立产品目录并运行内存草稿/
+遥测演示，不保存或连接输出。构建方式：
+
+```powershell
+cmake -S examples/object_api -B obj/object-example -G "Visual Studio 16 2019" -A x64 -T v142
+cmake --build obj/object-example --config Release
+.\obj\object-example\Release\RaceBearObjectExample.exe
+```
+
+覆盖范围与并发合同见 [统一对象 ABI](../docs/RaceBearSDK_OBJECT_API.md)。
+SDK 目录已包含 9 个状态/草稿对象、29 个同步服务域和 20 个异步动作；示例只演示其中少量流程，
+不是完整前端。265 个公开业务操作的参数与签名见 [服务目录](../docs/RaceBearSDK_SERVICE_API.md)。
 
 Qt 示例已移除。需要 GUI 时，可以把这两个示例里的 SDK 会话放进自己的窗口程序；SDK 本身不要求使用特定 UI 框架。
 

@@ -7,6 +7,7 @@ The table below routes API reading, not a promise that every export needs an ind
 
 | Frontend surface | Start with | Read in the frontend guide |
 | --- | --- | --- |
+| Unified object ABI | `RB_Object_*`, Describe actual registry | `docs/RaceBearSDK_OBJECT_API.md`, `docs/RaceBearSDK_SERVICE_API.md`; rows below define the same business contracts |
 | Runtime summary | `RB_State_Read` | Sections 2 and 5 |
 | License | `state.License`, `RB_Command_Run` license commands | Section 6 |
 | Games and installs | `RB_Game_*` | Section 7 |

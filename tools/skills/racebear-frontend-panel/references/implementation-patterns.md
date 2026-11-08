@@ -7,6 +7,13 @@ language binding. Verify the actual C ABI in the supplied header.
 Read `docs/RaceBearSDK_FRONTEND_UI_SPEC.md` for page/container placement and
 `docs/RaceBearSDK_AI_DEVELOPMENT.md` for development stages and delivery records.
 
+Native object services use a caller-owned packet/result per call and no shared request slot.
+Read the operation key/signature/types in `docs/RaceBearSDK_SERVICE_API.md`; preserve float
+bits and pointer width. Validate transport status separately from the business result.
+Use an existing host worker for slow synchronous operations; keep handles and callback
+user data alive through deregistration and in-flight callbacks. These services do not use
+draft revisions or SDK task IDs and do not make Write+Invoke atomic.
+
 ## 1. Selector And Draft Ownership
 
 Each editor owns this state:
@@ -120,6 +127,13 @@ Repeated actions require explicit intent: no tight retry loops on license failur
 failure, activation, binding, homing or firmware start. UI status polling only reads state.
 
 ## 4. Command JSON And Buffer Results
+
+The object API has a separate safe result-read protocol: Invoke exactly once, retain task ID
+and captured draft Revision, Poll until terminal, expand according to PayloadBytes, then consume.
+Poll success and task ResultCode are distinct. A polling deadline is not cancellation.
+For shared object drafts, Write conflicts require rereading and merging; do not automatically
+rebase and replay an entire stale structure. See `docs/RaceBearSDK_OBJECT_API.md`.
+The legacy command guidance below still applies to `RB_Command_Run`.
 
 Use a real JSON library from the host stack. Serialize user input as data; parse the command
 response and inspect both the native result and documented JSON business result. Retain error

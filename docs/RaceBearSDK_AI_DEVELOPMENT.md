@@ -5,6 +5,11 @@
 本文指导完成已授权开发，不授予联网发布、操作真实电机或改写其它产品用户数据的权限。
 本文用于开发第三方前端，不要求修改 SDK 内部实现。
 
+授权边界：RGBAPP、`SEATBELT_CAN`、Haptic 和 Wind 的计算与输出完全不依赖 SDK 主授权。实现或审查
+前端时，不能把 `RB_LicenseSnapshot.OutputAllowed` 作为 RGB/安全带/Haptic/Wind 页面的总开关；
+该字段只控制 Motion、平台输出和其它受保护能力。未授权状态快照仍会
+隐藏主运动专有计算结果，但 Haptic、Wind、RGB 和安全带产品状态可正常读取。
+
 ## 1. 可直接交给 AI 的任务
 
 ```text
@@ -40,6 +45,7 @@ SDK 根目录通过 `include/RaceBearSDK.h` 与 `docs` 同时存在确定，不�
 | 6 | `tools/skills/racebear-frontend-panel/SKILL.md` | 可选工具无关规则入口；未安装 Skill 时也能直接读文件 |
 | 按需 | [CAN 指南](RaceBearSDK_RB_CAN_GUIDE.md) | UID、绑定、健康、维护、恢复 |
 | 按需 | [仪表开发](RaceBearSDK_DASHBOARD_DEVELOPMENT.md) | 包格式、设计器、像素、VOCORE、Web、资源 |
+| 采用对象 ABI 时必读 | [统一对象 ABI](RaceBearSDK_OBJECT_API.md) / [同步服务目录](RaceBearSDK_SERVICE_API.md) | 协议第 0 节提供 key 分类、调用路线和公开服务域用途；第 2/5 节列对象/命令，服务目录列全部 265 项公开操作参数 |
 | 按需 | SDK 根目录的 `examples/README.md` | 当前语言可复用的接入片段和可构建工程 |
 
 Skill 的 feature-routing、integration-workflow、implementation-patterns、
@@ -51,6 +57,14 @@ validation-checklist 是实现时的索引与模板，位于
 合同冲突先核对同包头文件与当前接口行为，记录问题并使文档或适配层一致；
 不能凭函数名字猜参数，也不能把 README 中某个历史版本的“不公开”当成当前版本结论。
 没有对应公开接口的能力明确标记限制，不伪造调用、默认值、参数意义或“已经支持”。
+
+使用对象入口时先读 Describe 的实际目录；通用入口覆盖公开业务操作，旧导出仍保留。
+服务包装只统一调用边界，不自动提供事务、异步完成或新的数据类；第一方操作非第三方合同。
+高频遥测使用整帧 Binary，低频配置编辑处理版本冲突，异步动作保留
+提交版本和任务归属。复杂 RGB/安全带只有二进制 schema，不能凭元数据猜字段或范围。
+测试至少包含并发读取、冲突、短结果缓冲区不消费、不重复动作、满队列和退出时任务收敛。
+使用同步服务时还须验签名/架构错误无副作用、浮点/句柄位模式、回调重入、缓冲区有效期，
+并检查宿主导入表以证明调用确实通过对象 ABI。离线通过不等于已完成前端或硬件验收。
 
 ## 3. 起步检查与默认决策
 

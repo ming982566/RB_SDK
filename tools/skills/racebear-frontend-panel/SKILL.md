@@ -23,6 +23,22 @@ localization, or visual acceptance, read `docs/RaceBearSDK_FRONTEND_UI_SPEC.md`.
 These documents are relative to the SDK root; they are also usable without installing a Skill.
 Do not require SDK private sources or SimRacebear's UI helpers.
 
+RGBAPP, `SEATBELT_CAN`, Haptic, and Wind are independent products. Their calculation, configuration
+application, connection, test output, and normal device output remain available when
+`RB_LicenseSnapshot.OutputAllowed` is zero. Use the license snapshot to gate Motion,
+platform outputs, and other protected surfaces only; do not use it as a
+global switch for RGB, seatbelt, Haptic, or Wind pages.
+
+For the optional unified object ABI, read `docs/RaceBearSDK_OBJECT_API.md` first.
+Protocol v1 registers 9 state/draft objects, 29 native synchronous service domains, and 20 asynchronous actions; all legacy exports remain.
+Use the directory's actual coverage, caller-owned buffers, revision-checked shared drafts,
+and retained task results. High-frequency telemetry uses a binary whole-frame snapshot.
+Use `docs/RaceBearSDK_SERVICE_API.md` to map all 265 public business operations to native
+services; first-party operations are not public contracts. Native-call packets are in-process
+only and retain the original pointer, handle, callback, blocking and error semantics.
+Do not infer automatic transactions, complex-form generation, or one class per ABI.
+An Invoke acceptance is not execution success; consume completed Poll results without resubmitting.
+
 ## Define The Requested Surface
 
 List the requested pages and behaviors before coding. Distinguish:
