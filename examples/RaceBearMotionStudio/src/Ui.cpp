@@ -1,5 +1,5 @@
 #include "Ui.h"
-#include "RaceBearSDK.h"
+#include "ExampleServices.h"
 #include <cwchar>
 #include <iomanip>
 #include <sstream>
@@ -34,8 +34,13 @@ LRESULT CALLBACK CanvasProc(HWND hwnd, UINT message, WPARAM wParam,
     GetClientRect(hwnd, &rc);
     FillRect(dc, &rc, g_darkEditBg_ ? g_darkEditBg_ :
                                       reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1));
-    if (state && state->paint)
-      state->paint(dc, rc);
+    // 绘制中的服务失败也必须配对 EndPaint，且不得穿出窗口回调。
+    try {
+      if (state && state->paint) state->paint(dc, rc);
+    } catch (const std::exception& error) {
+      OutputDebugStringA(error.what());
+      DrawTextW(dc, L"SDK 读取失败", -1, &rc, DT_LEFT | DT_TOP);
+    }
     HBRUSH frame = CreateSolidBrush(RGB(58, 64, 65));
     FrameRect(dc, &rc, frame);
     DeleteObject(frame);
@@ -121,14 +126,21 @@ LRESULT CALLBACK PageProc(HWND hwnd, UINT message, WPARAM wParam,
     SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(page));
   }
   if (page && message == WM_COMMAND) {
-    page->OnCommand(LOWORD(wParam), HIWORD(wParam),
-                    reinterpret_cast<HWND>(lParam));
+    // 页面窗口有独立回调，不能依赖主窗口去接住子窗口内的 C++ 异常。
+    try {
+      page->OnCommand(LOWORD(wParam), HIWORD(wParam), reinterpret_cast<HWND>(lParam));
+    } catch (const std::exception& error) {
+      MessageBoxW(hwnd, Utf8ToWide(error.what()).c_str(), L"SDK 调用失败", MB_ICONERROR);
+    }
     return 0;
   }
   if (page && message == WM_HSCROLL && lParam) {
     HWND tb = reinterpret_cast<HWND>(lParam);
-    page->OnHScroll(GetDlgCtrlID(tb),
-                    static_cast<int>(SendMessageW(tb, TBM_GETPOS, 0, 0)));
+    try {
+      page->OnHScroll(GetDlgCtrlID(tb), static_cast<int>(SendMessageW(tb, TBM_GETPOS, 0, 0)));
+    } catch (const std::exception& error) {
+      MessageBoxW(hwnd, Utf8ToWide(error.what()).c_str(), L"SDK 调用失败", MB_ICONERROR);
+    }
     return 0;
   }
   if (message == WM_DRAWITEM) {

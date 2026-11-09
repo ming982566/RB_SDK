@@ -45,11 +45,14 @@ Before running the release script:
 - Run the ABI, configuration, dynamic roundtrip, communication, dashboard,
   and other tests required by the change.
 - Confirm that the public header, DLL, LIB, runtime dependencies, dashboard
-  assets, docs, examples, and tools all come from the same verified build.
+  assets, docs, C++ examples, and tools all come from the same verified build.
 - Check that private SDK source, tests, internal references, build outputs, and
-  private project files cannot enter the public package. The public
-  `examples/RaceBearMotionStudio` sample may retain its own public solution and
-  project files.
+  private project files cannot enter the public package. Only reviewed C++
+  example projects under `examples` are allowed; Python and generated build
+  outputs are rejected by the package allowlist.
+- Build all C++ examples with VS2019/v142 x64 in Debug and Release, and verify
+  their SDK imports belong to the 10 unified ABI exports. Example wrappers are
+  host source code, not extra DLL exports or legacy ABI declarations.
 - Compare the public header and exported DLL symbols against the approved public
   API list. Configuration package APIs and external `RB_CAN` realtime position
   APIs are public in 0.6.0. From 0.6.1, the approved list also includes the
@@ -74,16 +77,30 @@ The script performs these operations in order:
 1. Rebuilds the SDK Debug and Release configurations unless `-SkipBuild` is
    explicitly used after an equivalent verified build.
 2. Copies only the public files from `RaceBear_SDK` into `RB_SDK`.
-3. Removes generated example output from the public package tree.
+3. Copies only allowlisted C++ example sources and rejects unexpected package files.
 4. Runs the private-source leakage checks.
 5. Creates `RaceBearSDK-X.Y.Z-vs2019-x64.zip` and its SHA256 sidecar.
-6. Commits the public tree with the release version.
-7. Pushes `main` and the annotated `vX.Y.Z` tag.
-8. Creates the GitHub Release if it does not exist, or replaces its package
+6. Extracts the actual ZIP into an isolated SDK `obj` directory, verifies every
+   delivered file against the public tree and SDK build, checks complete
+   documentation/Skill/resource inclusion, builds all four C++ programs plus the
+   API lifecycle snippet and runtime probe in Debug/Release, checks exact DLL
+   exports and client imports, and runs read-only version/protocol/defaults smokes.
+   Any failure stops before a commit or network publication.
+7. Commits the public tree with the release version.
+8. Pushes `main` and the annotated `vX.Y.Z` tag.
+9. Creates the GitHub Release if it does not exist, or replaces its package
    assets when the same Release already exists.
 
 The script is the release boundary. Do not run a separate ordinary `git push`
 for a release after it completes.
+
+For a local delivery review, use `-PrepareOnly` (and `-SkipBuild` only after
+verified matching builds). It copies the reviewed SDK delivery, builds and
+validates the ZIP, then returns before any commit, push, tag or GitHub Release.
+It permits the already reviewed preparation changes in the worktree; it does
+not clean or approve unknown changes. Review the complete resulting diff,
+commit the approved preparation, then run without `-PrepareOnly` from clean
+`main` for the full release.
 
 ## Post-Release Cleanup
 

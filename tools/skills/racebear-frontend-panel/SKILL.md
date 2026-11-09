@@ -29,7 +29,7 @@ application, connection, test output, and normal device output remain available 
 platform outputs, and other protected surfaces only; do not use it as a
 global switch for RGB, seatbelt, Haptic, or Wind pages.
 
-For the optional unified object ABI, read `docs/RaceBearSDK_OBJECT_API.md` first.
+For the unified object ABI, read `docs/RaceBearSDK_OBJECT_API.md` first.
 Protocol v1 registers 9 state/draft objects, 29 native synchronous service domains, and 20 asynchronous actions. The public DLL exposes only the 10 unified ABI entries.
 Use the directory's actual coverage, caller-owned buffers, revision-checked shared drafts,
 and retained task results. High-frequency telemetry uses a binary whole-frame snapshot.

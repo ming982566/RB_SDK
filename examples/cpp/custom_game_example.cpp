@@ -50,7 +50,7 @@ int RegisterCustomUdpGame()
 	CopyText(registration.Udp.ListenAddress, "127.0.0.1");
 	registration.Udp.ListenPort = 27890;
 	CopyText(registration.Udp.AllowedSenderAddress, "127.0.0.1");
-	return RB_Game_RegisterCustom(&registration);
+	return rb_example::Game_RegisterCustom(&registration);
 }
 
 std::vector<unsigned char> BuildCustomRawPacket(unsigned long long sequence, unsigned long long gameTimeUs,

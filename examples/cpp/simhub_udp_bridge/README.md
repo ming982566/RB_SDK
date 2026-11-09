@@ -2,6 +2,10 @@
 
 这个桥接程序使用 SimHub 的公开 Generic UDP 输出接收最终轴值，再通过 `RaceBearSDK.dll` 的公开 C ABI 提交到现有 `RB_CAN` 输出实例。
 
+当前只导入 10 个统一 ABI 的子集；CAN 操作由 `../../common/ExampleServices.h`
+中的宿主包装经 Resolve/Write(NATIVE_CALL) 分派，不导入旧业务函数。
+`--help` 在初始化前退出，不打开网络或设备；实际启动将按配置连接真实输出。
+
 ## SimHub 输出文本
 
 在 SimHub Motion 中使用 Generic UDP 输出，目标地址填写 `127.0.0.1`，端口填写 `24740`，周期建议 `2 ms`。输出模板为：

@@ -77,8 +77,8 @@ public:
                        std::to_wstring(s.Can.MotorCount);
     std::wstring vals[] = {
         Utf8ToWide(RB_Runtime_GetVersion()) + L" / " +
-            (RB_Runtime_IsLoopRunning() ? L"运行" : L"停止") + L" / " +
-            std::to_wstring(RB_Runtime_GetLoopIntervalMs()) + L" ms",
+            (rb_example::Runtime_IsLoopRunning() ? L"运行" : L"停止") + L" / " +
+            std::to_wstring(rb_example::Runtime_GetLoopIntervalMs()) + L" ms",
         std::to_wstring(s.License.State) +
             (s.License.OutputAllowed ? L"（输出允许）" : L"（输出锁定）"),
         Utf8ToWide(s.Game.GameName),
@@ -101,8 +101,8 @@ public:
       SetWindowTextW(v_[i], vals[i].c_str());
   }
   void OnCommand(int id, int, HWND) override {
-    int rc = id == 1   ? RB_Runtime_PauseLoop()
-             : id == 2 ? RB_Runtime_ResumeLoop()
+    int rc = id == 1   ? rb_example::Runtime_PauseLoop()
+             : id == 2 ? rb_example::Runtime_ResumeLoop()
                        : RB_INVALID_ARGUMENT;
     Status((id == 1 ? L"暂停: " : L"恢复: ") + ResultText(rc), rc != RB_OK);
   }
@@ -115,7 +115,7 @@ public:
   License(HWND h, SdkRuntime &s) : Page(h), s_(s) {}
   void Build() override {
     Header(L"授权",
-           L"未授权时仍可编辑配置，所有真实输出操作由前端和 SDK 双重锁定。");
+           L"Motion 授权状态；独立产品按各自设备与保护规则运行。");
     state_ = ui::Label(hwnd_, L"-", 210, 100, 600);
     problem_ = ui::Label(hwnd_, L"-", 210, 140, 600);
     remain_ = ui::Label(hwnd_, L"-", 210, 180, 600);
@@ -131,7 +131,7 @@ public:
     ui::Button(hwnd_, 13, L"手动检查", 140, 330);
   }
   void OnState(const RB_RuntimeState &s) override {
-    const wchar_t *states[] = {L"未知",     L"检查中",   L"未授权 / 输出锁定",
+    const wchar_t *states[] = {L"未知",     L"检查中",   L"未授权 / Motion 受限",
                                L"永久授权", L"限时授权", L"试用"};
     SetWindowTextW(state_, s.License.State >= 0 && s.License.State < 6
                                ? states[s.License.State]
@@ -152,7 +152,7 @@ public:
   }
   void OnCommand(int id, int, HWND) override {
     if (id == 12 &&
-        MessageBoxW(hwnd_, L"确定要反激活当前授权吗？反激活后输出将被锁定。",
+        MessageBoxW(hwnd_, L"确定要反激活当前授权吗？反激活后 Motion 将受限。",
                      L"确认反激活", MB_YESNO | MB_ICONWARNING) != IDYES)
       return;
     const char *c = id == 11   ? "license.activate"
@@ -231,10 +231,10 @@ public:
         Status(L"日志已保存");
       }
     } else if (id == 23) {
-      int rc = RB_Debug_OpenMonitor();
+      int rc = rb_example::Debug_OpenMonitor();
       Status(ResultText(rc), rc != RB_OK);
     } else if (id == 24) {
-      RB_Debug_CloseMonitor();
+      rb_example::Debug_CloseMonitor();
       Status(L"资源监视器已关闭");
     }
   }

@@ -5,7 +5,7 @@
 当前 DLL 只导出 7 个 `RB_Object_*` 加 `RB_Runtime_GetVersion/Initialize/Shutdown`，
 共 10 个入口。旧业务实现仍可作为 SDK 内部服务实现细节存在，但第三方不得直接导入。
 独立产品在初始化前设置 AppDataName；第三方应通过目录中的同步服务完成配置操作。
-运行时版本为 `1.0.1`，对象协议版本为 1；不能仅凭运行时版本判断是否支持，
+运行时版本为 `1.0.2`，对象协议版本为 1；不能仅凭运行时版本判断是否支持，
 动态加载时须检查新增导出，随后读取 Describe 的 `protocolVersion`。
 
 第二阶段增加 `RB_OBJECT_NATIVE_CALL=3`，在现有 7 个入口内补齐同步业务服务。
@@ -273,7 +273,11 @@ Shutdown 拒绝新动作、取消未开始任务，等待在途工作线程结�
 
 ## 7. 可编译示例与验收边界
 
-完整 SDK 中的示例为 `examples/object_api/main.cpp` 和该目录 CMakeLists；
+完整 SDK 仅提供 C++ 示例，统一入口为 `examples/README.md`；
+`examples/object_api/main.cpp` 直接演示 Resolve/Read/Write/Invoke/Poll，
+其它 C++ 示例用 `examples/common/ExampleServices.h` 的宿主包装调用同步服务，
+包装不增加 DLL 导出，也不启用旧 ABI 声明。封套每次独占，传输失败抛出宿主异常，
+业务返回值仍由页面或控制台判断；示例外层负责捕获异常并执行资源清理。
 模块 Docs 只是文档分发副本，示例与 Skill 应从完整 SDK 获取。
 默认只读取目录，不初始化；`--runtime` 使用独立 `RaceBearObjectDemo` 配置目录初始化，
 启动循环、改内存 Wind 草稿并读取快照，不保存配置、不连接输出。该模式要求当前账户能

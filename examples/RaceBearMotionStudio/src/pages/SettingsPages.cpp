@@ -35,7 +35,7 @@ public:
   void OnShow() override { Read(); }
 
   void Read() {
-    int rc = RB_System_ReadConfigOrDefault(&config_);
+    int rc = rb_example::System_ReadConfigOrDefault(&config_);
     if (rc != RB_OK) {
       Status(L"读取系统设置失败: " + ResultText(rc), true);
       return;
@@ -43,7 +43,7 @@ public:
     ui::SetChecked(checks_[0], config_.EnableLogging);
     ui::SetChecked(checks_[1], config_.TelemetryShow);
     ui::SetChecked(checks_[2], config_.VRCompensation);
-    ui::SetInt(interval_, RB_Runtime_GetLoopIntervalMs());
+    ui::SetInt(interval_, rb_example::Runtime_GetLoopIntervalMs());
   }
 
   void OnCommand(int id, int, HWND) override {
@@ -53,20 +53,20 @@ public:
       config_.EnableLogging = ui::Checked(checks_[0]);
       config_.TelemetryShow = ui::Checked(checks_[1]);
       config_.VRCompensation = ui::Checked(checks_[2]);
-      const int rc = RB_System_SaveConfig(&config_);
+      const int rc = rb_example::System_SaveConfig(&config_);
       Status(L"保存系统设置: " + ResultText(rc), rc != RB_OK);
     } else if (id == 1211) {
-      const int rc = RB_Runtime_SetLoopIntervalMs(ui::Int(interval_, 2));
+      const int rc = rb_example::Runtime_SetLoopIntervalMs(ui::Int(interval_, 2));
       Status(L"设置循环间隔: " + ResultText(rc), rc != RB_OK);
     } else if (id == 1212) {
-      int rc = RB_Runtime_IsLoopRunning() ? RB_Runtime_ResumeLoop()
-                                         : RB_Runtime_StartLoop(ui::Int(interval_, 2));
+      int rc = rb_example::Runtime_IsLoopRunning() ? rb_example::Runtime_ResumeLoop()
+                                         : rb_example::Runtime_StartLoop(ui::Int(interval_, 2));
       Status(L"启动/恢复循环: " + ResultText(rc), rc != RB_OK);
     } else if (id == 1213) {
-      const int rc = RB_Runtime_PauseLoop();
+      const int rc = rb_example::Runtime_PauseLoop();
       Status(L"暂停循环: " + ResultText(rc), rc != RB_OK);
     } else if (id == 1214) {
-      const int rc = RB_Runtime_StopLoop();
+      const int rc = rb_example::Runtime_StopLoop();
       Status(L"停止循环: " + ResultText(rc), rc != RB_OK);
     }
   }
@@ -156,7 +156,7 @@ public:
 
   void RefreshTelemetry() {
     SendMessageW(telemetry_, CB_RESETCONTENT, 0, 0);
-    if (RB_Telemetry_GetCatalog(&catalog_) != RB_OK)
+    if (rb_example::Telemetry_GetCatalog(&catalog_) != RB_OK)
       return;
     for (int i = 0; i < catalog_.Count; ++i)
       ui::ComboAdd(telemetry_, Utf8ToWide(catalog_.Items[i].Name) + L" [" +
@@ -174,10 +174,10 @@ public:
       desc.TransitionMs = ui::Int(transition_, 2000);
       const bool valid = SetUtf8(desc.SourceKey, sizeof(desc.SourceKey), GetWindowString(sourceKey_)) &&
                          SetUtf8(desc.SourceName, sizeof(desc.SourceName), GetWindowString(sourceName_));
-      const int rc = valid ? RB_ExternalSource_Open(&desc) : RB_INVALID_ARGUMENT;
+      const int rc = valid ? rb_example::ExternalSource_Open(&desc) : RB_INVALID_ARGUMENT;
       Status(L"打开外部数据源：" + ResultText(rc), rc != RB_OK);
     } else if (id == 1305) {
-      RB_ExternalSource_Close();
+      rb_example::ExternalSource_Close();
       Status(L"外部数据源已关闭");
     } else if (id == 1308) {
       const int item = ui::ComboData(telemetry_);
@@ -192,14 +192,14 @@ public:
       frame.ValueCount = 1;
       frame.Values[0].Index = catalog_.Items[item].Index;
       frame.Values[0].Value = ui::Double(value_);
-      const int rc = RB_ExternalSource_SubmitFrame(&frame);
+      const int rc = rb_example::ExternalSource_SubmitFrame(&frame);
       Status(L"提交外部遥测帧: " + ResultText(rc), rc != RB_OK);
     }
   }
 
   void OnTimer(UINT_PTR) override {
     RB_ExternalSourceState state{};
-    const int rc = RB_ExternalSource_GetState(&state);
+    const int rc = rb_example::ExternalSource_GetState(&state);
     if (rc == RB_OK)
       SetWindowTextW(stateText_,
         (L"打开=" + std::to_wstring(state.Open) + L" 已连接=" +
@@ -209,7 +209,7 @@ public:
          std::to_wstring(state.SubmittedFrameCount)).c_str());
   }
 
-  void Shutdown() override { RB_ExternalSource_Close(); }
+  void Shutdown() override { rb_example::ExternalSource_Close(); }
 };
 } // namespace
 

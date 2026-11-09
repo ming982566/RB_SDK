@@ -1,4 +1,4 @@
-#include "RaceBearSDK.h"
+#include "ExampleServices.h"
 
 #include <WinSock2.h>
 #include <Windows.h>
@@ -239,16 +239,16 @@ namespace
 
     int FindCanOutput(int requestedIndex)
     {
-        const int count = RB_Output_GetInstanceCount();
+        const int count = rb_example::Output_GetInstanceCount();
         if (requestedIndex >= 0) {
             if (requestedIndex >= count) return -1;
             RB_OutputConfig config{};
-            if (RB_Output_ReadInstanceConfigByIndex(requestedIndex, &config) != RB_OK) return -1;
+            if (rb_example::Output_ReadInstanceConfigByIndex(requestedIndex, &config) != RB_OK) return -1;
             return std::strcmp(config.OutputKind, "RB_CAN") == 0 ? requestedIndex : -1;
         }
         for (int i = 0; i < count; ++i) {
             RB_OutputConfig config{};
-            if (RB_Output_ReadInstanceConfigByIndex(i, &config) == RB_OK && std::strcmp(config.OutputKind, "RB_CAN") == 0) {
+            if (rb_example::Output_ReadInstanceConfigByIndex(i, &config) == RB_OK && std::strcmp(config.OutputKind, "RB_CAN") == 0) {
                 return i;
             }
         }
@@ -257,21 +257,21 @@ namespace
 
     bool ReadOutputConfig(int outputIndex, RB_OutputConfig* config)
     {
-        return config != nullptr && RB_Output_ReadInstanceConfigByIndex(outputIndex, config) == RB_OK &&
+        return config != nullptr && rb_example::Output_ReadInstanceConfigByIndex(outputIndex, config) == RB_OK &&
             std::strcmp(config->OutputKind, "RB_CAN") == 0;
     }
 
     bool WaitForOutputReady(int outputIndex, int timeoutMs)
     {
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
-        RB_Output_ConnectInstanceByIndex(outputIndex);
+        rb_example::Output_ConnectInstanceByIndex(outputIndex);
         while (g_running.load() && std::chrono::steady_clock::now() < deadline) {
             RB_CanOutputHealthState health{};
             health.Size = sizeof(health);
             RB_CanOutputBindingState binding{};
             binding.Size = sizeof(binding);
-            if (RB_Can_GetOutputHealthState(outputIndex, &health) == RB_OK &&
-                RB_Can_GetOutputBindingState(outputIndex, &binding) == RB_OK &&
+            if (rb_example::Can_GetOutputHealthState(outputIndex, &health) == RB_OK &&
+                rb_example::Can_GetOutputBindingState(outputIndex, &binding) == RB_OK &&
                 health.DeviceConnected && health.DeviceOpened && binding.Ready && health.Armed && health.OutputActive) {
                 return true;
             }
@@ -287,12 +287,17 @@ namespace
         const double normalized = (std::clamp)(parkPercent / 100.0, 0.0, 1.0);
         const int park = static_cast<int>((std::llround)(targetMin + normalized * (targetMax - targetMin)));
         std::vector<int32_t> positions(static_cast<size_t>(axisCount), park);
-        return RB_Can_SubmitPositions(outputIndex, positions.data(), axisCount) == RB_OK;
+        return rb_example::Can_SubmitPositions(outputIndex, positions.data(), axisCount) == RB_OK;
     }
 }
 
 int main(int argc, char** argv)
 {
+    // 帮助是成功的只读操作，在初始化网络和 SDK 前返回。
+    if (argc == 2 && (std::strcmp(argv[1], "--help") == 0 || std::strcmp(argv[1], "-h") == 0)) {
+        PrintUsage();
+        return 0;
+    }
     BridgeOptions options{};
     if (!ParseOptions(argc, argv, &options)) return 2;
     SetConsoleCtrlHandler(ConsoleHandler, TRUE);
@@ -308,13 +313,13 @@ int main(int argc, char** argv)
     bool sdkInitialized = false;
     int outputIndex = -1;
     try {
-        if (RB_Runtime_SetAppDataName(options.AppDataName.c_str()) != RB_OK || RB_Runtime_Initialize() != RB_OK) {
+        if (rb_example::Runtime_SetAppDataName(options.AppDataName.c_str()) != RB_OK || RB_Runtime_Initialize() != RB_OK) {
             std::fprintf(stderr, "RaceBear SDK initialization failed\n");
             exitCode = 4;
             throw 1;
         }
         sdkInitialized = true;
-        if (RB_Runtime_StartLoop(1) != RB_OK) {
+        if (rb_example::Runtime_StartLoop(1) != RB_OK) {
             std::fprintf(stderr, "RaceBear SDK runtime loop start failed\n");
             exitCode = 5;
             throw 1;
@@ -382,7 +387,7 @@ int main(int argc, char** argv)
                     std::vector<int32_t> positions;
                     positions.reserve(packet.Values.size());
                     for (uint16_t value : packet.Values) positions.push_back(MapValue(value, options));
-                    if (RB_Can_SubmitPositions(outputIndex, positions.data(), static_cast<int>(positions.size())) == RB_OK) {
+                    if (rb_example::Can_SubmitPositions(outputIndex, positions.data(), static_cast<int>(positions.size())) == RB_OK) {
                         lastPacketTime = now;
                         parked = false;
                     }
@@ -400,11 +405,11 @@ int main(int argc, char** argv)
                 health.Size = sizeof(health);
                 RB_CanOutputBindingState binding{};
                 binding.Size = sizeof(binding);
-                if (RB_Can_GetOutputHealthState(outputIndex, &health) == RB_OK &&
-                    RB_Can_GetOutputBindingState(outputIndex, &binding) == RB_OK &&
+                if (rb_example::Can_GetOutputHealthState(outputIndex, &health) == RB_OK &&
+                    rb_example::Can_GetOutputBindingState(outputIndex, &binding) == RB_OK &&
                     !health.RequiresHumanIntervention &&
                     (!health.DeviceConnected || !health.DeviceOpened || !binding.Ready || !health.Armed)) {
-                    RB_Output_ConnectInstanceByIndex(outputIndex);
+                    rb_example::Output_ConnectInstanceByIndex(outputIndex);
                 }
                 lastReconnectAttempt = now;
             }
@@ -414,8 +419,8 @@ int main(int argc, char** argv)
                 health.Size = sizeof(health);
                 RB_CanOutputBindingState binding{};
                 binding.Size = sizeof(binding);
-                if (RB_Can_GetOutputHealthState(outputIndex, &health) == RB_OK &&
-                    RB_Can_GetOutputBindingState(outputIndex, &binding) == RB_OK) {
+                if (rb_example::Can_GetOutputHealthState(outputIndex, &health) == RB_OK &&
+                    rb_example::Can_GetOutputBindingState(outputIndex, &binding) == RB_OK) {
                     std::printf("CAN: ready=%d armed=%d active=%d fault=%d retry=%u stale=%d\n",
                         binding.Ready, health.Armed, health.OutputActive, health.FaultReason,
                         health.RetryCount, parked ? 1 : 0);
@@ -430,13 +435,23 @@ int main(int argc, char** argv)
             std::this_thread::sleep_for(std::chrono::milliseconds(20));
         }
     }
+    catch (const std::exception& error) {
+        std::fprintf(stderr, "%s\n", error.what());
+        exitCode = 9;
+    }
     catch (...) {
         // 上面的分支已经记录具体错误；这里统一执行资源释放。
     }
 
     if (socketHandle != INVALID_SOCKET) closesocket(socketHandle);
     if (sdkInitialized) {
-        if (outputIndex >= 0) RB_Output_DisconnectInstanceByIndex(outputIndex);
+        // 清理阶段也可能传输失败，但必须继续调用 Shutdown 收敛 SDK 线程。
+        try {
+            if (outputIndex >= 0) rb_example::Output_DisconnectInstanceByIndex(outputIndex);
+        } catch (const std::exception& error) {
+            std::fprintf(stderr, "Disconnect: %s\n", error.what());
+            exitCode = 9;
+        }
         RB_Runtime_Shutdown();
     }
     WSACleanup();

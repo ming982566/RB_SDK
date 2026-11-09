@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.15)
+project(RaceBearObjectExample LANGUAGES CXX)
+include("../common/ExampleBuild.cmake")
+add_executable(RaceBearObjectExample main.cpp)
+racebear_example(RaceBearObjectExample)

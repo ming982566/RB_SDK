@@ -1,6 +1,6 @@
 #include "configuration_examples.h"
 
-#include "RaceBearSDK.h"
+#include "ExampleServices.h"
 
 #include <cstring>
 
@@ -10,7 +10,7 @@ int ConfigureDynamicInputExample(int profileIndex, int dofIndex, int candidateIn
 		return RB_INVALID_ARGUMENT;
 	}
 	RB_DynamicInputCandidateCatalog candidates{};
-	int rc = RB_Dynamic_GetInputCandidateCatalog(dofIndex, &candidates);
+	int rc = rb_example::Dynamic_GetInputCandidateCatalog(dofIndex, &candidates);
 	if (rc != RB_OK || candidateIndex < 0 || candidateIndex >= candidates.Count) {
 		return rc == RB_OK ? RB_INVALID_ARGUMENT : rc;
 	}
@@ -18,7 +18,7 @@ int ConfigureDynamicInputExample(int profileIndex, int dofIndex, int candidateIn
 
 	// Always read the complete profile first so untouched DOFs and channels survive.
 	RB_DynamicV2Profile profile{};
-	rc = RB_Dynamic_ReadProfileByIndex(profileIndex, &profile);
+	rc = rb_example::Dynamic_ReadProfileByIndex(profileIndex, &profile);
 	if (rc != RB_OK) {
 		return rc;
 	}
@@ -43,8 +43,8 @@ int ConfigureDynamicInputExample(int profileIndex, int dofIndex, int candidateIn
 	dof.Enabled = 1;
 
 	// Apply updates the live model; Save persists the whole profile.
-	rc = RB_Dynamic_ApplyProfileToCurrentRig(&profile);
-	return rc == RB_OK ? RB_Dynamic_SaveProfileByIndex(profileIndex, &profile) : rc;
+	rc = rb_example::Dynamic_ApplyProfileToCurrentRig(&profile);
+	return rc == RB_OK ? rb_example::Dynamic_SaveProfileByIndex(profileIndex, &profile) : rc;
 }
 
 int ConfigureSerialOutputExample(int instanceIndex, const char* portName)
@@ -54,14 +54,14 @@ int ConfigureSerialOutputExample(int instanceIndex, const char* portName)
 	}
 
 	RB_OutputConfig output{};
-	int rc = RB_Output_ReadInstanceConfigByIndex(instanceIndex, &output);
+	int rc = rb_example::Output_ReadInstanceConfigByIndex(instanceIndex, &output);
 	if (rc != RB_OK) {
 		return rc;
 	}
 
 	// Connection fields must only change while this instance is disconnected.
-	if (RB_Output_IsInstanceConnected(instanceIndex)) {
-		rc = RB_Output_DisconnectInstanceByIndex(instanceIndex);
+	if (rb_example::Output_IsInstanceConnected(instanceIndex)) {
+		rc = rb_example::Output_DisconnectInstanceByIndex(instanceIndex);
 		if (rc != RB_OK) {
 			return rc;
 		}
@@ -75,60 +75,60 @@ int ConfigureSerialOutputExample(int instanceIndex, const char* portName)
 	strcpy_s(output.OutPutString, sizeof(output.OutPutString), "<A1><A2><A3><A4>");
 	strcpy_s(output.OutPutTime, sizeof(output.OutPutTime), "2"); // milliseconds
 
-	rc = RB_Output_SaveInstanceConfigByIndex(instanceIndex, &output);
-	return rc == RB_OK ? RB_Output_ApplyInstanceConfigByIndex(instanceIndex, &output) : rc;
+	rc = rb_example::Output_SaveInstanceConfigByIndex(instanceIndex, &output);
+	return rc == RB_OK ? rb_example::Output_ApplyInstanceConfigByIndex(instanceIndex, &output) : rc;
 }
 
 int ConfigureAdditionalEffectsExample(int motionProfileIndex, int dynamicProfileIndex)
 {
 	// 运动增强拥有独立目录，motionProfileIndex 必须来自运动增强配置选择框。
 	RB_MotionEffectProfile motion{};
-	int rc = RB_MotionEffect_ReadProfileByIndex(motionProfileIndex, &motion);
+	int rc = rb_example::MotionEffect_ReadProfileByIndex(motionProfileIndex, &motion);
 	if (rc != RB_OK) {
 		return rc;
 	}
 	motion.Effects[0].Enabled = 1;
 	motion.Effects[0].Gain = 1.0;
-	rc = RB_MotionEffect_ApplyProfileToCurrentRig(&motion);
+	rc = rb_example::MotionEffect_ApplyProfileToCurrentRig(&motion);
 	if (rc != RB_OK) {
 		return rc;
 	}
-	rc = RB_MotionEffect_SaveProfileByIndex(motionProfileIndex, &motion);
+	rc = rb_example::MotionEffect_SaveProfileByIndex(motionProfileIndex, &motion);
 	if (rc != RB_OK) {
 		return rc;
 	}
 
 	// 震动内容独立，但当前 ByIndex 接口按动态配置索引查找同名震动节点。
 	RB_HapticEffectProfile haptic{};
-	rc = RB_Haptic_ReadProfileByIndex(dynamicProfileIndex, &haptic);
+	rc = rb_example::Haptic_ReadProfileByIndex(dynamicProfileIndex, &haptic);
 	if (rc != RB_OK) {
 		return rc;
 	}
 	haptic.Effects[0].Enabled = 1;
 	haptic.Effects[0].OutputChannel = 0; // Haptic1
 	haptic.Effects[0].Gain = 1.0;
-	rc = RB_Haptic_ApplyProfileToCurrentFunction(&haptic);
+	rc = rb_example::Haptic_ApplyProfileToCurrentFunction(&haptic);
 	if (rc != RB_OK) {
 		return rc;
 	}
-	rc = RB_Haptic_SaveProfileByIndex(dynamicProfileIndex, &haptic);
+	rc = rb_example::Haptic_SaveProfileByIndex(dynamicProfileIndex, &haptic);
 	if (rc != RB_OK) {
 		return rc;
 	}
 
 	RB_WindEffectConfig wind{};
-	rc = RB_Wind_ReadConfig(&wind);
+	rc = rb_example::Wind_ReadConfig(&wind);
 	if (rc != RB_OK) {
 		return rc;
 	}
 	wind.Enabled = 1;
 	wind.InputMinKmh = 20.0;
 	wind.InputMaxKmh = 180.0;
-	rc = RB_Wind_ApplyConfigToCurrentFunction(&wind);
+	rc = rb_example::Wind_ApplyConfigToCurrentFunction(&wind);
 	if (rc != RB_OK) {
 		return rc;
 	}
-	return RB_Wind_SaveConfig(&wind);
+	return rb_example::Wind_SaveConfig(&wind);
 }
 
 int ConfigureGameTelemetryExample(const char* gameKey, int catalogIndex, int sourcePort)
@@ -139,52 +139,52 @@ int ConfigureGameTelemetryExample(const char* gameKey, int catalogIndex, int sou
 
 	// Read the existing game-specific config so fields not shown by this page survive.
 	RB_GameConfig config{};
-	int rc = RB_Game_ReadConfig(gameKey, &config);
+	int rc = rb_example::Game_ReadConfig(gameKey, &config);
 	if (rc != RB_OK) {
 		return rc;
 	}
 	config.SourcePort = sourcePort;
 	strcpy_s(config.SourceIP, sizeof(config.SourceIP), "127.0.0.1");
 
-	rc = RB_Game_SaveConfig(gameKey, &config);
+	rc = rb_example::Game_SaveConfig(gameKey, &config);
 	if (rc != RB_OK) {
 		return rc;
 	}
-	return RB_Game_AutoConnect(catalogIndex, &config);
+	return rb_example::Game_AutoConnect(catalogIndex, &config);
 }
 
 int InspectPluginsAndManualPoseExample()
 {
 	// Plugin indexes are snapshot-local. Refresh first, then use one catalog copy.
-	if (RB_Plugin_Refresh() < 0) {
+	if (rb_example::Plugin_Refresh() < 0) {
 		return RB_ERROR;
 	}
 	RB_PluginCatalog plugins{};
-	int rc = RB_Plugin_GetCatalog(&plugins);
+	int rc = rb_example::Plugin_GetCatalog(&plugins);
 	if (rc != RB_OK) {
 		return rc;
 	}
 
-	const int platformIndex = RB_Platform_ReadSelectedIndex();
+	const int platformIndex = rb_example::Platform_ReadSelectedIndex();
 	RB_PlatformConfig platform{};
-	if (platformIndex < 0 || RB_Platform_ReadConfigByIndex(platformIndex, &platform) != RB_OK) {
+	if (platformIndex < 0 || rb_example::Platform_ReadConfigByIndex(platformIndex, &platform) != RB_OK) {
 		return RB_ERROR;
 	}
 
 	// A value of zero verifies the manual-test path without commanding movement.
-	rc = RB_ManualPose_SetTestEnabled(1);
+	rc = rb_example::ManualPose_SetTestEnabled(1);
 	if (rc == RB_OK) {
-		rc = RB_ManualPose_SetDrive(0, 0.0);
+		rc = rb_example::ManualPose_SetDrive(0, 0.0);
 	}
-	RB_ManualPose_ResetDrive();
-	RB_ManualPose_SetTestEnabled(0);
+	rb_example::ManualPose_ResetDrive();
+	rb_example::ManualPose_SetTestEnabled(0);
 	return rc;
 }
 
 int ConfigureRgbEffectExample(const char* optionalDeviceUid)
 {
 	RB_RgbEffectProfile profile{};
-	int rc = RB_Rgb_GetDefaultEffectProfile(&profile);
+	int rc = rb_example::Rgb_GetDefaultEffectProfile(&profile);
 	if (rc != RB_OK) return rc;
 
 	profile.Enabled = 1;
@@ -229,21 +229,21 @@ int ConfigureRgbEffectExample(const char* optionalDeviceUid)
 	profile.Layers[2].Priority = 30;
 
 	// Apply only updates the runtime copy. Save is the explicit disk write.
-	rc = RB_Rgb_ApplyEffectProfile(&profile);
+	rc = rb_example::Rgb_ApplyEffectProfile(&profile);
 	if (rc != RB_OK) return rc;
-	rc = RB_Rgb_SaveEffectProfile(&profile);
+	rc = rb_example::Rgb_SaveEffectProfile(&profile);
 	if (rc != RB_OK || optionalDeviceUid == nullptr || optionalDeviceUid[0] == '\0') return rc;
 
 	// Device discovery is low frequency and UID based; directory indexes are not persisted.
-	if (RB_Rgb_RefreshDevices() < 0) return RB_ERROR;
-	rc = RB_Rgb_Connect(optionalDeviceUid);
+	if (rb_example::Rgb_RefreshDevices() < 0) return RB_ERROR;
+	rc = rb_example::Rgb_Connect(optionalDeviceUid);
 	if (rc != RB_OK) return rc;
 
 	RB_RgbDeviceConfig device{};
-	rc = RB_Rgb_ReadDeviceConfig(&device);
+	rc = rb_example::Rgb_ReadDeviceConfig(&device);
 	if (rc != RB_OK) return rc;
 	device.GlobalBrightness = 204;
 	device.CurrentLimitMa = 5000;
 	// Applying does not write MCU Flash. Call SaveDeviceConfig only from an explicit Save action.
-	return RB_Rgb_ApplyDeviceConfig(&device);
+	return rb_example::Rgb_ApplyDeviceConfig(&device);
 }

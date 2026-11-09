@@ -31,7 +31,7 @@ class PlatformPage final : public Page {
   double ManualLimit(int dof) const {
     if (index_ < 0 || dof < 0 || dof >= RB_DOF_COUNT)
       return 0.0;
-    return std::abs(RB_Platform_GetPreviewPoseLimit(index_, &cfg_, dof));
+    return std::abs(rb_example::Platform_GetPreviewPoseLimit(index_, &cfg_, dof));
   }
 
   void SetManualSliderUi(int dof, int position) {
@@ -108,13 +108,13 @@ public:
   }
   void Refresh() {
     SendMessageW(combo_, CB_RESETCONTENT, 0, 0);
-    int n = RB_Platform_GetCount();
+    int n = rb_example::Platform_GetCount();
     for (int i = 0; i < n; ++i) {
       char b[RB_TEXT_MEDIUM]{};
-      if (RB_Platform_GetName(i, b, sizeof b) == RB_OK)
+      if (rb_example::Platform_GetName(i, b, sizeof b) == RB_OK)
         ui::ComboAdd(combo_, Utf8ToWide(b), i);
     }
-    int sel = RB_Platform_ReadSelectedIndex();
+    int sel = rb_example::Platform_ReadSelectedIndex();
     ui::SelectComboData(combo_, sel);
     Read();
   }
@@ -122,7 +122,7 @@ public:
     index_ = ui::ComboData(combo_);
     if (index_ < 0)
       return;
-    int rc = RB_Platform_ReadConfigByIndex(index_, &cfg_);
+    int rc = rb_example::Platform_ReadConfigByIndex(index_, &cfg_);
     if (rc != RB_OK) {
       Status(L"读取平台失败: " + ResultText(rc), true);
       return;
@@ -132,9 +132,9 @@ public:
       ui::SetInt(e_[i], l[i]);
       char name[RB_TEXT_MEDIUM]{};
       int nameRc = i < 7
-                       ? RB_Platform_GetGeometryParameterName(index_, i + 1,
+                       ? rb_example::Platform_GetGeometryParameterName(index_, i + 1,
                                                               name, sizeof name)
-                       : RB_Platform_GetStrokeParameterName(index_, i + 1, name,
+                       : rb_example::Platform_GetStrokeParameterName(index_, i + 1, name,
                                                             sizeof name);
       const bool used = nameRc == RB_OK && name[0];
       std::wstring label = used ? Utf8ToWide(name)
@@ -155,8 +155,8 @@ public:
     }
     SetWindowUtf8(e_[19], cfg_.OutKey);
     for (int i = 0; i < 6; ++i) {
-      dofSupported_[i] = RB_Platform_IsDofSupported(index_, i) != 0 &&
-                         RB_Platform_IsPreviewPosePossible(index_, &cfg_, i) != 0;
+      dofSupported_[i] = rb_example::Platform_IsDofSupported(index_, i) != 0 &&
+                         rb_example::Platform_IsPreviewPosePossible(index_, &cfg_, i) != 0;
       SendMessageW(d_[i], TBM_SETPOS, TRUE, 0);
       SetManualSliderUi(i, 0);
     }
@@ -206,7 +206,7 @@ public:
 
       const double value = ManualLimit(dof) * static_cast<double>(position) /
                            static_cast<double>(ManualSliderScale);
-      const int rc = RB_ManualPose_SetDrive(dof, value);
+      const int rc = rb_example::ManualPose_SetDrive(dof, value);
       if (rc != RB_OK)
         Status(L"手动姿态: " + ResultText(rc), true);
     }
@@ -254,7 +254,7 @@ public:
       double limit = std::abs(motion_.PoseLimit[i]);
       // 运行态尚未给出限制时，用当前平台配置计算预览范围，避免错误显示为 0。
       if (limit <= 0.000001 && index_ >= 0)
-        limit = std::abs(RB_Platform_GetPreviewPoseLimit(index_, &cfg_, i));
+        limit = std::abs(rb_example::Platform_GetPreviewPoseLimit(index_, &cfg_, i));
       const double normalized = limit > 0.000001
           ? (std::max)(-1.0, (std::min)(1.0, motion_.RigFiltered[i] / limit))
           : 0.0;
@@ -286,27 +286,27 @@ public:
       Read();
     else if (id == 202) {
       if (Pull())
-        Report(RB_Platform_ApplyRuntimeConfigToCurrentRig(&cfg_), L"应用");
+        Report(rb_example::Platform_ApplyRuntimeConfigToCurrentRig(&cfg_), L"应用");
     } else if (id == 203) {
       if (!Pull())
         return;
-      int rc = RB_Platform_SaveConfigByIndex(index_, &cfg_);
+      int rc = rb_example::Platform_SaveConfigByIndex(index_, &cfg_);
       if (rc != RB_OK) {
         Report(rc, L"保存平台配置");
         return;
       }
-      rc = RB_Platform_SaveSelectedIndex(index_);
+      rc = rb_example::Platform_SaveSelectedIndex(index_);
       if (rc != RB_OK) {
         Report(rc, L"保存平台选择项");
         return;
       }
-      rc = RB_Platform_SetSelectedState(index_, &cfg_);
+      rc = rb_example::Platform_SetSelectedState(index_, &cfg_);
       if (rc != RB_OK) {
         Report(rc, L"更新平台状态");
         return;
       }
       RB_PlatformConfig saved{};
-      rc = RB_Platform_ReadConfigByIndex(index_, &saved);
+      rc = rb_example::Platform_ReadConfigByIndex(index_, &saved);
       if (rc != RB_OK) {
         Report(rc, L"保存成功，但回读失败");
         return;
@@ -319,7 +319,7 @@ public:
         Status(L"授权未允许真实输出，测试被锁定", true);
         return;
       }
-      const int rc = RB_ManualPose_SetTestEnabled(ui::Checked(test_));
+      const int rc = rb_example::ManualPose_SetTestEnabled(ui::Checked(test_));
       Report(rc, L"测试模式");
       if (rc != RB_OK)
         ui::SetChecked(test_, 0);
@@ -335,8 +335,8 @@ public:
   }
   void Reset() {
     // 离开页面或退出程序时必须同时归零目标值并关闭手动测试模式。
-    const int resetRc = RB_ManualPose_ResetDrive();
-    const int disableRc = RB_ManualPose_SetTestEnabled(0);
+    const int resetRc = rb_example::ManualPose_ResetDrive();
+    const int disableRc = rb_example::ManualPose_SetTestEnabled(0);
     if (resetRc != RB_OK && disableRc != RB_OK && allowed_)
       Status(L"手动姿态复位失败", true);
     if (test_)

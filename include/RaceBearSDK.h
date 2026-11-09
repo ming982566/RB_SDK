@@ -5,9 +5,9 @@
 //
 // Developer contract:
 // 1. Include this header and link RaceBearSDK.lib, then ship RaceBearSDK.dll with the host app.
-// 2. Call RB_Runtime_SetAppDataName() first if the host app does not want to use the default SimRacebear config directory.
+// 2. 初始化前通过 rb.service.runtime 的 rb.runtime.set_app_data_name 操作设置产品目录名（可选）。
 // 3. Call RB_Runtime_Initialize() once before using runtime/config/output APIs.
-// 4. Call RB_Runtime_StartLoop() to let the SDK drive backend calculations internally.
+// 4. 通过 RB_Object_Invoke("rb.runtime.start", ...) 启动计算，并用 RB_Object_Poll 确认任务结果。
 // 5. Call RB_Runtime_Shutdown() once before process exit. Shutdown automatically stops the runtime loop.
 // 6. All char buffers are UTF-8. wchar_t* parameters are Windows UTF-16.
 // 7. For full integration steps, examples, return-value rules, and field units, read RaceBearSDK_API.md.

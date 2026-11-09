@@ -5,7 +5,7 @@
 SdkRuntime::~SdkRuntime() { Stop(); }
 bool SdkRuntime::Start(std::wstring &error) {
   // AppData 名称只在初始化前生效，用于隔离示例程序和正式软件的配置。
-  if (RB_Runtime_SetAppDataName("RaceBearMotionStudio") != RB_OK) {
+  if (rb_example::Runtime_SetAppDataName("RaceBearMotionStudio") != RB_OK) {
     error = L"无法设置独立应用数据目录名称";
     return false;
   }
@@ -16,7 +16,7 @@ bool SdkRuntime::Start(std::wstring &error) {
   }
   started_ = true;
   // 参数单位是 ms；2 表示由 SDK 内部以约 500 Hz 驱动后端循环。
-  rc = RB_Runtime_StartLoop(2);
+  rc = rb_example::Runtime_StartLoop(2);
   if (rc != RB_OK) {
     error = L"SDK 2 ms 内部循环启动失败：" + ResultText(rc);
     Stop();
@@ -31,7 +31,8 @@ void SdkRuntime::Stop() {
   started_ = false;
 }
 bool SdkRuntime::ReadState(RB_RuntimeState &s, std::wstring &error) const {
-  int rc = RB_State_Read(&s);
+  // 高频 UI 读取一份完整运行态，不逐字段同步分派。
+  int rc = rb_example::ReadBinary("rb.runtime.state", s);
   if (rc == RB_OK)
     return true;
   error = ResultText(rc);
@@ -39,10 +40,15 @@ bool SdkRuntime::ReadState(RB_RuntimeState &s, std::wstring &error) const {
 }
 std::vector<std::wstring> SdkRuntime::DrainLogs() {
   std::vector<std::wstring> out;
-  std::array<char, 4096> b{};
+  std::vector<char> b(4096);
   // 单次最多取 500 条，防止大量历史日志长时间占用 UI 线程。
   for (int i = 0; i < 500; ++i) {
-    int rc = RB_Log_Read(b.data(), static_cast<int>(b.size()));
+    int rc = rb_example::Log_Read(b.data(), static_cast<int>(b.size()));
+    if (rc == RB_BUFFER_TOO_SMALL && b.size() < 16 * 1024 * 1024) {
+      b.resize(b.size() * 2);
+      --i; // 日志尚未出队，扩容只重读同一条记录。
+      continue;
+    }
     if (rc != RB_OK) {
       out.push_back(L"RB_Log_Read: " + ResultText(rc));
       break;
@@ -55,8 +61,9 @@ std::vector<std::wstring> SdkRuntime::DrainLogs() {
 }
 bool SdkRuntime::Command(const char *c, const std::string &j, std::wstring &r,
                          std::wstring &e) const {
-  std::array<char, 4096> b{};
-  int rc = RB_Command_Run(c, j.c_str(), b.data(), static_cast<int>(b.size()));
+  // 动作只调用一次；容量不足报告错误，不以扩容为理由重发动作。
+  std::vector<char> b(64 * 1024);
+  int rc = rb_example::Command_Run(c, j.c_str(), b.data(), static_cast<int>(b.size()));
   r = Utf8ToWide(b.data());
   if (rc == RB_OK)
     return true;

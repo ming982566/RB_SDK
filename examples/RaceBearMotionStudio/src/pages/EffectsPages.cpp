@@ -14,7 +14,7 @@ std::wstring DynamicInputDisplayName(const char *key, int inputType) {
 
 void FillTelemetry(HWND c, RB_TelemetryCatalog &tc) {
   SendMessageW(c, CB_RESETCONTENT, 0, 0);
-  if (RB_Telemetry_GetCatalog(&tc) != RB_OK)
+  if (rb_example::Telemetry_GetCatalog(&tc) != RB_OK)
     return;
   for (int i = 0; i < tc.Count; ++i)
     ui::ComboAdd(c,
@@ -88,13 +88,13 @@ public:
   }
   void Refresh() {
     SendMessageW(profiles_, CB_RESETCONTENT, 0, 0);
-    int n = RB_Dynamic_GetProfileCount();
+    int n = rb_example::Dynamic_GetProfileCount();
     for (int i = 0; i < n; ++i) {
       char b[RB_TEXT_MEDIUM]{};
-      if (RB_Dynamic_GetProfileName(i, b, sizeof b) == RB_OK)
+      if (rb_example::Dynamic_GetProfileName(i, b, sizeof b) == RB_OK)
         ui::ComboAdd(profiles_, Utf8ToWide(b), i);
     }
-    int cur = RB_Dynamic_ReadCurrentGameProfileIndex();
+    int cur = rb_example::Dynamic_ReadCurrentGameProfileIndex();
     ui::SelectComboData(profiles_, cur >= 0 ? cur : 0);
     Read();
   }
@@ -102,7 +102,7 @@ public:
     pi_ = ui::ComboData(profiles_);
     if (pi_ < 0)
       return;
-    int rc = RB_Dynamic_ReadProfileByIndex(pi_, &p_);
+    int rc = rb_example::Dynamic_ReadProfileByIndex(pi_, &p_);
     if (rc != RB_OK) {
       Status(L"读取动态配置失败", true);
       return;
@@ -132,7 +132,7 @@ public:
     SendMessageW(tele_, CB_RESETCONTENT, 0, 0);
     candidates_ = {};
     // 候选目录按当前 DOF 过滤，不能把完整遥测目录直接暴露给用户选择。
-    if (RB_Dynamic_GetInputCandidateCatalog(di_, &candidates_) != RB_OK)
+    if (rb_example::Dynamic_GetInputCandidateCatalog(di_, &candidates_) != RB_OK)
       return;
     const auto &dof = p_.Dofs[di_];
     for (int candidateIndex = 0; candidateIndex < candidates_.Count; ++candidateIndex) {
@@ -254,7 +254,7 @@ public:
       Read();
     else if (id == 302) {
       Store();
-      Report(RB_Dynamic_ApplyProfileToCurrentRig(&p_), L"应用");
+      Report(rb_example::Dynamic_ApplyProfileToCurrentRig(&p_), L"应用");
     } else if (id == 303) {
       Store();
       // 保存完整结构体前清空未使用槽位，避免删除通道后残留旧参数。
@@ -263,13 +263,13 @@ public:
         for (int ii = dof.InputCount; ii < RB_DYNAMIC_MAX_INPUTS; ++ii)
           dof.Inputs[ii] = {};
       }
-      int rc = RB_Dynamic_SaveProfileByIndex(pi_, &p_);
+      int rc = rb_example::Dynamic_SaveProfileByIndex(pi_, &p_);
       if (rc != RB_OK) {
         Report(rc, L"保存");
         return;
       }
       RB_DynamicV2Profile saved{};
-      rc = RB_Dynamic_ReadProfileByIndex(pi_, &saved);
+      rc = rb_example::Dynamic_ReadProfileByIndex(pi_, &saved);
       if (rc != RB_OK) {
         Report(rc, L"保存成功，但回读失败");
         return;
@@ -280,16 +280,16 @@ public:
       Store();
       auto n = WideToUtf8(GetWindowString(copy_));
       Report(n.empty() ? RB_INVALID_ARGUMENT
-                       : RB_Dynamic_SaveProfile(n.c_str(), &p_),
+                       : rb_example::Dynamic_SaveProfile(n.c_str(), &p_),
              L"复制");
       Refresh();
     } else if (id == 306) {
       if (MessageBoxW(hwnd_, L"确定要删除当前动态滤波配置吗？此操作同时删除同名运动增强和震动配置。",
                        L"确认删除", MB_YESNO | MB_ICONWARNING) != IDYES) return;
-      Report(RB_Dynamic_DeleteProfileByIndex(pi_), L"删除");
+      Report(rb_example::Dynamic_DeleteProfileByIndex(pi_), L"删除");
       Refresh();
     } else if (id == 307) {
-      Report(RB_Dynamic_SaveCurrentGameProfileIndex(pi_), L"绑定当前游戏");
+      Report(rb_example::Dynamic_SaveCurrentGameProfileIndex(pi_), L"绑定当前游戏");
     }
   }
   void Report(int rc, const wchar_t *n) {
@@ -348,16 +348,16 @@ public:
     Refresh();
   }
   void Refresh() {
-    RB_MotionEffect_GetCatalog(&cat_);
+    rb_example::MotionEffect_GetCatalog(&cat_);
     SendMessageW(effect_, CB_RESETCONTENT, 0, 0);
     for (int i = 0; i < cat_.Count; ++i)
       ui::ComboAdd(effect_, Utf8ToWide(cat_.Items[i].Name),
                    cat_.Items[i].Index);
     SendMessageW(profile_, CB_RESETCONTENT, 0, 0);
-    int n = RB_MotionEffect_GetProfileCount();
+    int n = rb_example::MotionEffect_GetProfileCount();
     for (int i = 0; i < n; ++i) {
       char b[128]{};
-      if (RB_MotionEffect_GetProfileName(i, b, sizeof b) == RB_OK)
+      if (rb_example::MotionEffect_GetProfileName(i, b, sizeof b) == RB_OK)
         ui::ComboAdd(profile_, Utf8ToWide(b), i);
     }
     FillTelemetry(input_, tc_);
@@ -372,7 +372,7 @@ public:
     ei_ = ui::ComboData(effect_);
     if (pi_ < 0 || ei_ < 0)
       return;
-    if (RB_MotionEffect_ReadProfileByIndex(pi_, &p_) != RB_OK)
+    if (rb_example::MotionEffect_ReadProfileByIndex(pi_, &p_) != RB_OK)
       return;
     ri_ = 0;
     Load();
@@ -417,16 +417,16 @@ public:
       Read();
     else if (id == 403) {
       Store();
-      Report(RB_MotionEffect_ApplyProfileToCurrentRig(&p_), L"应用");
+      Report(rb_example::MotionEffect_ApplyProfileToCurrentRig(&p_), L"应用");
     } else if (id == 404) {
       Store();
-      int rc = RB_MotionEffect_SaveProfileByIndex(pi_, &p_);
+      int rc = rb_example::MotionEffect_SaveProfileByIndex(pi_, &p_);
       if (rc != RB_OK) {
         Report(rc, L"保存");
         return;
       }
       RB_MotionEffectProfile saved{};
-      rc = RB_MotionEffect_ReadProfileByIndex(pi_, &saved);
+      rc = rb_example::MotionEffect_ReadProfileByIndex(pi_, &saved);
       if (rc != RB_OK) {
         Report(rc, L"保存成功，但回读失败");
         return;
@@ -501,16 +501,16 @@ public:
     Refresh();
   }
   void Refresh() {
-    RB_Haptic_GetCatalog(&cat_);
+    rb_example::Haptic_GetCatalog(&cat_);
     SendMessageW(effect_, CB_RESETCONTENT, 0, 0);
     for (int i = 0; i < cat_.Count; ++i)
       ui::ComboAdd(effect_, Utf8ToWide(cat_.Items[i].Name),
                    cat_.Items[i].Index);
     SendMessageW(profile_, CB_RESETCONTENT, 0, 0);
-    int n = RB_Dynamic_GetProfileCount();
+    int n = rb_example::Dynamic_GetProfileCount();
     for (int i = 0; i < n; ++i) {
       char b[128]{};
-      if (RB_Dynamic_GetProfileName(i, b, sizeof b) == RB_OK)
+      if (rb_example::Dynamic_GetProfileName(i, b, sizeof b) == RB_OK)
         ui::ComboAdd(profile_, Utf8ToWide(b), i);
     }
     FillTelemetry(in_, tc_);
@@ -525,7 +525,7 @@ public:
     ei_ = ui::ComboData(effect_);
     if (pi_ < 0 || ei_ < 0)
       return;
-    if (RB_Haptic_ReadProfileByIndex(pi_, &p_) != RB_OK)
+    if (rb_example::Haptic_ReadProfileByIndex(pi_, &p_) != RB_OK)
       return;
     Load();
   }
@@ -567,16 +567,16 @@ public:
       Read();
     else if (id == 503) {
       Store();
-      Report(RB_Haptic_ApplyProfileToCurrentFunction(&p_), L"应用");
+      Report(rb_example::Haptic_ApplyProfileToCurrentFunction(&p_), L"应用");
     } else if (id == 504) {
       Store();
-      int rc = RB_Haptic_SaveProfileByIndex(pi_, &p_);
+      int rc = rb_example::Haptic_SaveProfileByIndex(pi_, &p_);
       if (rc != RB_OK) {
         Report(rc, L"保存");
         return;
       }
       RB_HapticEffectProfile saved{};
-      rc = RB_Haptic_ReadProfileByIndex(pi_, &saved);
+      rc = rb_example::Haptic_ReadProfileByIndex(pi_, &saved);
       if (rc != RB_OK) {
         Report(rc, L"保存成功，但回读失败");
         return;
@@ -597,7 +597,6 @@ class Wind final : public Page {
   std::array<HWND, 10> wv_{};       // value display for sliders
   HWND state_{};
   RB_WindEffectConfig c_{};
-  bool allowed_{};
 
   static int SliderIdx(int itemIdx) {
     if (itemIdx == 3) return 0;
@@ -644,9 +643,9 @@ public:
     Read();
   }
   void Read() {
-    int rc = RB_Wind_ReadConfig(&c_);
+    int rc = rb_example::Wind_ReadConfig(&c_);
     if (rc != RB_OK)
-      rc = RB_Wind_GetDefaultConfig(&c_);
+      rc = rb_example::Wind_GetDefaultConfig(&c_);
     if (rc != RB_OK)
       return;
     ui::SetChecked(e_[0], c_.Enabled);
@@ -706,7 +705,7 @@ public:
   void OnHide() override { Zero(); }
   void Shutdown() override { Zero(); }
   void OnState(const RB_RuntimeState &s) override {
-    allowed_ = s.License.OutputAllowed;
+    // Wind/安全带无需授权，设备和机械保护仍由 SDK 校验。
     SetWindowTextW(state_,
                    (L"输入 " + FormatDouble(s.Wind.CurrentInputKmh) +
                     L" km/h  输出 " +
@@ -721,16 +720,16 @@ public:
       Read();
     else if (id == 621) {
       Pull();
-      Report(RB_Wind_ApplyConfigToCurrentFunction(&c_), L"应用");
+      Report(rb_example::Wind_ApplyConfigToCurrentFunction(&c_), L"应用");
     } else if (id == 622) {
       Pull();
-      int rc = RB_Wind_SaveConfig(&c_);
+      int rc = rb_example::Wind_SaveConfig(&c_);
       if (rc != RB_OK) {
         Report(rc, L"保存");
         return;
       }
       RB_WindEffectConfig saved{};
-      rc = RB_Wind_ReadConfig(&saved);
+      rc = rb_example::Wind_ReadConfig(&saved);
       if (rc != RB_OK) {
         Report(rc, L"保存成功，但回读失败");
         return;
@@ -738,18 +737,14 @@ public:
       c_ = saved;
       Report(RB_OK, L"保存并回读");
     } else if (id == 624) {
-      if (!allowed_) {
-        Status(L"当前授权状态不支持真实测试输出", true);
-        return;
-      }
-      Report(RB_Wind_SetTestOutput(1, ui::Double(GetDlgItem(hwnd_, 623))),
+      Report(rb_example::Wind_SetTestOutput(1, ui::Double(GetDlgItem(hwnd_, 623))),
           L"测试");
     } else if (id == 625)
       Zero();
   }
   void Zero() {
-    const int rc = RB_Wind_SetTestOutput(0, 0);
-    if (rc != RB_OK && allowed_)
+    const int rc = rb_example::Wind_SetTestOutput(0, 0);
+    if (rc != RB_OK)
       Status(L"风感测试归零失败: " + ResultText(rc), true);
   }
   void Report(int r, const wchar_t *n) {
@@ -764,7 +759,6 @@ class Seatbelt final : public Page {
   std::array<HWND, 8> sv_{};       // value display for sliders
   HWND mode_{}, state_{};
   RB_SeatbeltEffectConfig c_{};
-  bool allowed_{};
 
   static int SeatSliderIdx(int item) {
     int map[] = {1,4,5,7,8,10,18,19};
@@ -839,9 +833,9 @@ public:
     Read();
   }
   void Read() {
-    int rc = RB_Seatbelt_ReadConfig(&c_);
+    int rc = rb_example::Seatbelt_ReadConfig(&c_);
     if (rc != RB_OK)
-      rc = RB_Seatbelt_GetDefaultConfig(&c_);
+      rc = rb_example::Seatbelt_GetDefaultConfig(&c_);
     if (rc != RB_OK)
       return;
     ui::SelectComboData(mode_, c_.InputMode);
@@ -919,7 +913,7 @@ public:
   void OnHide() override { Zero(); }
   void Shutdown() override { Zero(); }
   void OnState(const RB_RuntimeState &s) override {
-    allowed_ = s.License.OutputAllowed;
+    // Wind/安全带无需授权，设备和机械保护仍由 SDK 校验。
     SetWindowTextW(state_,
                    (L"左 " + FormatDouble(s.Seatbelt.LeftOutputPercent) +
                     L"% / 右 " + FormatDouble(s.Seatbelt.RightOutputPercent) +
@@ -932,16 +926,16 @@ public:
       Read();
     else if (id == 741) {
       Pull();
-      Report(RB_Seatbelt_ApplyConfigToCurrentFunction(&c_), L"应用");
+      Report(rb_example::Seatbelt_ApplyConfigToCurrentFunction(&c_), L"应用");
     } else if (id == 742) {
       Pull();
-      int rc = RB_Seatbelt_SaveConfig(&c_);
+      int rc = rb_example::Seatbelt_SaveConfig(&c_);
       if (rc != RB_OK) {
         Report(rc, L"保存");
         return;
       }
       RB_SeatbeltEffectConfig saved{};
-      rc = RB_Seatbelt_ReadConfig(&saved);
+      rc = rb_example::Seatbelt_ReadConfig(&saved);
       if (rc != RB_OK) {
         Report(rc, L"保存成功，但回读失败");
         return;
@@ -949,11 +943,7 @@ public:
       c_ = saved;
       Report(RB_OK, L"保存并回读");
     } else if (id == 745) {
-      if (!allowed_) {
-        Status(L"当前授权状态不支持真实测试输出", true);
-        return;
-      }
-      Report(RB_Seatbelt_SetTestOutput(
+      Report(rb_example::Seatbelt_SetTestOutput(
               1, ui::Double(e_[22]),
               ui::Double(static_cast<HWND>(GetPropW(hwnd_, L"seatRight")))),
           L"测试");
@@ -961,8 +951,8 @@ public:
       Zero();
   }
   void Zero() {
-    const int rc = RB_Seatbelt_SetTestOutput(0, 0, 0);
-    if (rc != RB_OK && allowed_)
+    const int rc = rb_example::Seatbelt_SetTestOutput(0, 0, 0);
+    if (rc != RB_OK)
       Status(L"安全带测试归零失败: " + ResultText(rc), true);
   }
   void Report(int r, const wchar_t *n) {

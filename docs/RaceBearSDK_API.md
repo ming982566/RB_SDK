@@ -36,35 +36,54 @@
 
 ## 3. 最小生命周期
 
-应用目录名通过同步服务 `rb.service.runtime` 的操作 `rb.runtime.set_app_data_name` 设置。该操作使用 `RB_ObjectNativeCall`，必须在初始化前完成。下面的代码省略了 `CallNativeService` 的封装，封装实现见对象协议“同步本机服务”一节。
+应用目录名通过同步服务 `rb.service.runtime` 的操作 `rb.runtime.set_app_data_name` 设置，必须在初始化前完成。以下完整程序使用包内 `examples/common` 的宿主包装；编译时加入该目录和 `include`，链接同配置的 SDK LIB。包装源码展示了完整 NATIVE_CALL 封套，不增加 DLL 入口。
 
 ```cpp
-#include "RaceBearSDK.h"
+#include "ExampleServices.h"
+#include <chrono>
+#include <cstdio>
+#include <thread>
+#include <vector>
 
-int StartRaceBear()
+// 同一任务持续等待并消费终态；缓冲区不足只重读，不重复提交动作。
+int RunAction(const char* key, const char* json)
 {
-    if (CallNativeService(
-            "rb.service.runtime",
-            "rb.runtime.set_app_data_name",
-            "StableProductName") != RB_OK)
-        return RB_ERROR;
-
-    int rc = RB_Runtime_Initialize();
-    if (rc != RB_OK)
-        return rc;
-
-    uint64_t taskId = 0;
-    return RB_Object_Invoke(
-        "rb.runtime.start",
-        "{\"intervalMs\":2}",
-        &taskId);
+    uint64_t task = 0;
+    int rc = RB_Object_Invoke(key, json, &task);
+    if (rc != RB_OK) return rc;
+    std::vector<char> result(1024);
+    for (;;) {
+        RB_ObjectTaskInfo info{};
+        info.Size = sizeof(info); info.Version = 1;
+        rc = RB_Object_Poll(task, 1, result.data(), static_cast<int>(result.size()), &info);
+        if (rc == RB_BUFFER_TOO_SMALL) {
+            result.resize(info.PayloadBytes);
+            continue;
+        }
+        if (rc != RB_OK) return rc;
+        if (info.Status >= RB_OBJECT_TASK_COMPLETE) return info.ResultCode;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
 }
 
-void StopRaceBear()
+int main()
 {
-    uint64_t taskId = 0;
-    RB_Object_Invoke("rb.runtime.stop", "{}", &taskId);
-    RB_Runtime_Shutdown();
+    bool initialized = false;
+    try {
+        if (rb_example::Runtime_SetAppDataName("RaceBearLifecycleDemo") != RB_OK) return 1;
+        if (RB_Runtime_Initialize() != RB_OK) return 1;
+        initialized = true;
+        const int started = RunAction("rb.runtime.start", "{\"intervalMs\":2}");
+        // 此处运行宿主业务；退出前先停止其它调用线程、设备和回调。
+        const int stopped = RunAction("rb.runtime.stop", "{}");
+        RB_Runtime_Shutdown();
+        return started == RB_OK && stopped == RB_OK ? 0 : 1;
+    }
+    catch (const std::exception& error) {
+        std::fprintf(stderr, "%s\n", error.what());
+        if (initialized) RB_Runtime_Shutdown();
+        return 1;
+    }
 }
 ```
 

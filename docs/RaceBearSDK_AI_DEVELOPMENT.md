@@ -46,7 +46,7 @@ SDK 根目录通过 `include/RaceBearSDK.h` 与 `docs` 同时存在确定，不�
 | 按需 | [CAN 指南](RaceBearSDK_RB_CAN_GUIDE.md) | UID、绑定、健康、维护、恢复 |
 | 按需 | [仪表开发](RaceBearSDK_DASHBOARD_DEVELOPMENT.md) | 包格式、设计器、像素、VOCORE、Web、资源 |
 | 采用对象 ABI 时必读 | [统一对象 ABI](RaceBearSDK_OBJECT_API.md) / [同步服务目录](RaceBearSDK_SERVICE_API.md) | 协议第 0 节提供 key 分类、调用路线和公开服务域用途；第 2/5 节列对象/命令，服务目录列全部 265 项公开操作参数 |
-| 按需 | SDK 根目录的 `examples/README.md` | 当前语言可复用的接入片段和可构建工程 |
+| 按需 | SDK 根目录的 `examples/README.md` | 仅 C++ 可构建示例，全部使用 10 个统一 ABI；其它语言按公开协议自行绑定 |
 
 Skill 的 feature-routing、integration-workflow、implementation-patterns、
 validation-checklist 是实现时的索引与模板，位于

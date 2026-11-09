@@ -18,7 +18,6 @@ class Output final : public Page {
   RB_OutputCatalog cat_{};
   RB_OutputConfig c_{};
   int idx_{-1};
-  bool allowed_{};
 
 public:
   Output(HWND h, SdkRuntime &s) : Page(h), s_(s) {}
@@ -56,7 +55,7 @@ public:
   }
   void Refresh() {
     SendMessageW(list_, LB_RESETCONTENT, 0, 0);
-    if (RB_Output_GetCatalog(&cat_) == RB_OK) {
+    if (rb_example::Output_GetCatalog(&cat_) == RB_OK) {
       for (int i = 0; i < cat_.InstanceCount; ++i) {
         std::wstring t = Utf8ToWide(cat_.Instances[i].Key) +
                          (cat_.Instances[i].Connected ? L" [已连接]" : L"");
@@ -71,9 +70,9 @@ public:
             reinterpret_cast<LPARAM>(Utf8ToWide(cat_.Keys[i].Key).c_str()));
     }
     SendMessageW(kinds_, CB_RESETCONTENT, 0, 0);
-    for (int i = 0; i < RB_Output_GetKindCount(); ++i) {
+    for (int i = 0; i < rb_example::Output_GetKindCount(); ++i) {
       char b[64]{};
-      if (RB_Output_GetKind(i, b, sizeof b) == RB_OK)
+      if (rb_example::Output_GetKind(i, b, sizeof b) == RB_OK)
         ui::ComboAdd(kinds_, OutputKindText(b), i);
     }
     if (cat_.InstanceCount) {
@@ -86,7 +85,7 @@ public:
     if (r < 0)
       return;
     idx_ = static_cast<int>(SendMessageW(list_, LB_GETITEMDATA, r, 0));
-    int rc = RB_Output_ReadInstanceConfigByIndex(idx_, &c_);
+    int rc = rb_example::Output_ReadInstanceConfigByIndex(idx_, &c_);
     if (rc != RB_OK)
       return;
     ui::SetChecked(e_[0], c_.AutoConnect);
@@ -107,9 +106,9 @@ public:
     SetWindowUtf8(e_[14], c_.OutPutTime);
     SetWindowUtf8(e_[15], c_.EndString);
     SetWindowUtf8(e_[16], c_.EndTime);
-    for (int i = 0; i < RB_Output_GetKindCount(); ++i) {
+    for (int i = 0; i < rb_example::Output_GetKindCount(); ++i) {
       char b[64]{};
-      if (RB_Output_GetKind(i, b, sizeof b) == RB_OK &&
+      if (rb_example::Output_GetKind(i, b, sizeof b) == RB_OK &&
           strcmp(b, c_.OutputKind) == 0) {
         ui::SelectComboData(kinds_, i);
         break;
@@ -127,7 +126,7 @@ public:
     c_.ParkPositionPercent = ui::Int(e_[10]);
     int ki = ui::ComboData(kinds_);
     char k[64]{};
-    if (RB_Output_GetKind(ki, k, sizeof k) != RB_OK)
+    if (rb_example::Output_GetKind(ki, k, sizeof k) != RB_OK)
       return false;
     strcpy_s(c_.OutputKind, k);
     return SetUtf8(c_.Port, sizeof c_.Port, GetWindowString(e_[3])) &&
@@ -147,7 +146,7 @@ public:
   }
   void OnShow() override { Refresh(); }
   void OnState(const RB_RuntimeState &s) override {
-    allowed_ = s.License.OutputAllowed;
+    // 同一目录可能含无需授权的安全带实例，按实例类型由 SDK 校验连接许可。
     SetWindowTextW(status_,
                    (L"实例 " + std::to_wstring(s.Output.Count) + L" / " +
                     (s.Output.AnyRuntimeActive ? L"运行中" : L"空闲") +
@@ -162,9 +161,9 @@ public:
     else if (id == 803) {
       char k[64]{};
       int x = ui::ComboData(kinds_);
-      int rc = RB_Output_GetKind(x, k, sizeof k);
+      int rc = rb_example::Output_GetKind(x, k, sizeof k);
       if (rc == RB_OK) {
-        int ni = RB_Output_AddInstance(k);
+        int ni = rb_example::Output_AddInstance(k);
         rc = ni < 0 ? ni : RB_OK;
       }
       Report(rc, L"增加实例");
@@ -172,49 +171,41 @@ public:
     } else if (id == 804) {
       if (MessageBoxW(hwnd_, L"确定要删除当前输出实例吗？删除前会自动断开连接。",
                        L"确认删除", MB_YESNO | MB_ICONWARNING) != IDYES) return;
-      if (idx_ >= 0 && RB_Output_IsInstanceConnected(idx_))
-        RB_Output_DisconnectInstanceByIndex(idx_);
-      Report(RB_Output_DeleteInstanceByIndex(idx_), L"删除实例");
+      if (idx_ >= 0 && rb_example::Output_IsInstanceConnected(idx_))
+        rb_example::Output_DisconnectInstanceByIndex(idx_);
+      Report(rb_example::Output_DeleteInstanceByIndex(idx_), L"删除实例");
       Refresh();
     } else if (id == 805) {
-      if (!allowed_) {
-        Status(L"当前授权状态不支持连接真实输出", true);
-        return;
-      }
-      Report(RB_Output_ConnectInstanceByIndex(idx_), L"连接");
+      Report(rb_example::Output_ConnectInstanceByIndex(idx_), L"连接");
     } else if (id == 806)
-      Report(RB_Output_DisconnectInstanceByIndex(idx_), L"断开");
+      Report(rb_example::Output_DisconnectInstanceByIndex(idx_), L"断开");
     else if (id == 807) {
-      if (!allowed_) {
-        Status(L"当前授权状态不支持连接真实输出", true);
-        return;
-      }
-      int n = RB_Output_ConnectAll();
+      int n = rb_example::Output_ConnectAll();
       Report(n < 0 ? n : RB_OK, L"全部连接");
     } else if (id == 808) {
-      int n = RB_Output_DisconnectAll();
+      int n = rb_example::Output_DisconnectAll();
       Report(n < 0 ? n : RB_OK, L"全部断开");
     } else if (id == 850) {
       if (Pull()) {
-        if (RB_Output_IsInstanceConnected(idx_)) {
+        if (rb_example::Output_IsInstanceConnected(idx_)) {
           Status(L"请先断开实例再修改连接参数", true);
           return;
         }
-        Report(RB_Output_ApplyInstanceConfigByIndex(idx_, &c_), L"应用");
+        Report(rb_example::Output_ApplyInstanceConfigByIndex(idx_, &c_), L"应用");
       }
     } else if (id == 851) {
       if (Pull()) {
-        if (RB_Output_IsInstanceConnected(idx_)) {
+        if (rb_example::Output_IsInstanceConnected(idx_)) {
           Status(L"请先断开已连接实例", true);
           return;
         }
-        int rc = RB_Output_SaveInstanceConfigByIndex(idx_, &c_);
+        int rc = rb_example::Output_SaveInstanceConfigByIndex(idx_, &c_);
         if (rc != RB_OK) {
           Report(rc, L"保存");
           return;
         }
         RB_OutputConfig saved{};
-        rc = RB_Output_ReadInstanceConfigByIndex(idx_, &saved);
+        rc = rb_example::Output_ReadInstanceConfigByIndex(idx_, &saved);
         if (rc != RB_OK) {
           Report(rc, L"保存成功，但回读失败");
           return;
@@ -314,10 +305,10 @@ public:
   }
   void Refresh() {
     SendMessageW(ports_, CB_RESETCONTENT, 0, 0);
-    int n = RB_Serial_GetAvailablePortCount();
+    int n = rb_example::Serial_GetAvailablePortCount();
     for (int i = 0; i < n; ++i) {
       RB_SerialPortInfo x{};
-      if (RB_Serial_GetAvailablePortInfo(i, &x) == RB_OK)
+      if (rb_example::Serial_GetAvailablePortInfo(i, &x) == RB_OK)
         ui::ComboAdd(
             ports_,
             Utf8ToWide(x.PortName) + L" - " + Utf8ToWide(x.FriendlyName), i);
@@ -329,23 +320,23 @@ public:
     Close();
     int row = ui::ComboData(ports_);
     RB_SerialPortInfo p{};
-    if (RB_Serial_GetAvailablePortInfo(row, &p) != RB_OK)
+    if (rb_example::Serial_GetAvailablePortInfo(row, &p) != RB_OK)
       return;
-    handle_ = RB_Serial_Create();
+    handle_ = rb_example::Serial_Create();
     if (!handle_) {
       Status(L"创建串口句柄失败", true);
       return;
     }
-    int rc = RB_Serial_InitEx(handle_, p.PortName, ui::Int(baud_, 115200),
+    int rc = rb_example::Serial_InitEx(handle_, p.PortName, ui::Int(baud_, 115200),
                               ui::ComboData(parity_), ui::ComboData(dataBits_),
                               ui::ComboData(stopBits_), ui::ComboData(flow_), 8192);
     operateMode_ = ui::ComboData(mode_);
     if (rc == RB_OK)
-      rc = RB_Serial_SetOperateMode(handle_, operateMode_);
+      rc = rb_example::Serial_SetOperateMode(handle_, operateMode_);
     if (rc == RB_OK)
-      rc = RB_Serial_SetAutoReconnectEnabled(handle_, ui::Checked(autoReconnect_));
+      rc = rb_example::Serial_SetAutoReconnectEnabled(handle_, ui::Checked(autoReconnect_));
     if (rc == RB_OK)
-      rc = RB_Serial_SetAutoReconnectInterval(handle_, ui::Int(reconnectMs_, 1000));
+      rc = rb_example::Serial_SetAutoReconnectInterval(handle_, ui::Int(reconnectMs_, 1000));
     RB_SerialTimeoutConfig timeouts{};
     timeouts.ReadIntervalTimeout = ui::Int(timeout_[0]);
     timeouts.ReadTotalTimeoutMultiplier = ui::Int(timeout_[1]);
@@ -353,17 +344,17 @@ public:
     timeouts.WriteTotalTimeoutMultiplier = ui::Int(timeout_[3]);
     timeouts.WriteTotalTimeoutConstant = ui::Int(timeout_[4]);
     if (rc == RB_OK)
-      rc = RB_Serial_SetTimeoutConfig(handle_, &timeouts);
+      rc = rb_example::Serial_SetTimeoutConfig(handle_, &timeouts);
     if (rc == RB_OK)
-      rc = RB_Serial_ConnectReadEvent(handle_, ReadCb, this);
+      rc = rb_example::Serial_ConnectReadEvent(handle_, ReadCb, this);
     if (rc == RB_OK)
-      rc = RB_Serial_ConnectHotPlugEvent(handle_, HotCb, this);
+      rc = rb_example::Serial_ConnectHotPlugEvent(handle_, HotCb, this);
     if (rc == RB_OK)
-      rc = RB_Serial_Open(handle_);
+      rc = rb_example::Serial_Open(handle_);
     if (rc == RB_OK)
-      rc = RB_Serial_SetDtr(handle_, ui::Checked(dtr_));
+      rc = rb_example::Serial_SetDtr(handle_, ui::Checked(dtr_));
     if (rc == RB_OK)
-      rc = RB_Serial_SetRts(handle_, ui::Checked(rts_));
+      rc = rb_example::Serial_SetRts(handle_, ui::Checked(rts_));
     if (rc != RB_OK) {
       Err(L"打开串口", rc);
       Close();
@@ -373,10 +364,10 @@ public:
   void Close() {
     if (!handle_)
       return;
-    RB_Serial_DisconnectReadEvent(handle_);
-    RB_Serial_DisconnectHotPlugEvent(handle_);
-    RB_Serial_Close(handle_);
-    RB_Serial_Destroy(handle_);
+    rb_example::Serial_DisconnectReadEvent(handle_);
+    rb_example::Serial_DisconnectHotPlugEvent(handle_);
+    rb_example::Serial_Close(handle_);
+    rb_example::Serial_Destroy(handle_);
     handle_ = nullptr;
     if (state_)
       SetWindowTextW(state_, L"关闭");
@@ -394,7 +385,7 @@ public:
       Refresh();
     if ((rd || operateMode_ == RB_SERIAL_SYNC) && handle_) {
       char b[4096]{};
-      int n = RB_Serial_ReadAll(handle_, b, sizeof b - 1);
+      int n = rb_example::Serial_ReadAll(handle_, b, sizeof b - 1);
       if (n > 0) {
         b[n] = 0;
         SendMessageW(recv_, LB_ADDSTRING, 0,
@@ -411,7 +402,7 @@ public:
       Close();
     else if (id == 906 && handle_) {
       auto x = WideToUtf8(GetWindowString(send_));
-      int n = RB_Serial_Write(handle_, x.data(), static_cast<int>(x.size()));
+      int n = rb_example::Serial_Write(handle_, x.data(), static_cast<int>(x.size()));
       if (n < 0)
         Err(L"发送", n);
       else
@@ -421,7 +412,7 @@ public:
   void Err(const wchar_t *n, int rc) {
     char b[512]{};
     if (handle_)
-      RB_Serial_GetLastErrorMsg(handle_, b, sizeof b);
+      rb_example::Serial_GetLastErrorMsg(handle_, b, sizeof b);
     Status(std::wstring(n) + L": " + ResultText(rc) + L" " + Utf8ToWide(b),
            true);
   }
@@ -506,12 +497,12 @@ public:
                         GetWindowString(e_[9])) &&
                 SetUtf8(r.Udp.AllowedSenderAddress, sizeof r.Udp.AllowedSenderAddress,
                         GetWindowString(e_[11]));
-      Report(ok ? RB_Game_RegisterCustom(&r) : RB_INVALID_ARGUMENT, L"注册");
+      Report(ok ? rb_example::Game_RegisterCustom(&r) : RB_INVALID_ARGUMENT, L"注册");
     } else if (id == 1023)
-      Report(RB_Game_SelectByKey(key_.c_str()), L"选择/监听");
+      Report(rb_example::Game_SelectByKey(key_.c_str()), L"选择/监听");
     else if (id == 1024) {
       RB_CustomGameState st{};
-      int rc = RB_Game_GetCustomState(key_.c_str(), &st);
+      int rc = rb_example::Game_GetCustomState(key_.c_str(), &st);
       if (rc == RB_OK)
         SetWindowTextW(state_,
                        (Utf8ToWide(st.StatusText) + L"\r\n包 " +
@@ -524,9 +515,9 @@ public:
     } else if (id == 1025) {
       if (MessageBoxW(hwnd_, L"确定要注销自定义游戏吗？", L"确认注销",
                        MB_YESNO | MB_ICONWARNING) != IDYES) return;
-      Report(RB_Game_UnregisterCustom(key_.c_str()), L"注销");
+      Report(rb_example::Game_UnregisterCustom(key_.c_str()), L"注销");
     } else if (id == 1026)
-      Report(RB_Game_ReloadCustomRegistry(), L"重载");
+      Report(rb_example::Game_ReloadCustomRegistry(), L"重载");
   }
   void Report(int r, const wchar_t *n) {
     Status(std::wstring(n) + L": " + ResultText(r), r != RB_OK);
@@ -550,9 +541,9 @@ public:
     Refresh();
   }
   void Refresh() {
-    int n = RB_Plugin_Refresh();
+    int n = rb_example::Plugin_Refresh();
     SendMessageW(list_, LB_RESETCONTENT, 0, 0);
-    if (n >= 0 && RB_Plugin_GetCatalog(&cat_) == RB_OK)
+    if (n >= 0 && rb_example::Plugin_GetCatalog(&cat_) == RB_OK)
       for (int i = 0; i < cat_.Count; ++i) {
         std::wstring t = Utf8ToWide(cat_.Items[i].Name) + L"  " +
                          Utf8ToWide(cat_.Items[i].Version);
@@ -573,14 +564,14 @@ public:
     } else if (id == 1101)
       Refresh();
     else if (id == 1102) {
-      int n = RB_Plugin_StartRuntimes();
+      int n = rb_example::Plugin_StartRuntimes();
       Status(n < 0 ? L"启动失败"
                    : L"已启动/存在 " + std::to_wstring(n) + L" 个运行态",
              n < 0);
     } else if (id == 1103) {
       int r = static_cast<int>(SendMessageW(list_, LB_GETCURSEL, 0, 0));
       if (r >= 0) {
-        int rc = RB_Plugin_Launch(cat_.Items[r].Index);
+        int rc = rb_example::Plugin_Launch(cat_.Items[r].Index);
         Status(ResultText(rc), rc != RB_OK);
       }
     }

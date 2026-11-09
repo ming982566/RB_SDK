@@ -1,4 +1,4 @@
-#include "RaceBearSDK.h"
+#include "ExampleServices.h"
 
 #include <algorithm>
 #include <chrono>
@@ -20,7 +20,7 @@ namespace
 		bool Start(const char* appDataName, int intervalMs)
 		{
 			// 应用目录名只能在初始化前设置，不能传入完整路径。
-			if (RB_Runtime_SetAppDataName(appDataName) != RB_OK) {
+			if (rb_example::Runtime_SetAppDataName(appDataName) != RB_OK) {
 				return false;
 			}
 
@@ -31,7 +31,7 @@ namespace
 			initialized_ = true;
 
 			// 后端计算由 SDK 的 MultimediaTimer 驱动，前端不再自行调用计算函数。
-			if (RB_Runtime_StartLoop(intervalMs) != RB_OK) {
+			if (rb_example::Runtime_StartLoop(intervalMs) != RB_OK) {
 				Stop();
 				return false;
 			}
@@ -65,7 +65,7 @@ namespace
 		// 64 KiB 可以覆盖常见配置，16 MiB 上限用于防止异常数据无限分配内存。
 		std::vector<char> buffer(64 * 1024);
 		while (buffer.size() <= 16 * 1024 * 1024) {
-			const int rc = RB_Data_ReadJson(
+			const int rc = rb_example::Data_ReadJson(
 				key,
 				buffer.data(),
 				static_cast<int>(buffer.size()));
@@ -81,23 +81,13 @@ namespace
 		return false;
 	}
 
-	// Command 的动作结果通过返回码和 JSON 同时表达。返回码判断调用是否成功，
-	// result 中的 ok/count/code 等字段用于更新具体 UI。
+	// 同步服务动作只执行一次；缓冲不足直接报告，不能通过重发重复激活或写配置。
 	int RunCommand(const char* command, const char* argsJson, std::string& result)
 	{
-		std::vector<char> buffer(4096);
-		for (;;) {
-			const int rc = RB_Command_Run(
-				command,
-				argsJson,
-				buffer.data(),
-				static_cast<int>(buffer.size()));
-			if (rc != RB_BUFFER_TOO_SMALL) {
-				result.assign(buffer.data());
-				return rc;
-			}
-			buffer.resize(buffer.size() * 2);
-		}
+		std::vector<char> buffer(64 * 1024);
+		const int rc = rb_example::Command_Run(command, argsJson, buffer.data(), static_cast<int>(buffer.size()));
+		result.assign(buffer.data());
+		return rc;
 	}
 
 	// 仅RB_OK才出队；容量不足保留队首，扩容重试后再判断空队列。
@@ -105,7 +95,7 @@ namespace
 	{
 		std::vector<char> text(4096);
 		for (;;) {
-			const int rc = RB_Log_Read(text.data(), static_cast<int>(text.size()));
+			const int rc = rb_example::Log_Read(text.data(), static_cast<int>(text.size()));
 			if (rc == RB_BUFFER_TOO_SMALL) {
 				if (text.size() > static_cast<size_t>((std::numeric_limits<int>::max)()) / 2) {
 					std::puts("[SDK] Log buffer exceeds host capacity; record retained.");
@@ -122,10 +112,16 @@ namespace
 	}
 }
 
-int main()
+// 默认只检查协议和默认值；显式 --runtime 才启动隔离的合成遥测会话。
+int main(int argc, char** argv) try
 {
 	// GetVersion 不要求先初始化，可用于启动时检查 DLL 与宿主期望版本是否一致。
 	std::printf("RaceBear SDK version: %s\n", RB_Runtime_GetVersion());
+	RB_WindEffectConfig defaults{};
+	if (rb_example::Wind_GetDefaultConfig(&defaults) != RB_OK) return 1;
+	std::puts("Unified ABI defaults read successfully; use --runtime for synthetic telemetry.");
+	if (argc == 1) return 0;
+	if (argc != 2 || std::strcmp(argv[1], "--runtime") != 0) return 2;
 
 	// 示例使用独立目录，避免覆盖正式 SimRacebear 或第三方产品配置。
 	RuntimeSession session;
@@ -142,7 +138,7 @@ int main()
 	// 目录和配置属于低频 JSON 数据，不应放在 60/100 Hz 状态刷新循环中读取。
 	// 推荐用结构体接口枚举游戏：UI 显示 GameName，内部保存和传递 GameKey。
 	RB_GameCatalog catalog{};
-	if (RB_Game_GetCatalog(&catalog) == RB_OK) {
+	if (rb_example::Game_GetCatalog(&catalog) == RB_OK) {
 		std::printf("supported games: %d\n", catalog.Count);
 		for (int i = 0; i < (std::min)(catalog.Count, 3); ++i) {
 			const RB_GameCatalogItem& item = catalog.Items[i];
@@ -165,9 +161,9 @@ int main()
 	}
 
 	// 外部游戏只能保存稳定key，启动时再解析当前SDK运行时索引。
-	const int speedIndex = RB_Telemetry_FindIndexByKey("rb.vehicle.speed");
-	const int yawIndex = RB_Telemetry_FindIndexByKey("rb.motion.yaw.position");
-	const int packetIndex = RB_Telemetry_FindIndexByKey("rb.stream.packet.id.time");
+	const int speedIndex = rb_example::Telemetry_FindIndexByKey("rb.vehicle.speed");
+	const int yawIndex = rb_example::Telemetry_FindIndexByKey("rb.motion.yaw.position");
+	const int packetIndex = rb_example::Telemetry_FindIndexByKey("rb.stream.packet.id.time");
 	if (speedIndex < 0 || yawIndex < 0 || packetIndex < 0) {
 		std::puts("Required external telemetry keys are unavailable.");
 		return 1;
@@ -180,7 +176,7 @@ int main()
 	std::snprintf(externalDesc.SourceName, sizeof(externalDesc.SourceName), "%s", "Synthetic Game Example");
 	externalDesc.DataTimeoutMs = 500;
 	externalDesc.TransitionMs = 1000;
-	if (RB_ExternalSource_Open(&externalDesc) != RB_OK) {
+	if (rb_example::ExternalSource_Open(&externalDesc) != RB_OK) {
 		std::puts("Failed to open external telemetry source.");
 		return 1;
 	}
@@ -197,14 +193,14 @@ int main()
 		frame.Values[0] = { speedIndex, 20.0 }; // m/s
 		frame.Values[1] = { yawIndex, std::sin(tick * 0.05) * 10.0 }; // deg
 		frame.Values[2] = { packetIndex, static_cast<double>(tick + 1) };
-		if (RB_ExternalSource_SubmitFrame(&frame) != RB_OK) {
+		if (rb_example::ExternalSource_SubmitFrame(&frame) != RB_OK) {
 			std::puts("External frame submission failed.");
 			break;
 		}
 
 		// SDK 会清零并填写整个结构体，调用方不需要手动设置 Size 或 Version。
 		RB_RuntimeState state{};
-		if (RB_State_Read(&state) == RB_OK && tick % 20 == 0) {
+		if (rb_example::ReadBinary("rb.runtime.state", state) == RB_OK && tick % 20 == 0) {
 			std::printf(
 				"game=%s telemetry=%d output=%d license=%d allowed=%d\n",
 				state.Game.GameName,
@@ -218,8 +214,12 @@ int main()
 		DrainLogs();
 		std::this_thread::sleep_for(std::chrono::milliseconds(50));
 	}
-	RB_ExternalSource_Close();
+	rb_example::ExternalSource_Close();
 
 	// 离开 main() 后 RuntimeSession 析构，此时已经没有其它线程继续调用 SDK。
 	return 0;
+}
+catch (const std::exception& error) {
+	std::fprintf(stderr, "%s\n", error.what());
+	return 1;
 }

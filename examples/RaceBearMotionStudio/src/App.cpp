@@ -179,14 +179,22 @@ void App::Shutdown() {
   closing_ = true;
   KillTimer(hwnd_, STATE_TIMER);
   KillTimer(hwnd_, LOG_TIMER);
+  // 任一服务传输失败也继续执行其它清理，不能让异常穿出 Win32 回调。
+  auto cleanup = [](auto action) {
+    try { return action(); }
+    catch (const std::exception& error) {
+      OutputDebugStringA(error.what());
+      return static_cast<int>(RB_ERROR);
+    }
+  };
   for (auto &p : pages_)
-    p->Shutdown();
+    cleanup([&] { p->Shutdown(); return static_cast<int>(RB_OK); });
   // SDK 退出前先清零测试输出并断开设备，避免硬件停在最后一次测试值。
-  const int poseResetRc = RB_ManualPose_ResetDrive();
-  const int poseDisableRc = RB_ManualPose_SetTestEnabled(0);
-  const int windRc = RB_Wind_SetTestOutput(0, 0);
-  const int seatbeltRc = RB_Seatbelt_SetTestOutput(0, 0, 0);
-  const int disconnectRc = RB_Output_RequestDisconnectAll();
+  const int poseResetRc = cleanup([] { return rb_example::ManualPose_ResetDrive(); });
+  const int poseDisableRc = cleanup([] { return rb_example::ManualPose_SetTestEnabled(0); });
+  const int windRc = cleanup([] { return rb_example::Wind_SetTestOutput(0, 0); });
+  const int seatbeltRc = cleanup([] { return rb_example::Seatbelt_SetTestOutput(0, 0, 0); });
+  const int disconnectRc = cleanup([] { return rb_example::Output_RequestDisconnectAll(); });
   const bool cleanupFailed =
       (poseResetRc != RB_OK && state_.Rig.Count > 0) ||
       (poseDisableRc != RB_OK && state_.Rig.Count > 0) ||
@@ -196,9 +204,9 @@ void App::Shutdown() {
   if (cleanupFailed)
     OutputDebugStringW(
         L"RaceBear Motion Studio: one or more shutdown safety calls failed.\n");
-  for (int i = 0; i < 100 && !RB_Output_AreAllDisconnected(); ++i)
+  for (int i = 0; i < 100 && cleanup([] { return rb_example::Output_AreAllDisconnected(); }) == 0; ++i)
     Sleep(10);
-  RB_Debug_CloseMonitor();
+  cleanup([] { rb_example::Debug_CloseMonitor(); return static_cast<int>(RB_OK); });
   sdk_.Stop();
 }
 LRESULT CALLBACK App::WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
@@ -208,7 +216,13 @@ LRESULT CALLBACK App::WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
                : reinterpret_cast<App *>(GetWindowLongPtrW(h, GWLP_USERDATA));
   if (m == WM_NCCREATE)
     SetWindowLongPtrW(h, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(a));
-  return a ? a->Handle(h, m, w, l) : DefWindowProcW(h, m, w, l);
+  try {
+    return a ? a->Handle(h, m, w, l) : DefWindowProcW(h, m, w, l);
+  } catch (const std::exception& error) {
+    // 业务错误仍走页面返回码；这里只显示对象协议的传输失败。
+    MessageBoxW(h, Utf8ToWide(error.what()).c_str(), L"SDK 调用失败", MB_ICONERROR);
+    return 0;
+  }
 }
 LRESULT App::Handle(HWND h, UINT m, WPARAM w, LPARAM l) {
   switch (m) {

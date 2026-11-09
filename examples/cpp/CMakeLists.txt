@@ -1,82 +1,10 @@
 cmake_minimum_required(VERSION 3.15)
 project(RaceBearSDKCppExample LANGUAGES CXX)
-
-# RaceBearSDK.lib 由 VS2019 生成；本示例直接链接导入库，因此要求 MSVC。
-if(NOT WIN32 OR NOT MSVC)
-    message(FATAL_ERROR "This example requires Windows and the MSVC toolchain.")
-endif()
-
-# SDK 只发布 x64 版本，避免误生成 Win32 工程后在运行时无法加载 DLL。
-if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
-    message(FATAL_ERROR "RaceBear SDK requires an x64 target.")
-endif()
-
-# 示例位于 SDK_ROOT/examples/cpp，因此默认向上两级就是 SDK 根目录。
-# 第三方也可以通过 -DRACEBEAR_SDK_ROOT=... 指定独立的 SDK 安装目录。
-set(RACEBEAR_SDK_ROOT "" CACHE PATH "RaceBear SDK root directory")
-if(NOT RACEBEAR_SDK_ROOT)
-    get_filename_component(RACEBEAR_SDK_ROOT
-        "${CMAKE_CURRENT_LIST_DIR}/../.."
-        ABSOLUTE)
-endif()
-
-if(NOT EXISTS "${RACEBEAR_SDK_ROOT}/include/RaceBearSDK.h")
-    message(FATAL_ERROR "RaceBearSDK.h was not found under ${RACEBEAR_SDK_ROOT}/include")
-endif()
-if(NOT EXISTS "${RACEBEAR_SDK_ROOT}/bin/x64/Release/RaceBearSDK.lib")
-    message(FATAL_ERROR "RaceBearSDK.lib was not found under ${RACEBEAR_SDK_ROOT}/bin/x64/Release")
-endif()
-if(NOT EXISTS "${RACEBEAR_SDK_ROOT}/bin/x64/Release/RaceBearSDK.dll")
-    message(FATAL_ERROR "RaceBearSDK.dll was not found under ${RACEBEAR_SDK_ROOT}/bin/x64/Release")
-endif()
-if(NOT EXISTS "${RACEBEAR_SDK_ROOT}/bin/x64/Release/libusb-1.0.dll")
-    message(FATAL_ERROR "libusb-1.0.dll was not found under ${RACEBEAR_SDK_ROOT}/bin/x64/Release")
-endif()
-
-# 公开头只需要 RaceBearSDK.h，不应包含 src 下的任何私有头文件。
+include("../common/ExampleBuild.cmake")
 add_executable(RaceBearSDKCppExample
-    main.cpp
-    custom_game_example.cpp
-    custom_game_example.h
-    configuration_examples.cpp
-    configuration_examples.h)
-
-# SimHub 公共 Generic UDP 中继；桥接程序只依赖公开 SDK 头和导入库，不复制 CAN 协议。
-add_executable(RaceBearSimHubUdpBridge
-    simhub_udp_bridge/main.cpp)
-
-target_compile_features(RaceBearSDKCppExample PRIVATE cxx_std_17)
-target_compile_features(RaceBearSimHubUdpBridge PRIVATE cxx_std_17)
-target_compile_options(RaceBearSimHubUdpBridge PRIVATE /utf-8)
-
-# 示例源码使用 UTF-8 无 BOM 中文注释；VS2019 必须显式按 UTF-8 解析源码。
-target_compile_options(RaceBearSDKCppExample PRIVATE /utf-8)
-
-target_include_directories(RaceBearSDKCppExample PRIVATE
-    "${RACEBEAR_SDK_ROOT}/include")
-target_include_directories(RaceBearSimHubUdpBridge PRIVATE
-    "${RACEBEAR_SDK_ROOT}/include")
-target_link_libraries(RaceBearSDKCppExample PRIVATE
-    "${RACEBEAR_SDK_ROOT}/bin/x64/Release/RaceBearSDK.lib")
-target_link_libraries(RaceBearSimHubUdpBridge PRIVATE
-    "${RACEBEAR_SDK_ROOT}/bin/x64/Release/RaceBearSDK.lib"
-    ws2_32)
-
-# Windows 默认从 EXE 同目录查找 DLL，构建后自动复制可直接运行示例。
-add_custom_command(TARGET RaceBearSDKCppExample POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${RACEBEAR_SDK_ROOT}/bin/x64/Release/RaceBearSDK.dll"
-        "$<TARGET_FILE_DIR:RaceBearSDKCppExample>")
-add_custom_command(TARGET RaceBearSDKCppExample POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${RACEBEAR_SDK_ROOT}/bin/x64/Release/libusb-1.0.dll"
-        "$<TARGET_FILE_DIR:RaceBearSDKCppExample>")
-
-add_custom_command(TARGET RaceBearSimHubUdpBridge POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${RACEBEAR_SDK_ROOT}/bin/x64/Release/RaceBearSDK.dll"
-        "$<TARGET_FILE_DIR:RaceBearSimHubUdpBridge>")
-add_custom_command(TARGET RaceBearSimHubUdpBridge POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${RACEBEAR_SDK_ROOT}/bin/x64/Release/libusb-1.0.dll"
-        "$<TARGET_FILE_DIR:RaceBearSimHubUdpBridge>")
+    main.cpp custom_game_example.cpp custom_game_example.h
+    configuration_examples.cpp configuration_examples.h)
+racebear_example(RaceBearSDKCppExample)
+add_executable(RaceBearSimHubUdpBridge simhub_udp_bridge/main.cpp)
+racebear_example(RaceBearSimHubUdpBridge)
+target_link_libraries(RaceBearSimHubUdpBridge PRIVATE ws2_32)

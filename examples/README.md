@@ -1,72 +1,45 @@
-# RaceBear SDK 第三方接入示例
+# C++ 接入示例
 
-这里的示例面向需要把 RaceBear SDK 接入自己软件的开发者。示例代码保持小而完整，重点展示 DLL 加载、运行时生命周期、状态读取、外部遥测提交和配置读写。
+仅提供 C++ 示例，不包含 Python。所有示例只依赖公开头和 10 个统一 ABI。
 
-## 先看哪个示例
+| 目录 | 内容 |
+|---|---|
+| `object_api` | 直接演示目录、默认值、版本草稿、异步任务和整帧遥测 |
+| `cpp` | 控制台生命周期、外部遥测、配置片段和自定义 UDP 数据包 |
+| `cpp/simhub_udp_bridge` | 接收 SimHub Generic UDP 最终轴值，提交 SDK CAN 输出 |
+| `RaceBearMotionStudio` | Win32 控制面板，含平台、动态、效果、输出和串口页面 |
+| `common` | 示例共用的本机服务包装和按配置匹配的构建设置 |
 
-| 目录 | 适合场景 | 依赖 |
-| --- | --- | --- |
-| `cpp` | Windows 原生程序、Visual Studio、CMake | VS2019/v142、C++17 |
-| `python` | 工具、脚本、原型和数据采集 | 64 位 Python 3.8+、标准库 `ctypes` |
-| `object_api` | 统一对象 ABI：目录、同步默认值、草稿版本、异步任务与整帧遥测 | VS2019/v142、C++17；Debug/Release 链接各自匹配产物 |
-
-`object_api` 默认打印协议目录并通过同步服务读取 Wind 默认值；`--runtime` 才初始化独立产品目录并运行内存草稿/
-遥测演示，不保存或连接输出。构建方式：
+从 SDK 根目录使用 VS2019/v142 x64 构建全部示例：
 
 ```powershell
-cmake -S examples/object_api -B obj/object-example -G "Visual Studio 16 2019" -A x64 -T v142
-cmake --build obj/object-example --config Release
-.\obj\object-example\Release\RaceBearObjectExample.exe
+cmake -S examples -B obj/cpp-examples -G "Visual Studio 16 2019" -A x64 -T v142
+cmake --build obj/cpp-examples --config Debug
+cmake --build obj/cpp-examples --config Release
+.\obj\cpp-examples\object_api\Release\RaceBearObjectExample.exe
+.\obj\cpp-examples\cpp\Release\RaceBearSDKCppExample.exe
+.\obj\cpp-examples\cpp\Release\RaceBearSimHubUdpBridge.exe --help
 ```
 
-覆盖范围与并发合同见 [统一对象 ABI](../docs/RaceBearSDK_OBJECT_API.md)。
-SDK 目录已包含 9 个状态/草稿对象、29 个同步服务域和 20 个异步动作；示例只演示其中少量流程，
-不是完整前端。265 个公开业务操作的参数与签名见 [服务目录](../docs/RaceBearSDK_SERVICE_API.md)。
+也可单独构建子目录；必须保留相邻的 `common` 目录。构建会复制同配置
+`RaceBearSDK.dll` 和 `libusb-1.0.dll`，导入库也使用相同配置，不能混配。
+运行机器需要 Microsoft Visual C++ x64 运行库。
 
-Qt 示例已移除。需要 GUI 时，可以把这两个示例里的 SDK 会话放进自己的窗口程序；SDK 本身不要求使用特定 UI 框架。
+两个控制台示例默认只做初始化前的只读检查。显式加 `--runtime` 才初始化
+独立数据目录：`RaceBearObjectDemo` 或 `RaceBearCppExample`；运行账户须有
+AppData/Documents 写权限。不会连接真实输出，但会创建隔离目录。
+UDP 中继按其 README 配置并连接真实 CAN 输出；MotionStudio 由用户明确点击连接或测试。
 
-## SDK 包结构
+`common/ExampleServices.h` 是宿主源码包装，使用 Resolve + Write(NATIVE_CALL)，
+不是旧函数导出或额外 ABI。`ObjectClient.h` 说明按位封装、每次调用独占结果、
+传输失败与业务结果的区别。高频状态/遥测通过 Read 读取完整对象帧。
+同步服务仍可能阻塞；生产 UI 应把扫描、命令和设备操作放到自己的后台线程。
 
-开发时至少需要以下文件：
+异步 Invoke 只提交一次，Poll 扩容读取原任务结果，不能重发动作。
+object_api 等待真实终态；示例没有强制取消机制。退出前先停止宿主调用、测试和回调，
+关闭自有句柄、消费任务，再 Shutdown；失败返回与硬件安全状态必须分别确认。
 
-```text
-RaceBear_SDK/
-  include/RaceBearSDK.h
-  bin/x64/Release/RaceBearSDK.dll
-  bin/x64/Release/RaceBearSDK.lib       # 仅 C/C++ 链接需要
-  bin/x64/Release/libusb-1.0.dll        # RaceBearSDK.dll 的 USB 运行依赖
-  examples/cpp/
-  examples/python/
-```
-
-`RaceBearSDK.dll` 和 `libusb-1.0.dll` 必须和最终 EXE 位于同一目录，或者位于 Windows DLL 搜索路径中。正式部署还要检查 Microsoft Visual C++ 2015-2022 Redistributable x64。
-
-示例使用独立的 `AppDataName`，因此运行账户必须能够创建和写入 `%APPDATA%\<AppDataName>` 与 `Documents\<AppDataName>`。安装器或产品首次启动时应预先创建这两个目录；如果宿主没有目录写权限，`RB_Runtime_Initialize()` 会失败。不要直接把示例改成 `SimRacebear` 来绕过权限问题，否则会读写正式软件的配置和授权数据。
-
-## 两个示例共有的生命周期
-
-1. 为宿主设置独立的 `appDataName`，避免覆盖 SimRacebear 的配置。
-2. 初始化 SDK。
-3. 启动 SDK 内部计算循环。
-4. 在自己的定时器或工作线程中读取状态、提交遥测或执行命令。
-5. 停止自己的定时器、串口线程和设备操作。
-6. 关闭外部遥测源，再调用 SDK Shutdown。
-
-`RB_Runtime_StartLoop()` 已经启动 SDK 的后端计算，宿主不需要高频调用 `RB_Runtime_DoCalculations()`。状态读取可以按界面需要使用 30-100 Hz 定时器；目录、配置和端口枚举属于低频操作，不要放进高频刷新循环。
-
-## 配置和数据规则
-
-- 修改配置时先读取完整结构体，修改需要改变的字段，再执行 Apply 和 Save。
-- Apply 只改变当前运行态，Save 才写入磁盘。
-- 游戏、遥测和设备的持久化标识使用稳定 key 或 UID，不要保存当前列表索引。
-- JSON 接口适合兼容未知字段的工具；固定结构体接口适合正式设置页面。
-- 示例默认使用合成遥测，不会自动连接真实游戏、平台或电机。
-
-## 进一步阅读
-
-- [公开 C API 说明](../docs/RaceBearSDK_API.md)
-- [前端接入指南](../docs/RaceBearSDK_FRONTEND_GUIDE.md)
-- [RB-CAN 接入指南](../docs/RaceBearSDK_RB_CAN_GUIDE.md)
-- [公开头文件](../include/RaceBearSDK.h)
-
-这些示例用于说明接入方式，不是完整的产品界面。正式产品仍需自行实现窗口、错误提示、配置编辑、线程协调和退出状态机。
+参数与边界以[公开头](../include/RaceBearSDK.h)、
+[对象协议](../docs/RaceBearSDK_OBJECT_API.md)、
+[同步服务目录](../docs/RaceBearSDK_SERVICE_API.md)和
+[接入指南](../docs/RaceBearSDK_FRONTEND_GUIDE.md)为准。

@@ -1,6 +1,6 @@
 # RaceBear SDK
 
-## 统一对象 ABI（1.0.1）
+## 统一对象 ABI（1.0.2）
 
 新增 7 个 `RB_Object_*` 入口，配合原版本/初始化/关闭入口组成主要 10 个接入函数。
 当前目录覆盖 9 个状态/草稿对象、29 个同步服务域、20 个异步动作。
@@ -9,9 +9,17 @@
 旧业务函数已从第三方公开 ABI 和 DLL 导出表移除；当前标准公开头和 DLL 仅保留上述 10 个入口。
 旧业务实现只作为 SDK 内部服务的实现细节保留，第三方不得定义内部迁移宏或直接导入旧符号。
 并发、版本冲突、缓冲区、生命周期和覆盖限制见
-[统一对象协议](docs/RaceBearSDK_OBJECT_API.md)，示例位于 `examples/object_api`。
-协议版本为 1，运行时为 1.0.1；启动时应检查 10 个导出并读取 Describe 的协议版本。
-本地开发验证不等于硬件验收；1.0.1 的公开发布仍需单独执行发布流程。
+[统一对象协议](docs/RaceBearSDK_OBJECT_API.md)。
+公开 SDK 仅保留 C++ 示例，全部使用 10 个统一 ABI；不再提供 Python 示例或旧业务函数绑定。
+协议版本为 1，运行时为 1.0.2；启动时应检查 10 个导出并读取 Describe 的协议版本。
+本地开发和压缩包验证不等于真实设备、游戏或 USB 长稳验收。
+
+## 1.0.2
+
+- 仅分发 C++ 示例，控制台、UDP 中继、object_api、MotionStudio 全部使用十入口 ABI。
+- 示例提供宿主侧同步服务包装，区分传输和业务失败，匹配 Debug/Release 依赖。
+- 修正文档生命周期和授权说明，发布前对实际 ZIP 解压后的示例和匹配产物独立验收。
+- 保持对象协议、结构体布局、计算、设备保护和授权边界不变。
 
 ## 1.0.1
 
@@ -157,7 +165,7 @@
 - 修复动态配置回读时按旧候选表过滤输入，导致公共遥测目录创建的通道被静默丢弃的问题。
 - 公开按目标DOF划分的动态输入效果候选目录，前端不再从完整遥测目录猜测可添加通道。
 
-VS2019 x64 DLL SDK project for the RaceBear backend.
+VS2019 x64 DLL SDK distribution for the RaceBear backend.
 
 ## Start Here
 
@@ -167,15 +175,13 @@ Application developers should read:
 - `docs/RaceBearSDK_FRONTEND_UI_SPEC.md`: page/container map, controls, drafts, task states, localization, and visual acceptance.
 - `include/RaceBearSDK.h`: minimal public C ABI header for normal frontends.
 - `docs/RaceBearSDK_FRONTEND_GUIDE.md`: page-by-page frontend implementation guide and authoritative configuration ownership rules.
-- `docs/RaceBearSDK_API.md`: integration guide, call order, examples, field units, and common failure causes.
+- `docs/RaceBearSDK_API.md`: integration guide, call order, field units, and common failure causes.
 - `docs/RaceBearSDK_DASHBOARD_DEVELOPMENT.md`: dashboard template, data binding, rendering, VOCORE, Web output, threading, and deployment guide.
 - `docs/RaceBearSDK_RB_CAN_GUIDE.md`: RB_CAN device discovery, logical-index assignment, stable UID binding, diagnostics, and recovery workflow.
 - `tools/skills/racebear-frontend-panel`: reusable, tool-neutral AI coding Skill for frontend implementation, review, and debugging.
-- `examples/cpp`: buildable VS2019/CMake C++ console example.
-- `examples/python`: dependency-free Python `ctypes` binding and runnable example.
 
-The public header, import library, DLL, examples, and documentation provide the
-complete integration surface for application development.
+The public header, import library, DLL, documentation, and Skill provide the
+complete supported integration surface for application development.
 
 ## AI-Assisted Frontend Development
 
@@ -208,43 +214,37 @@ existing architecture and use a header/DLL/LIB set from the same SDK build.
 
 `include/RaceBearSDK.h` is the public SDK header. Application-specific convenience wrappers can live in the host adapter while preserving this stable ABI boundary.
 
-## Open And Build
+## Build The C++ Examples
 
-Open `RaceBearSDK.sln` with Visual Studio 2019.
+Install Visual Studio 2019 C++ tools (v142, Windows SDK) and CMake. From the
+extracted package root:
 
-Supported configurations:
+```powershell
+cmake -S examples -B build-examples -G "Visual Studio 16 2019" -A x64 -T v142
+cmake --build build-examples --config Release
+cmake --build build-examples --config Debug
+```
 
-- `Debug|x64`
-- `Release|x64`
+This builds the console, UDP bridge, object protocol and MotionStudio programs.
+The build copies matching SDK and libusb DLLs beside each executable.
+MotionStudio also includes its own Visual Studio solution under
+`examples/RaceBearMotionStudio`. The SDK implementation project is private and
+is not needed to build a host application.
 
-Release output:
+Release dependencies:
 
 - `bin/x64/Release/RaceBearSDK.dll`
 - `bin/x64/Release/RaceBearSDK.lib`
-- `bin/x64/Release/RaceBearSDK.pdb`
 - `bin/x64/Release/libusb-1.0.dll`（使用 VOCORE 屏幕时必须随 DLL 一起发布）
 - `bin/x64/Release/DashboardAssets/RaceBear`（使用 Ford GT 或随附客户仪表时部署到 DLL 同级 `DashboardAssets/RaceBear`）
 - `tools/DashboardDesigner/index.html`（无需安装或服务器，浏览器直接打开）
 
 ## Architecture Boundaries
 
-The SDK source project has Win32 and x64 Visual Studio configurations, but
-the supported public SDK release and the SimRacebear frontend use only the
-matching x64 outputs:
-
-- `RaceBear_SDK\bin\x64\Debug` and `bin\x64\Release`: public C ABI DLL/LIB,
-  consumed by `SimRacebear\Debug64` or `Release64` and by x64 native hosts.
-- `SimRacebear\module\RB_SDK\RBSDK`: UTF-8 BOM炫彩解析镜像；它必须跟随公共头
-  做布局门禁，但不是发布 SDK 头文件的直接替换品。
-- `RaceBear_SDK\bin\Win32\Release`: only the 32-bit SDK DLL used by the
-  `RaceBearSimHubPlugin` x86 in-process plugin. It is not interchangeable
-  with the x64 SDK package and is not copied into an x64 SimRacebear output.
-
-The independent `RaceBearSimHubUpdater.exe` is built as AnyCPU with
-`Prefer32Bit=false`; this describes the updater process, not the architecture
-of the in-process SimHub plugin or its x86 SDK dependency. Headers, import
-libraries, DLLs and host processes must always use one matching architecture
-and one matching build.
+This package supports Windows x64 hosts with VS2019 v142. Headers, import
+libraries, DLLs and host processes must use one matching architecture and build.
+Link Debug applications to `bin/x64/Debug` and Release applications to
+`bin/x64/Release`; deploy the DLLs from the same directory.
 
 ## Public Header
 
@@ -257,50 +257,16 @@ Host applications include:
 The public API uses a C ABI with fixed-layout data types so C++, C#, Qt, Python,
 and other hosts can share the same stable DLL boundary.
 
-Minimal runtime order:
+The supported call surface is the ten-function object ABI:
 
-```cpp
-RB_Runtime_SetAppDataName("YourProductName"); // optional, call before RB_Runtime_Initialize
-RB_Runtime_Initialize();
-RB_Runtime_StartLoop(2);                      // intervalMs: calculate about once every 2 ms
-RB_Runtime_Shutdown();
-```
+- `RB_Runtime_GetVersion`, `RB_Runtime_Initialize`, `RB_Runtime_Shutdown`
+- `RB_Object_Describe`, `RB_Object_Resolve`, `RB_Object_Read`, `RB_Object_Write`
+- `RB_Object_Invoke`, `RB_Object_Poll`, `RB_Object_GetLastError`
 
-Recommended frontend integration:
-
-```cpp
-RB_State_Read(&state);                                      // high-frequency state struct
-RB_Game_GetCatalog(&games);                                 // low-frequency catalog struct
-RB_Output_ReadInstanceConfigByIndex(0, &output);             // read complete typed config
-RB_Output_SaveInstanceConfigByIndex(0, &output);             // persist typed config
-RB_Command_Run("output.connectAuto", "{}", buffer, size);   // actions
-RB_Log_Read(buffer, size);                                  // runtime log queue
-```
-
-Normal C++/Qt/Python frontends use the typed dynamic, output, motion, haptic,
-wind, and seatbelt configuration APIs. `RB_Data_ReadJson()` and
-`RB_Data_WriteJson()` remain available for scripts, migration tools, and advanced
-editors. Regular product pages should present typed controls instead of asking
-users to edit SDK JSON directly.
-
-Game installation/source configuration, functional plugin catalogs, platform
-diagnostics, and limited manual pose testing are also public typed APIs. Complete
-The public RB_CAN workflow covers CANAPP discovery, stable binding, diagnostics,
-and recovery. Other CAN protocols and LAN control are outside the current public
-API scope.
-
-Integrated games can feed raw telemetry through `RB_ExternalSource_Open()` and
-`RB_ExternalSource_SubmitFrame()`. Persist RaceBear telemetry keys such as
-`rb.vehicle.speed`; resolve runtime indices with `RB_Telemetry_FindIndexByKey()`
-when the source starts. Runtime indices are never a configuration or wire format.
-
-Games developed by SDK customers should use `RB_Game_RegisterCustom()`. Registered
-games enter the normal catalog and process-detection flow, persist in
-`CustomGamesV1.json`, and receive either the shared MMF/UDP V1 packet protocol in
-raw telemetry mode or normalized direct-6DOF mode. Wire packets use stable FieldId
-values from `RB_Telemetry_FindFieldIdByKey()`, never runtime indices.
-
-The public header keeps the ABI compact by omitting framework-specific overloads and inline implementations. Product-specific convenience functions fit naturally in the host application's adapter layer. SimRacebear UI, language, and drawing adapters are application components rather than part of the SDK contract.
+Use the object and service documentation to resolve stable `rb.*` keys, read
+snapshots and drafts, submit synchronous native service calls, and poll actions.
+Product-specific convenience functions belong in the host adapter and must not
+be added to the DLL boundary.
 
 ## App Data Name
 
@@ -308,96 +274,47 @@ The SDK stores local config under `%APPDATA%\<AppDataName>\configV2` and related
 user files under `Documents\<AppDataName>`. The default app data name is
 `SimRacebear`.
 
-Host applications can set their own name before runtime initialization:
-
-```cpp
-RB_Runtime_SetAppDataName("ThirdPartyName");
-RB_Runtime_Initialize();
-```
-
-The first initialization of a new name creates independent default platform and
-dynamic configuration. Choose a stable product-specific name so the application
-receives its own defaults without sharing another product's user data.
+Host applications can set their own name through the synchronous
+`rb.runtime.set_app_data_name` service before runtime initialization. See
+`docs/RaceBearSDK_API.md` for the native-call envelope and lifetime rules.
 
 ## License Runtime
 
 `RB_Runtime_Initialize()` starts the SDK license runtime. Missing or invalid local
 licenses enter a local trial countdown first; when the countdown reaches zero, or
-when a timed license expires or is revoked/disabled, the SDK locks real output
-capabilities. Perpetual licenses are validated locally and do not run a periodic
+when a timed license expires or is revoked/disabled, the SDK restricts protected
+Motion and ordinary platform outputs. RGB, seatbelt, Wind and Haptic retain their
+own product and safety contracts. Perpetual licenses are validated locally and do not run a periodic
 online heartbeat.
 
-When output is locked:
+When protected Motion output is locked:
 
 - Telemetry/config/query APIs remain available.
 - Activation/deactivation commands remain available.
-- New output connections are rejected.
-- Existing outputs are driven through the normal safe disconnect path when
+- New protected output connections are rejected.
+- Existing protected outputs are driven through the normal safe disconnect path when
   possible.
 
-Read license display state from `RB_RuntimeState::License` and submit actions through the command API:
-
-```cpp
-RB_RuntimeState state{};
-RB_State_Read(&state);
-
-RB_Command_Run("license.check", "{}", buffer, size);
-RB_Command_Run("license.activate", "{\"activationCode\":\"...\"}", buffer, size);
-RB_Command_Run("license.deactivate", "{}", buffer, size);
-```
+Read license state from `rb.runtime.state` and use `rb.command.run` through
+`rb.service.command` for activation or deactivation. Do not import legacy typed functions.
 
 ## Data Packages And Commands
 
-Configuration files are exposed as whole JSON documents. This keeps the C ABI
-stable while backend config fields continue to evolve.
+Configuration, catalog and command payloads are documented by
+`RaceBearSDK_OBJECT_API.md` and `RaceBearSDK_SERVICE_API.md`. Use
+`RB_Object_Read`, `RB_Object_Write`, `RB_Object_Invoke` and `RB_Object_Poll`;
+the C++ examples use host-side object service wrappers rather than legacy DLL imports.
 
-```cpp
-RB_Data_ReadJson("config.output", buffer, size);
-RB_Data_WriteJson("config.output", jsonText);
-RB_Command_Run("runtime.reloadConfig", "{}", buffer, size);
-```
-
-Readable JSON keys:
-
-- `runtime.snapshot`
-- `config.telemetry`
-- `config.dynamicV2`
-- `config.platform`
-- `config.output`
-- `game.catalog`
-- `telemetry.catalog`
-- `output.catalog`
-- `motionEffect.catalog`
-- `haptic.catalog`
-- `can.state`
-- `plugin.catalog`
-
-Writable JSON keys:
-
-- `config.telemetry`
-- `config.dynamicV2`
-- `config.platform`
-- `config.output`
-
-Common commands use a string command name and optional JSON args:
-
-```cpp
-RB_Command_Run("license.check", "{}", buffer, size);
-RB_Command_Run("license.activate", "{\"activationCode\":\"...\"}", buffer, size);
-RB_Command_Run("game.launch", "{\"gameKey\":\"Assetto Corsa\"}", buffer, size);
-RB_Command_Run("output.connectAuto", "{}", buffer, size);
-```
-
-## Source Layout
+## Package Layout
 
 - `include/` public SDK headers.
-- `src/RaceBearSDK.cpp` public C ABI wrapper.
-- `src/RaceBearRuntimeForSDK.cpp` SDK runtime entry.
-- `src/Core/` copied backend core source.
-- `examples/` C++, Python, and Qt integration examples for host applications.
+- `bin/x64/Debug` and `bin/x64/Release` matching DLL/LIB and dependencies.
+- `docs/` complete integration, object and service manuals.
+- `examples/` C++ sources using only the unified ABI.
+- `tools/` public release tools, Dashboard Designer and the frontend Skill.
 
 ## Notes
 
-- The SDK project uses VS2019 toolset `v142`.
-- `yyjson.c` is explicitly included because the backend config system links against yyjson C symbols.
+- Example builds require VS2019 toolset `v142`.
+- Use the API and object manuals for task ownership, shutdown and buffer rules.
 

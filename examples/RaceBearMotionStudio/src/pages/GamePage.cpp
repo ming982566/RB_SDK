@@ -54,7 +54,7 @@ public:
   }
   void Refresh() {
     SendMessageW(games_, LB_RESETCONTENT, 0, 0);
-    if (RB_Game_GetCatalog(&gc_) != RB_OK) {
+    if (rb_example::Game_GetCatalog(&gc_) != RB_OK) {
       Status(L"读取游戏目录失败", true);
       return;
     }
@@ -66,11 +66,11 @@ public:
     }
     if (gc_.Count > 0)
       SendMessageW(games_, LB_SETCURSEL, 0, 0);
-    const int installCount = RB_Game_RefreshInstallations();
+    const int installCount = rb_example::Game_RefreshInstallations();
     if (installCount < 0)
       Status(L"游戏安装扫描失败: " + ResultText(installCount), true);
     SendMessageW(telemetry_, LB_RESETCONTENT, 0, 0);
-    if (RB_Telemetry_GetCatalog(&tc_) == RB_OK)
+    if (rb_example::Telemetry_GetCatalog(&tc_) == RB_OK)
       for (int i = 0; i < tc_.Count; ++i) {
         std::wstring t = Utf8ToWide(tc_.Items[i].Name) + L"  [" +
                          Utf8ToWide(tc_.Items[i].Key) + L"] " +
@@ -88,14 +88,14 @@ public:
     selected_ = static_cast<int>(SendMessageW(games_, LB_GETITEMDATA, row, 0));
     auto &i = gc_.Items[selected_];
     key_ = i.GameKey;
-    int rc = RB_Game_SelectByKey(key_.c_str());
+    int rc = rb_example::Game_SelectByKey(key_.c_str());
     if (rc != RB_OK) {
       Status(L"选择游戏失败: " + ResultText(rc), true);
       return;
     }
     Read();
     RB_GameInstallInfo inf{};
-    if (RB_Game_FindInstallByKey(key_.c_str(), &inf) == RB_OK) {
+    if (rb_example::Game_FindInstallByKey(key_.c_str(), &inf) == RB_OK) {
       std::wstring t = (inf.Found ? L"已安装: " : L"未找到: ") +
                        Utf8ToWide(inf.InstallPath) +
                        (inf.Running ? L"\r\n正在运行" : L"\r\n未运行");
@@ -104,7 +104,7 @@ public:
       SetWindowTextW(install_, L"未找到安装信息");
   }
   void Read() {
-    int rc = RB_Game_ReadConfig(key_.c_str(), &cfg_);
+    int rc = rb_example::Game_ReadConfig(key_.c_str(), &cfg_);
     if (rc != RB_OK) {
       Status(L"读取游戏配置失败: " + ResultText(rc), true);
       return;
@@ -155,11 +155,16 @@ public:
     int r = static_cast<int>(SendMessageW(telemetry_, LB_GETCURSEL, 0, 0));
     if (r >= 0) {
       int i = static_cast<int>(SendMessageW(telemetry_, LB_GETITEMDATA, r, 0));
-      SetWindowTextW(raw_,
-                     (L"原始值 " + FormatDouble(RB_Telemetry_GetRawValue(i), 5) +
-                      L" / 处理值 " +
-                      FormatDouble(RB_Telemetry_GetProcessedValue(i), 5))
-                         .c_str());
+      // 原始值和处理值取同一发布帧，避免两次调用采到不同时间的状态。
+      RB_ObjectTelemetrySnapshot frame{};
+      RB_ObjectReadInfo info{};
+      if (rb_example::ReadBinary("rb.telemetry.snapshot", frame, &info) != RB_OK ||
+          !info.Sampled || i < 0 || i >= frame.Count) {
+        SetWindowTextW(raw_, L"遥测未采样或读取失败");
+      } else {
+        SetWindowTextW(raw_, (L"原始值 " + FormatDouble(frame.Raw[i], 5) +
+            L" / 处理值 " + FormatDouble(frame.Processed[i], 5)).c_str());
+      }
     }
   }
   void OnCommand(int id, int code, HWND) override {
@@ -175,20 +180,20 @@ public:
       Cmd(id == 104 ? "game.launch" : "game.terminate",
           "{\"gameKey\":" + J(key_) + "}");
     else if (id == 106)
-      Report(RB_Game_AutoConfigureCurrent(), L"自动配置");
+      Report(rb_example::Game_AutoConfigureCurrent(), L"自动配置");
     else if (id == 107) {
       if (Pull())
-        Report(RB_Game_CheckCurrentSideConfig(&cfg_), L"侧配置检查");
+        Report(rb_example::Game_CheckCurrentSideConfig(&cfg_), L"侧配置检查");
     } else if (id == 108) {
       RB_GameInstallInfo i{};
-      int rc = RB_Game_FindInstallByKey(key_.c_str(), &i);
-      Report(rc == RB_OK ? RB_Game_InstallCurrentPlugin(i.InstallPath) : rc,
+      int rc = rb_example::Game_FindInstallByKey(key_.c_str(), &i);
+      Report(rc == RB_OK ? rb_example::Game_InstallCurrentPlugin(i.InstallPath) : rc,
              L"插件安装");
     } else if (id == 140) {
       if (selected_ < 0 || selected_ >= gc_.Count) {
         Status(L"请先选择游戏", true);
       } else if (Pull())
-        Report(RB_Game_AutoConnect(gc_.Items[selected_].CatalogIndex, &cfg_),
+        Report(rb_example::Game_AutoConnect(gc_.Items[selected_].CatalogIndex, &cfg_),
                L"应用并重连数据源");
     } else if (id == 141) {
       if (key_.empty()) {
@@ -199,13 +204,13 @@ public:
         Status(L"文本超出 SDK 固定缓冲区", true);
         return;
       }
-      int rc = RB_Game_SaveConfig(key_.c_str(), &cfg_);
+      int rc = rb_example::Game_SaveConfig(key_.c_str(), &cfg_);
       if (rc != RB_OK) {
         Report(rc, L"保存");
         return;
       }
       RB_GameConfig saved{};
-      rc = RB_Game_ReadConfig(key_.c_str(), &saved);
+      rc = rb_example::Game_ReadConfig(key_.c_str(), &saved);
       if (rc != RB_OK) {
         Report(rc, L"保存成功，但回读失败");
         return;

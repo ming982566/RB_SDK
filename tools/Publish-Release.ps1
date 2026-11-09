@@ -6,7 +6,8 @@ param(
     [string]$SdkSourceRoot = '',
     [string]$Repository = 'ming982566/RB_SDK',
     [switch]$SkipBuild,
-    [switch]$PreflightOnly
+    [switch]$PreflightOnly,
+    [switch]$PrepareOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -22,6 +23,19 @@ $tag = "v$Version"
 $archiveName = "RaceBearSDK-$Version-vs2019-x64.zip"
 $archivePath = Join-Path $publishRoot $archiveName
 $hashPath = "$archivePath.sha256"
+# Only reviewed C++ source projects; Python and generated build files are excluded.
+$exampleAllowed = @(
+    '^examples\\(README\.md|CMakeLists\.txt)$',
+    '^examples\\common\\(ObjectClient\.h|ExampleServices\.h|ExampleBuild\.cmake)$',
+    '^examples\\cpp\\(CMakeLists\.txt|README\.md|main\.cpp|configuration_examples\.(cpp|h)|custom_game_example\.(cpp|h))$',
+    '^examples\\cpp\\simhub_udp_bridge\\(README\.md|main\.cpp)$',
+    '^examples\\object_api\\(CMakeLists\.txt|main\.cpp)$',
+    '^examples\\RaceBearMotionStudio\\(CMakeLists\.txt|README\.md|RaceBearMotionStudio\.(sln|vcxproj|vcxproj\.filters))$',
+    '^examples\\RaceBearMotionStudio\\src\\(App|SdkRuntime|Ui)\.(cpp|h)$',
+    '^examples\\RaceBearMotionStudio\\src\\main\.cpp$',
+    '^examples\\RaceBearMotionStudio\\src\\pages\\(EffectsPages|GamePage|HardwarePages|PlatformPage|SettingsPages|StatusPages)\.cpp$',
+    '^examples\\RaceBearMotionStudio\\src\\pages\\Pages\.h$'
+)
 
 function Invoke-Checked {
     param(
@@ -46,7 +60,6 @@ function Copy-SdkPackage {
         (Join-Path $publishRoot 'bin\x64\Release'),
         (Join-Path $publishRoot 'include'),
         (Join-Path $publishRoot 'docs'),
-        (Join-Path $publishRoot 'examples'),
         (Join-Path $publishRoot 'tools\DashboardDesigner'),
         (Join-Path $publishRoot 'tools\skills')
     )
@@ -80,41 +93,16 @@ function Copy-SdkPackage {
     Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_RB_CAN_GUIDE.md') (Join-Path $publishRoot 'docs\RaceBearSDK_RB_CAN_GUIDE.md') -Force
     Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_AI_DEVELOPMENT.md') (Join-Path $publishRoot 'docs\RaceBearSDK_AI_DEVELOPMENT.md') -Force
     Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_FRONTEND_UI_SPEC.md') (Join-Path $publishRoot 'docs\RaceBearSDK_FRONTEND_UI_SPEC.md') -Force
-    Copy-Item (Join-Path $SdkSourceRoot 'examples\README.md') (Join-Path $publishRoot 'examples\README.md') -Force
     # Double-click skill installer: package root entry point plus its implementation.
     Copy-Item (Join-Path $SdkSourceRoot 'Install-RaceBearSkill.cmd') (Join-Path $publishRoot 'Install-RaceBearSkill.cmd') -Force
     Copy-Item (Join-Path $SdkSourceRoot 'tools\Install-RaceBearSkill.ps1') (Join-Path $publishRoot 'tools\Install-RaceBearSkill.ps1') -Force
-    # SDK language examples are flat source directories. Copy only files so local
-    # CMake builds and Python caches can never enter the distribution package.
-    foreach ($exampleName in @('cpp', 'python')) {
-        $exampleSource = Join-Path $SdkSourceRoot "examples\$exampleName"
-        $exampleTarget = Join-Path $publishRoot "examples\$exampleName"
-        if (Test-Path -LiteralPath $exampleTarget) {
-            Remove-Item -LiteralPath $exampleTarget -Recurse -Force
-        }
-        New-Item -ItemType Directory -Path $exampleTarget -Force | Out-Null
-        Get-ChildItem -LiteralPath $exampleSource -File | Copy-Item -Destination $exampleTarget -Force
-    }
-
-    # simhub_udp_bridge is a second C++ target in a nested directory. The loop above
-    # copies only top-level files, so copy this one directory's files explicitly.
-    $bridgeSource = Join-Path $SdkSourceRoot 'examples\cpp\simhub_udp_bridge'
-    $bridgeTarget = Join-Path $publishRoot 'examples\cpp\simhub_udp_bridge'
-    if (Test-Path -LiteralPath $bridgeTarget) {
-        Remove-Item -LiteralPath $bridgeTarget -Recurse -Force
-    }
-    if (Test-Path -LiteralPath $bridgeSource) {
-        New-Item -ItemType Directory -Path $bridgeTarget -Force | Out-Null
-        Get-ChildItem -LiteralPath $bridgeSource -File | Copy-Item -Destination $bridgeTarget -Force
-    }
-
-    foreach ($generatedExamplePath in @(
-        (Join-Path $publishRoot 'examples\RaceBearMotionStudio\bin-app'),
-        (Join-Path $publishRoot 'examples\RaceBearMotionStudio\obj-app'),
-        (Join-Path $publishRoot 'examples\RaceBearMotionStudio\tests')
-    )) {
-        if (Test-Path -LiteralPath $generatedExamplePath) {
-            Remove-Item -LiteralPath $generatedExamplePath -Recurse -Force
+    # Copy from SDK example sources only; do not overwrite or delete unknown files.
+    foreach ($file in Get-ChildItem -LiteralPath (Join-Path $SdkSourceRoot 'examples') -Recurse -File) {
+        $relative = $file.FullName.Substring($SdkSourceRoot.TrimEnd('\').Length + 1)
+        if (@($exampleAllowed | Where-Object { $relative -match $_ }).Count) {
+            $target = Join-Path $publishRoot $relative
+            New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
+            Copy-Item -LiteralPath $file.FullName -Destination $target -Force
         }
     }
 
@@ -181,20 +169,14 @@ function New-ReleaseStage {
         '^bin\\x64\\(Debug|Release)\\DashboardAssets\\RaceBear\\[^\\]+\\[^\\]+\\[^\\]+\.(png|ttf|rbdash)$',
         '^include\\RaceBearSDK\.h$',
         '^docs\\(RaceBearSDK_API|RaceBearSDK_FRONTEND_GUIDE|RaceBearSDK_OBJECT_API|RaceBearSDK_SERVICE_API|RaceBearSDK_DASHBOARD_DEVELOPMENT|RaceBearSDK_RB_CAN_GUIDE|RaceBearSDK_AI_DEVELOPMENT|RaceBearSDK_FRONTEND_UI_SPEC|RELEASE_PROCESS)\.md$',
-        '^examples\\README\.md$',
-        '^examples\\(cpp|python)\\[^\\]+\.(cpp|h|py|md|txt)$',
-        '^examples\\cpp\\simhub_udp_bridge\\[^\\]+\.(cpp|h|md|txt)$',
-        '^examples\\RaceBearMotionStudio\\(RaceBearMotionStudio\.(sln|vcxproj|vcxproj\.filters)|README\.md)$',
-        '^examples\\RaceBearMotionStudio\\src\\[^\\]+\.(cpp|h)$',
-        '^examples\\RaceBearMotionStudio\\src\\pages\\[^\\]+\.(cpp|h)$',
         '^tools\\Publish-Release\.ps1$',
         '^tools\\Install-RaceBearSkill\.ps1$',
         '^tools\\DashboardDesigner\\(app\.js|index\.html|Start-DashboardDesigner\.cmd|styles\.css)$',
         '^tools\\skills\\racebear-frontend-panel\\SKILL\.md$',
         '^tools\\skills\\racebear-frontend-panel\\references\\[^\\]+\.md$'
-    )
+    ) + $exampleAllowed
     try {
-        $packagePaths = @('bin', 'include', 'docs', 'examples', 'tools', 'README.md', 'LICENSE', 'Install-RaceBearSkill.cmd')
+        $packagePaths = @('bin', 'include', 'docs', 'tools', 'examples', 'README.md', 'LICENSE', 'Install-RaceBearSkill.cmd')
         $stagedFiles = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         foreach ($path in $packagePaths) {
             $source = Join-Path $publishRoot $path
@@ -222,7 +204,24 @@ function New-ReleaseStage {
         foreach ($required in @('README.md', 'LICENSE', 'include\RaceBearSDK.h',
             'bin\x64\Debug\RaceBearSDK.dll', 'bin\x64\Debug\RaceBearSDK.lib',
             'bin\x64\Release\RaceBearSDK.dll', 'bin\x64\Release\RaceBearSDK.lib',
-            'Install-RaceBearSkill.cmd', 'tools\Install-RaceBearSkill.ps1')) {
+            'Install-RaceBearSkill.cmd', 'tools\Install-RaceBearSkill.ps1',
+            'examples\README.md', 'examples\CMakeLists.txt',
+            'examples\common\ObjectClient.h', 'examples\common\ExampleServices.h', 'examples\common\ExampleBuild.cmake',
+            'examples\cpp\main.cpp', 'examples\cpp\CMakeLists.txt', 'examples\cpp\configuration_examples.cpp',
+            'examples\cpp\configuration_examples.h', 'examples\cpp\custom_game_example.cpp', 'examples\cpp\custom_game_example.h',
+            'examples\cpp\simhub_udp_bridge\main.cpp', 'examples\object_api\main.cpp', 'examples\object_api\CMakeLists.txt',
+            'examples\RaceBearMotionStudio\RaceBearMotionStudio.sln',
+            'examples\RaceBearMotionStudio\RaceBearMotionStudio.vcxproj',
+            'examples\RaceBearMotionStudio\CMakeLists.txt',
+            'examples\RaceBearMotionStudio\src\main.cpp', 'examples\RaceBearMotionStudio\src\App.cpp',
+            'examples\RaceBearMotionStudio\src\SdkRuntime.cpp', 'examples\RaceBearMotionStudio\src\Ui.cpp',
+            'examples\RaceBearMotionStudio\src\pages\Pages.h',
+            'examples\RaceBearMotionStudio\src\pages\EffectsPages.cpp',
+            'examples\RaceBearMotionStudio\src\pages\GamePage.cpp',
+            'examples\RaceBearMotionStudio\src\pages\HardwarePages.cpp',
+            'examples\RaceBearMotionStudio\src\pages\PlatformPage.cpp',
+            'examples\RaceBearMotionStudio\src\pages\SettingsPages.cpp',
+            'examples\RaceBearMotionStudio\src\pages\StatusPages.cpp')) {
             if (-not $stagedFiles.Contains($required)) {
                 throw "Release staging misses required file: $required"
             }
@@ -281,7 +280,7 @@ function Invoke-ReleasePreflight {
     }
 
     $status = @(& git -C $publishRoot status --porcelain=v1 --untracked-files=all)
-    if ($status.Count -gt 0) {
+    if ($status.Count -gt 0 -and -not $PrepareOnly) {
         $details = $status -join [Environment]::NewLine
         throw "Release requires a clean worktree. Existing changes were not modified:`n$details"
     }
@@ -302,7 +301,12 @@ function Invoke-ReleasePreflight {
         throw "Version tag already exists on origin: $tag. Choose a new version."
     }
 
-    Write-Host "Release preflight passed: clean main worktree, matching origin, unused tag $tag."
+    if ($PrepareOnly) {
+        Write-Host "Local preparation preflight passed: main, matching origin, unused tag $tag; no commit/push/Release will run."
+    }
+    else {
+        Write-Host "Release preflight passed: clean main worktree, matching origin, unused tag $tag."
+    }
 }
 
 if (-not (Test-Path -LiteralPath $project)) {
@@ -330,6 +334,9 @@ try {
         Invoke-Checked $msbuild @($project, '/t:Rebuild', '/p:Configuration=Release', '/p:Platform=x64', '/m')
     }
 
+    # The examples must compile and import only the 10 unified ABI entries.
+    $exampleGate = Join-Path $SdkSourceRoot 'tests\Test-CppExamples.ps1'
+    Invoke-Checked powershell.exe @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $exampleGate)
     Copy-SdkPackage
     Assert-NoPrivateSdkSource
     Invoke-PublicMirrorAbiGate
@@ -351,6 +358,16 @@ try {
 
     $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash
     "$hash  $archiveName" | Set-Content -LiteralPath $hashPath -Encoding ASCII
+
+    # Validate the actual archive before committing or publishing anything.
+    $packageGate = Join-Path $SdkSourceRoot 'tests\Test-ReleasePackage.ps1'
+    Invoke-Checked powershell.exe @('-NoProfile', '-ExecutionPolicy', 'Bypass',
+        '-File', $packageGate, '-Archive', $archivePath, '-Version', $Version,
+        '-PublishRoot', $publishRoot, '-SdkRoot', $SdkSourceRoot)
+    if ($PrepareOnly) {
+        Write-Host "Local package verified: $archivePath. Review the complete diff before committing and publishing."
+        return
+    }
 
     # This machine has a stale global proxy; per-command empty proxy values keep publishing deterministic.
     Invoke-Checked git @('-c', 'http.proxy=', '-c', 'https.proxy=', 'add', '--all')
@@ -380,11 +397,27 @@ try {
         )
     }
     else {
+        # Use the shipped version notes and state the actual automated acceptance scope.
+        $readme = Get-Content -LiteralPath (Join-Path $publishRoot 'README.md') -Raw -Encoding UTF8
+        $versionNotes = [regex]::Match($readme,
+            '(?ms)^## ' + [regex]::Escape($Version) + '\r?\n(.*?)(?=^## |\z)')
+        if (-not $versionNotes.Success) { throw "README release notes missing for $Version." }
+        $notesPath = Join-Path $SdkSourceRoot "obj\release-$Version-notes.md"
+        $notes = $versionNotes.Groups[1].Value.Trim() + "`n`n" +
+            "Windows x64 / VS2019 v142. Object protocol v1; exactly 10 DLL exports.`n`n" +
+            "Validation: matching Debug/Release SDK builds, ABI/layout checks, frontend object tests, " +
+            "concurrent native-call marshalling, actual ZIP extraction, all four C++ example builds, " +
+            "API lifecycle snippet compilation, runtime version/protocol/default reads, and file hashes.`n`n" +
+            "Limits: automated package smokes run before runtime initialization. Initialization requires " +
+            "writable product AppData/Documents folders and separate initialized-host acceptance. " +
+            "These automated checks do not validate GUI workflows, real games/devices, " +
+            "mechanical protection or USB endurance."
+        [IO.File]::WriteAllText($notesPath, $notes, [Text.UTF8Encoding]::new($false))
         Invoke-Checked $gh @(
             'release', 'create', $tag, $archivePath, $hashPath,
             '--repo', $Repository,
             '--title', "RaceBear SDK $Version",
-            '--generate-notes'
+            '--notes-file', $notesPath
         )
     }
 
