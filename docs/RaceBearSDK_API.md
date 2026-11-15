@@ -4,6 +4,9 @@
 
 ## 1. SDK 包与版本
 
+当前正式交付为 `1.0.4`，对象协议 v1，DLL 导出仍为下述十个入口。
+公开同步服务共 281 项；通过目录检测操作能力，不把操作 key 当作 DLL 函数导入。
+
 使用同一次构建生成的以下文件：
 
 | 文件 | 用途 |
@@ -23,7 +26,7 @@
 | --- | --- |
 | `RB_Runtime_GetVersion` | 返回 SDK 版本字符串，调用方不释放 |
 | `RB_Runtime_Initialize` | 初始化一次进程级 SDK |
-| `RB_Runtime_Shutdown` | 停止任务、释放 SDK；调用方不得再使用其它入口 |
+| `RB_Runtime_Shutdown` | 停止任务、释放后端；关闭后仅保留协议允许的目录/错误查询和顺序 Poll |
 | `RB_Object_Describe` | 查询完整目录或单个对象描述 |
 | `RB_Object_Resolve` | 将稳定 key 解析为本次进程的对象 ID |
 | `RB_Object_Read` | 读取 Binary 快照、JSON 目录或配置草稿 |
@@ -135,6 +138,10 @@ int main()
 当前异步配置命令包括 `rb.wind.apply/save/reload`、`rb.seatbelt.apply/save/reload` 和 `rb.rgb.apply/save/reload`。Save 成功不表示运行态已经应用；Apply 成功也不表示配置已持久化。
 
 ## 7. 同步服务
+
+逐操作用途、参数、返回值见 [服务目录](RaceBearSDK_SERVICE_API.md)，离线生成绑定用
+[service-api.json](service-api.json)。[业务合同补充](RaceBearSDK_SERVICE_CONTRACTS.md)
+列明方案归属、配置后端错误码、JSON 数据包和关闭规则。
 
 同步服务通过 `RB_ObjectNativeCall` 调用。封套要求：
 

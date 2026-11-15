@@ -8,6 +8,10 @@
 
 从零开发先读 [AI 开发总入口](RaceBearSDK_AI_DEVELOPMENT.md)。
 SDK 调用顺序见 [前端指南](RaceBearSDK_FRONTEND_GUIDE.md)。
+配置方案归属与迁移见[服务合同](RaceBearSDK_SERVICE_CONTRACTS.md)，
+RGB 全链路见[RGB 工作流](RaceBearSDK_RGB_WORKFLOW.md)。
+参考实现、实测图片及素材许可边界见[界面参考](RaceBearSDK_UI_REFERENCE.md)；
+三语言术语见 [glossary.csv](glossary.csv)。
 
 RGB、安全带、Haptic 和 Wind 是独立产品页面。即使 `RB_LicenseSnapshot.OutputAllowed == 0`，页面仍应允许
 读取和应用配置、连接对应设备、执行测试输出，并显示真实运行状态；主运动和普通输出页面才
@@ -201,9 +205,16 @@ UI 文案使用“平滑、软限幅、变化步长、限制强度”等用户�
 后台任务由宿主服务拥有，窗口关闭请求不销毁仍在调用 SDK 的线程。
 
 安全带详情页须区分上电回零等待、正常回零、释放中、已释放锁定和保护故障。
-释放中禁用运动命令；终态保护锁定后提供显式“重新启用”，不由定时刷新或重连自动调用。
-同一按钮复用时应随状态明确改名，调用 `RB_SeatbeltCan_RequestReenable`，
-而非RequestHoming。异步请求接受后保留处理中状态，Ready才表示恢复完成。
+还须区分USB缺席等待（Starting为真、Connected为假）、已重连但电机未Ready、
+以及真正Ready。SDK自动按原UID重连，前端保留主动断开入口，不循环发起连接。
+控制器复位或严重保护仍显示锁定，不把设备重现当作重新启用成功。
+释放中禁用运动命令；运行中的临时通信异常及可复位驱动报警由SDK按
+[CAN指南](RaceBearSDK_RB_CAN_GUIDE.md)安全条件自动恢复，前端轮询实际Ready。
+持续驱动报警展示故障/恢复等待状态，SDK自动退避并按每轮10次、冷却10秒继续尝试。
+急停、原点丢失或非报警导致的释放失败等锁定保留显式“重新启用”，
+不由前端定时刷新或重连自动调用。
+同一按钮复用时应随状态明确改名，通过同步服务调用 `rb.seatbeltcan.request_reenable`，
+而非 `rb.seatbeltcan.request_homing`。请求接受后保留处理中状态，Ready才表示恢复完成。
 单路仅显示/校验有效电机；居中单路用左节点，双路节点不得重复。
 保护故障不等于已回0，重新启用被拒绝时保留诊断和重试入口。
 安全带输出间隔沿用本输出详情页的`OutPutTime`字段，单位明确标为ms；

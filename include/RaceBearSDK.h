@@ -1649,6 +1649,122 @@ RB_API int RB_Object_Poll(uint64_t taskId, int consume, char* buffer, int buffer
 /** @brief 读取当前调用线程上一次对象调用的错误详情；查询不清除错误，工作线程错误请读取任务结果。 */
 RB_API int RB_Object_GetLastError(char* buffer, int bufferSize, int* requiredBytes);
 
+// 以下签名仅供同步对象服务生成，绝不是可导入的 DLL 入口。
+#ifdef RACEBEARSDK_ENABLE_LEGACY_ABI
+/**
+ * @brief 返回 RGB 命名方案数量；空库为 0，不把未命名活动配置计入。
+ * @return 非负数量；配置读取失败返回配置后端负数码。
+ */
+RB_LEGACY_API int RB_Rgb_GetEffectProfileCount();
+/**
+ * @brief 读取按 UTF-8 字节排序的 RGB 方案名；增删后须刷新列表。
+ * @param index 当前库的零基索引，不可持久化。
+ * @param buffer 输出 UTF-8/NUL 名称，调用方拥有。
+ * @param bufferSize 输出容量字节，最大合法名称需 128 字节。
+ * @return RB_OK、RB_INVALID_ARGUMENT、RB_BUFFER_TOO_SMALL 或配置后端负数码。
+ */
+RB_LEGACY_API int RB_Rgb_GetEffectProfileName(int index, char* buffer, int bufferSize);
+/**
+ * @brief 精确读取命名灯效；不改变当前选择、草稿或运行态。
+ * @param name UTF-8 名称，1-127 字节，不能含路径分隔符、双引号、控制字符或为 _Default。
+ * @param profile 输出完整 RB_RgbEffectProfile/3，调用前设置 Size/Version。
+ * @return 0=成功；-5=不存在；其它配置后端负数码或 RB_INVALID_ARGUMENT。
+ */
+RB_LEGACY_API int RB_Rgb_ReadEffectProfileByName(const char* name, RB_RgbEffectProfile* profile);
+/**
+ * @brief 创建或覆盖命名灯效副本；不选定、不应用、不连接设备。
+ * @param name UTF-8 名称，1-127 字节，规则同 read_effect_profile_by_name。
+ * @param profile 输入完整 RB_RgbEffectProfile/3，所有字段按公开头校验。
+ * @return 0=成功；其它配置后端负数码或 RB_INVALID_ARGUMENT。
+ */
+RB_LEGACY_API int RB_Rgb_SaveEffectProfileAs(const char* name, const RB_RgbEffectProfile* profile);
+/**
+ * @brief 删除命名灯效；若为当前选择则清空名称，保留活动配置和运行态。
+ * @param name 要删除的精确名称；不支持 _Default。
+ * @return 0=成功；-5=不存在；其它配置后端负数码。
+ */
+RB_LEGACY_API int RB_Rgb_DeleteEffectProfile(const char* name);
+/**
+ * @brief 导出命名 RGB 方案为 schema=1、kind=rgb 的独立 JSON 包。
+ * @param name 已存在的命名方案。
+ * @param packagePath UTF-8 目标路径；由宿主文件保存对话框选择，可覆盖已有文件。
+ * @return 0=成功；其它配置后端负数码。包不包含设备固件或 Flash 配置。
+ */
+RB_LEGACY_API int RB_Rgb_ExportEffectPackage(const char* name, const char* packagePath);
+/**
+ * @brief 验证并导入 RGB 包为命名副本；同名覆盖，不选定或应用。
+ * @param packagePath UTF-8 包路径，文件最大 4 MiB。
+ * @param outName 输出导入的 UTF-8/NUL 名称；容量不足时不写配置。
+ * @param bufferSize outName 容量字节，建议 128。
+ * @return 0=成功；RB_BUFFER_TOO_SMALL=输出不足且无副作用；其它配置后端负数码。
+ */
+RB_LEGACY_API int RB_Rgb_ImportEffectPackage(const char* packagePath, char* outName, int bufferSize);
+/**
+ * @brief 读取已选 RGB 命名方案名称；空字符串表示未命名活动配置。
+ * @param buffer 输出 UTF-8/NUL 名称，调用方拥有。
+ * @param bufferSize 输出容量字节，建议 128。
+ * @return RB_OK、RB_BUFFER_TOO_SMALL 或配置后端负数码。
+ */
+RB_LEGACY_API int RB_Rgb_ReadCurrentEffectProfileName(char* buffer, int bufferSize);
+/**
+ * @brief 选定命名 RGB 方案，同一次文件写入更新活动配置与选择名；不应用运行态。
+ * @param name 已存在的精确名称；之后显式 reload 草稿和 apply，不能再次 save 当前配置覆盖它。
+ * @return 0=成功；-5=不存在；其它配置后端负数码。
+ * @note 原 save_effect_profile 保存未命名活动配置，会清空选择名；save_effect_profile_as 只保存库副本。
+ */
+RB_LEGACY_API int RB_Rgb_SaveCurrentEffectProfileName(const char* name);
+/**
+ * @brief 导出独立 MotionEffect 方案包，不要求同名 Dynamic 方案。
+ * @param name 已存在的运动增强方案名，1-127 UTF-8 字节。
+ * @param packagePath UTF-8 目标路径，可覆盖已有文件。
+ * @return 0=成功；其它配置后端负数码；不改变运行态。
+ */
+RB_LEGACY_API int RB_MotionEffect_ExportPackage(const char* name, const char* packagePath);
+/**
+ * @brief 验证并导入独立 MotionEffect 包；同名覆盖，不应用。
+ * @param packagePath schema=1、kind=motionEffect，最大 4 MiB 的 UTF-8 JSON 文件。
+ * @param outName 输出 UTF-8/NUL 方案名，容量不足时不保存。
+ * @param bufferSize outName 容量字节，建议 128。
+ * @return 0=成功；RB_BUFFER_TOO_SMALL=输出不足且无副作用；其它配置后端负数码。
+ */
+RB_LEGACY_API int RB_MotionEffect_ImportPackage(const char* packagePath, char* outName, int bufferSize);
+/**
+ * @brief 返回 Haptic 可选方案数量，明确复用 Dynamic 方案目录，不枚举孤立的震动节点。
+ * @return 非负数量；失败为负数；配合 get_profile_name 和 read_profile_by_index 使用。
+ */
+RB_LEGACY_API int RB_Haptic_GetProfileCount();
+/**
+ * @brief 读取与 Dynamic 同一顺序的 Haptic 可选方案名。
+ * @param index Dynamic 当前零基索引，不可持久化。
+ * @param buffer 输出 UTF-8/NUL 名称。
+ * @param bufferSize 输出容量字节。
+ * @return RB_OK、RB_BUFFER_TOO_SMALL 或错误码。
+ */
+RB_LEGACY_API int RB_Haptic_GetProfileName(int index, char* buffer, int bufferSize);
+/**
+ * @brief 删除同名震动附属配置，不删除 Dynamic，也不改变当前 Haptic 运行态。
+ * @param name 非 _Default 的震动配置名称。
+ * @return 0=成功；其它配置后端负数码；之后按索引读取将走既有默认回退。
+ */
+RB_LEGACY_API int RB_Haptic_DeleteProfile(const char* name);
+/**
+ * @brief 导出已经保存的同名 Haptic 节点为独立包，不导出隐式默认回退值。
+ * @param name 已保存的震动方案名，1-127 UTF-8 字节。
+ * @param packagePath UTF-8 目标路径，可覆盖已有文件。
+ * @return 0=成功；-5=未保存该节点；其它配置后端负数码。
+ */
+RB_LEGACY_API int RB_Haptic_ExportPackage(const char* name, const char* packagePath);
+/**
+ * @brief 验证并导入 Haptic 包；要求接收端已有同名 Dynamic 方案，不应用。
+ * @param packagePath schema=1、kind=haptic，最大 4 MiB 的 UTF-8 JSON 文件。
+ * @param outName 输出 UTF-8/NUL 名称，容量不足时不保存。
+ * @param bufferSize outName 容量字节，建议 128。
+ * @return 0=成功；-5=无同名 Dynamic；RB_BUFFER_TOO_SMALL=输出不足且无副作用；其它配置后端负数码。
+ * @note 跨机整体迁移可直接使用包含震动节点的 Dynamic 配置包。
+ */
+RB_LEGACY_API int RB_Haptic_ImportPackage(const char* packagePath, char* outName, int bufferSize);
+#endif
+
 /**
  * @brief 设置配置目录使用的应用名称，省略调用时默认为 "SimRacebear"。
  * @param name UTF-8、NUL 结尾的单个合法路径段；不能为空，也不能包含 Windows 路径非法字符。
@@ -2179,7 +2295,7 @@ RB_LEGACY_API int RB_Game_ReloadCustomRegistry();
 
 /**
  * @brief 按固定数据 key 读取 UTF-8 JSON 包。
- * @param key 数据包 key；支持范围见 RaceBearSDK_API.md 的“JSON 数据包”章节。
+ * @param key 数据包 key；支持范围见 RaceBearSDK_SERVICE_CONTRACTS.md 的“JSON 数据包”章节。
  * @param buffer 接收 UTF-8、NUL 结尾 JSON 的调用方缓冲区。
  * @param bufferSize buffer 的总容量，单位为字节且必须大于 0。
  * @return RB_OK 表示成功；RB_INVALID_ARGUMENT 表示 key 或缓冲区无效；RB_BUFFER_TOO_SMALL 表示容量不足；RB_ERROR 表示读取失败。
@@ -2190,7 +2306,7 @@ RB_LEGACY_API int RB_Data_ReadJson(const char* key, char* buffer, int bufferSize
 
 /**
  * @brief 按固定配置 key 写入完整 UTF-8 JSON 配置文档。
- * @param key 可写配置包 key；支持范围见 RaceBearSDK_API.md 的“JSON 数据包”章节。
+ * @param key 可写配置包 key；支持范围见 RaceBearSDK_SERVICE_CONTRACTS.md 的“JSON 数据包”章节。
  * @param jsonText UTF-8、NUL 结尾的完整 JSON 文本，不能为空。
  * @return RB_OK 表示写入成功；RB_INVALID_ARGUMENT 表示 key 或文本无效；RB_ERROR 表示保存失败。
  * @note 保存后是否需要执行 runtime.reloadConfig 命令，取决于对应配置的使用场景。

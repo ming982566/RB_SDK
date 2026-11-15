@@ -507,10 +507,11 @@ public:
       ui::ComboAdd(effect_, Utf8ToWide(cat_.Items[i].Name),
                    cat_.Items[i].Index);
     SendMessageW(profile_, CB_RESETCONTENT, 0, 0);
-    int n = rb_example::Dynamic_GetProfileCount();
+    // SDK 明确提供同名 Dynamic 方案目录，索引与 Haptic_ReadProfileByIndex 一致。
+    int n = rb_example::Haptic_GetProfileCount();
     for (int i = 0; i < n; ++i) {
       char b[128]{};
-      if (rb_example::Dynamic_GetProfileName(i, b, sizeof b) == RB_OK)
+      if (rb_example::Haptic_GetProfileName(i, b, sizeof b) == RB_OK)
         ui::ComboAdd(profile_, Utf8ToWide(b), i);
     }
     FillTelemetry(in_, tc_);
@@ -525,8 +526,11 @@ public:
     ei_ = ui::ComboData(effect_);
     if (pi_ < 0 || ei_ < 0)
       return;
-    if (rb_example::Haptic_ReadProfileByIndex(pi_, &p_) != RB_OK)
+    const int readResult = rb_example::Haptic_ReadProfileByIndex(pi_, &p_);
+    if (readResult != RB_OK) {
+      Report(readResult, L"读取震动配置失败");
       return;
+    }
     Load();
   }
   void Load() {

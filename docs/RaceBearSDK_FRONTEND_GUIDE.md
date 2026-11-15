@@ -21,6 +21,27 @@
 
 同一对象可以被多个调用源读取。每个调用方必须使用自己的缓冲区和 `RB_ObjectReadInfo`，不得共享正在写入的内存。高频遥测 Read 只复制已发布快照，不执行计算、不读 USB、不读文件。
 
+### CPU 验证
+
+SDK资源窗口显示的是宿主整个进程的CPU，包含前端和各后台线程。对比时记录
+CPU型号/逻辑处理器数、实际加载DLL的路径与SHA256、Debug/Release及相同游戏、
+输出和窗口状态；不能仅凭普通运行日志判定CPU热点或回归版本。
+UI继续使用30–60Hz快照刷新，不为降低CPU擅自降低后端输出频率或保护采样频率。
+2026-11-14开发更新已减少功能插件每周期重复构建界面状态的开销，插件IPC和
+40ms脉冲保持不变；实际整机改善需在相同配置和场景重新测量。
+同日CAN输出修正了逐帧通道解析重复抛异常及重连冷却忙等；CPU验收需区分
+正常Ready运行与故障重试阶段，分别和serial对照，记录实际DLL身份和输出间隔。
+配套更新DLL后重启宿主即可，无新ABI、调用步骤或固件要求，详见[CAN指南](RaceBearSDK_RB_CAN_GUIDE.md)。
+
+2026-11-15开发更新优化内置仪表最终尺寸图片缓存，减少Ford GT重复缩放，并修正
+字体缓存对名称尾字节的识别。保持原刷新频率；复测时分别记录纯渲染、固定帧USB
+发送与渲染加输出的CPU、实际FPS和丢帧，区分首次缓存建立和稳态。
+固定渲染线程可复用缓存；线程退出前需收敛其SDK调用。详见
+[仪表指南CPU验证](RaceBearSDK_DASHBOARD_DEVELOPMENT.md#121-cpu-与刷新验证)。
+无需新增ABI、重编宿主EXE或升级屏幕固件，更换同配置DLL并重启宿主生效。
+内置仪表缓存与图形会话由既有`RB_Runtime_Shutdown`显式释放；离线渲染未初始化
+运行态时，卸载DLL前同样需要停止所有调用并执行Shutdown。
+
 ## 3. 页面与对象映射
 
 | 页面 | 主要 key | 说明 |
@@ -91,6 +112,17 @@ RB_Object_Write(serviceId, RB_OBJECT_NATIVE_CALL,
 
 测试页面离开、设备丢失、授权丢失和应用退出时，都要提交明确的停止或复位命令。没有每任务强制取消接口，宿主要限制队列长度并在关闭时等待已提交任务收敛。
 
+安全带CAN运行会话的临时通信异常和可复位驱动报警由SDK确认安全条件后自动恢复。
+连接请求保持期间，SDK也处理设备缺席和USB拔插，按原UID自动重新打开；
+等待时Starting为真、Connected为假，连接后继续以Ready确认电机可用。
+主动断开会终止重试；宿主不要在设备事件或轮询中重复连接、回零或重新启用。
+控制器复位、急停及其它严重锁定不因USB重连解除，恢复后不回放旧目标。
+持续报警自动退避重试，每轮10次后冷却10秒继续，前端继续读取
+`rb.seatbeltcan.get_state`，不在轮询或重连回调中反复提交重新启用。急停、
+原点丢失及非报警导致的释放失败仍需排障后显式调用
+`rb.seatbeltcan.request_reenable`，以实际Ready确认。
+具体恢复条件与旧目标作废规则见[CAN指南](RaceBearSDK_RB_CAN_GUIDE.md)。
+
 ## 8. 授权和独立产品
 
 `rb.runtime.state` 中的授权快照只门控 Motion、普通平台输出和其它受保护运行能力。RGB、Wind、安全带和 Haptic 页面仍可读取状态、编辑配置和执行各自合同允许的测试或输出。具体设备和安全条件以对应服务目录和专题指南为准。
@@ -98,6 +130,16 @@ RB_Object_Write(serviceId, RB_OBJECT_NATIVE_CALL,
 ## 9. 目录和稳定身份
 
 游戏、输出、CAN、RGB、仪表包、插件和串口目录都拥有独立索引空间。索引只在当前快照内有效；保存配置应使用稳定 key、UID、PackageId 或公开业务身份。刷新目录、删除对象或设备热插拔后必须按稳定身份重新定位。
+
+配置方案的归属以[服务业务合同](RaceBearSDK_SERVICE_CONTRACTS.md)为准。
+Haptic 的 ByIndex、Count 和 Name 都解析 Dynamic 目录及同名附属配置；
+MotionEffect 与 RGB 命名方案分别拥有独立目录。RGB 选定命名方案后，还需重新加载草稿再显式应用。
+完整 RGB 页面流程见 [RGB 工作流](RaceBearSDK_RGB_WORKFLOW.md)。
+
+离线绑定生成可读取 [service-api.json](service-api.json)；它只列第三方公开操作，
+不能据此推断结构体布局或跨进程传送本机指针。构建、版本与 SHA256 校验见
+[构建与交付](RaceBearSDK_BUILD_AND_DELIVERY.md)，视觉和术语参考见
+[界面参考](RaceBearSDK_UI_REFERENCE.md)及 [glossary.csv](glossary.csv)。
 
 ## 10. 关闭验收
 

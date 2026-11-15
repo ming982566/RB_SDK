@@ -33,11 +33,20 @@ For the unified object ABI, read `docs/RaceBearSDK_OBJECT_API.md` first.
 Protocol v1 registers 9 state/draft objects, 29 native synchronous service domains, and 20 asynchronous actions. The public DLL exposes only the 10 unified ABI entries.
 Use the directory's actual coverage, caller-owned buffers, revision-checked shared drafts,
 and retained task results. High-frequency telemetry uses a binary whole-frame snapshot.
-Use `docs/RaceBearSDK_SERVICE_API.md` to map all 265 public business operations to native
+Use `docs/RaceBearSDK_SERVICE_API.md` to map all 281 public business operations to native
 services; first-party operations are not public contracts. Native-call packets are in-process
 only and retain the original pointer, handle, callback, blocking and error semantics.
 Do not infer automatic transactions, complex-form generation, or one class per ABI.
 An Invoke acceptance is not execution success; consume completed Poll results without resubmitting.
+
+Read `docs/RaceBearSDK_SERVICE_CONTRACTS.md` for business errors, JSON keys and profile ownership.
+Haptic selectors alias the Dynamic catalog; do not treat their indexes as an independent list.
+MotionEffect and named RGB libraries have independent catalogs. RGB selection updates saved active
+configuration, not a shared draft or hardware; reload the draft and explicitly apply it.
+Use `docs/service-api.json` for offline operation discovery. Use `docs/RaceBearSDK_RGB_WORKFLOW.md`
+for lighting pages and `docs/RaceBearSDK_BUILD_AND_DELIVERY.md` for hashes and host toolsets.
+UI references and the three-language terminology table are in `docs/RaceBearSDK_UI_REFERENCE.md`
+and `docs/glossary.csv`; SDK dashboard assets are not a UI icon license.
 
 ## Define The Requested Surface
 

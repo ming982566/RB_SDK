@@ -1,0 +1,50 @@
+key,zh-CN,zh-TW,en-US,field
+dynamic,动态滤波,動態濾波,Dynamic Filters,RB_DynamicV2Profile
+motionEffect,运动增强,運動增強,Motion Effects,RB_MotionEffectProfile
+haptic,震动,震動,Haptics,RB_HapticEffectProfile
+wind,风感,風感,Wind,RB_WindEffectConfig
+seatbelt,安全带,安全帶,Seatbelt,RB_SeatbeltEffectConfig
+rgb,灯效,燈效,Lighting,RB_RgbEffectProfile
+profile,配置方案,設定方案,Profile,profileName
+package,配置包,設定套件,Configuration Package,packagePath
+apply,应用,套用,Apply,rb.rgb.apply
+save,保存,儲存,Save,rb.rgb.save
+reload,重新加载,重新載入,Reload,rb.rgb.reload
+connect,连接,連線,Connect,rb.rgb.connect
+disconnect,断开,中斷連線,Disconnect,rb.rgb.disconnect
+gain,增益,增益,Gain,Gain
+threshold,阈值,閾值,Threshold,Threshold
+channel,通道,通道,Channel,OutputChannel
+softLimit,软限幅,軟限幅,Soft Limit,Limit
+preload,预紧,預緊,Preload,BasePreloadPercent
+duty,占空比,工作週期,Duty Cycle,BlinkDutyPercent
+stroke,行程,行程,Stroke,RB_PlatformConfig
+logicalMapping,逻辑映射,邏輯映射,Logical Mapping,LogicalStart
+brightness,亮度,亮度,Brightness,MasterBrightnessPercent
+layer,图层,圖層,Layer,Layers
+priority,优先级,優先順序,Priority,Priority
+output,输出,輸出,Output,RB_OutputConfig
+telemetry,遥测,遙測,Telemetry,RB_TelemetryCatalog
+source,数据源,資料來源,Source,RB_ExternalSourceDesc
+platform,平台,平台,Platform,RB_PlatformConfig
+manualPose,手动姿态,手動姿態,Manual Pose,rb.manualpose.set_drive
+dashboard,仪表,儀表,Dashboard,RB_DashboardPackageInfo
+device,设备,裝置,Device,RB_RgbDeviceInfo
+firmware,固件,韌體,Firmware,rb.rgb.start_app_firmware_update
+license,授权,授權,License,RB_LicenseSnapshot
+fault,故障,故障,Fault,Fault
+emergencyStop,急停,緊急停止,Emergency Stop,EStopLatched
+homing,回零,歸零,Homing,HomingOnConnect
+release,释放,釋放,Release,ReleaseSpeedPercent
+revision,修订号,修訂編號,Revision,RB_ObjectReadInfo.Revision
+conflict,版本冲突,版本衝突,Revision Conflict,RB_OBJECT_CONFLICT
+snapshot,快照,快照,Snapshot,rb.telemetry.snapshot
+state,状态,狀態,State,rb.runtime.state
+draft,草稿,草稿,Draft,rb.rgb.effects
+frequency,频率,頻率,Frequency,Frequency
+sway,横移,橫移,Sway,dofIndex=0
+surge,纵移,縱移,Surge,dofIndex=1
+heave,升降,升降,Heave,dofIndex=2
+yaw,偏航,偏航,Yaw,dofIndex=3
+roll,侧倾,側傾,Roll,dofIndex=4
+pitch,俯仰,俯仰,Pitch,dofIndex=5

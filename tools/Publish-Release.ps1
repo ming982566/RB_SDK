@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^\d+\.\d+\.\d+$')]
     [string]$Version,
@@ -29,12 +29,23 @@ $exampleAllowed = @(
     '^examples\\common\\(ObjectClient\.h|ExampleServices\.h|ExampleBuild\.cmake)$',
     '^examples\\cpp\\(CMakeLists\.txt|README\.md|main\.cpp|configuration_examples\.(cpp|h)|custom_game_example\.(cpp|h))$',
     '^examples\\cpp\\simhub_udp_bridge\\(README\.md|main\.cpp)$',
+    '^examples\\cpp\\profile_packages\\(README\.md|main\.cpp)$',
+    '^examples\\dashboard_render\\(README\.md|CMakeLists\.txt|main\.cpp)$',
     '^examples\\object_api\\(CMakeLists\.txt|main\.cpp)$',
     '^examples\\RaceBearMotionStudio\\(CMakeLists\.txt|README\.md|RaceBearMotionStudio\.(sln|vcxproj|vcxproj\.filters))$',
     '^examples\\RaceBearMotionStudio\\src\\(App|SdkRuntime|Ui)\.(cpp|h)$',
     '^examples\\RaceBearMotionStudio\\src\\main\.cpp$',
     '^examples\\RaceBearMotionStudio\\src\\pages\\(EffectsPages|GamePage|HardwarePages|PlatformPage|SettingsPages|StatusPages)\.cpp$',
     '^examples\\RaceBearMotionStudio\\src\\pages\\Pages\.h$'
+)
+
+# 公开文档精确允许清单；内部审计和核心专题不能进入发行包。
+$publicDocs = @(
+    'RaceBearSDK_API', 'RaceBearSDK_FRONTEND_GUIDE', 'RaceBearSDK_OBJECT_API',
+    'RaceBearSDK_SERVICE_API', 'RaceBearSDK_DASHBOARD_DEVELOPMENT', 'RaceBearSDK_RB_CAN_GUIDE',
+    'RaceBearSDK_AI_DEVELOPMENT', 'RaceBearSDK_FRONTEND_UI_SPEC', 'RaceBearSDK_SERVICE_CONTRACTS',
+    'RaceBearSDK_RGB_WORKFLOW', 'RaceBearSDK_BUILD_AND_DELIVERY', 'RaceBearSDK_UI_REFERENCE',
+    'RELEASE_PROCESS'
 )
 
 function Invoke-Checked {
@@ -85,14 +96,17 @@ function Copy-SdkPackage {
     }
 
     Copy-Item (Join-Path $SdkSourceRoot 'include\RaceBearSDK.h') (Join-Path $publishRoot 'include\RaceBearSDK.h') -Force
-    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_API.md') (Join-Path $publishRoot 'docs\RaceBearSDK_API.md') -Force
-    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_FRONTEND_GUIDE.md') (Join-Path $publishRoot 'docs\RaceBearSDK_FRONTEND_GUIDE.md') -Force
-    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_OBJECT_API.md') (Join-Path $publishRoot 'docs\RaceBearSDK_OBJECT_API.md') -Force
-    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_SERVICE_API.md') (Join-Path $publishRoot 'docs\RaceBearSDK_SERVICE_API.md') -Force
-    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_DASHBOARD_DEVELOPMENT.md') (Join-Path $publishRoot 'docs\RaceBearSDK_DASHBOARD_DEVELOPMENT.md') -Force
-    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_RB_CAN_GUIDE.md') (Join-Path $publishRoot 'docs\RaceBearSDK_RB_CAN_GUIDE.md') -Force
-    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_AI_DEVELOPMENT.md') (Join-Path $publishRoot 'docs\RaceBearSDK_AI_DEVELOPMENT.md') -Force
-    Copy-Item (Join-Path $SdkSourceRoot 'docs\RaceBearSDK_FRONTEND_UI_SPEC.md') (Join-Path $publishRoot 'docs\RaceBearSDK_FRONTEND_UI_SPEC.md') -Force
+    foreach ($name in $publicDocs) {
+        Copy-Item -LiteralPath (Join-Path $SdkSourceRoot "docs\$name.md") `
+            -Destination (Join-Path $publishRoot "docs\$name.md") -Force
+    }
+    foreach ($name in @('service-api.json', 'glossary.csv', 'images\dashboard-offline.png')) {
+        $target = Join-Path $publishRoot "docs\$name"
+        New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
+        Copy-Item -LiteralPath (Join-Path $SdkSourceRoot "docs\$name") -Destination $target -Force
+    }
+    Copy-Item -LiteralPath (Join-Path $SdkSourceRoot 'tools\Verify-SdkDelivery.ps1') `
+        -Destination (Join-Path $publishRoot 'tools\Verify-SdkDelivery.ps1') -Force
     # Double-click skill installer: package root entry point plus its implementation.
     Copy-Item (Join-Path $SdkSourceRoot 'Install-RaceBearSkill.cmd') (Join-Path $publishRoot 'Install-RaceBearSkill.cmd') -Force
     Copy-Item (Join-Path $SdkSourceRoot 'tools\Install-RaceBearSkill.ps1') (Join-Path $publishRoot 'tools\Install-RaceBearSkill.ps1') -Force
@@ -168,8 +182,10 @@ function New-ReleaseStage {
         '^bin\\x64\\(Debug|Release)\\DashboardAssets\\RaceBear\\[^\\]+\\[^\\]+\.(png|ttf|rbdash)$',
         '^bin\\x64\\(Debug|Release)\\DashboardAssets\\RaceBear\\[^\\]+\\[^\\]+\\[^\\]+\.(png|ttf|rbdash)$',
         '^include\\RaceBearSDK\.h$',
-        '^docs\\(RaceBearSDK_API|RaceBearSDK_FRONTEND_GUIDE|RaceBearSDK_OBJECT_API|RaceBearSDK_SERVICE_API|RaceBearSDK_DASHBOARD_DEVELOPMENT|RaceBearSDK_RB_CAN_GUIDE|RaceBearSDK_AI_DEVELOPMENT|RaceBearSDK_FRONTEND_UI_SPEC|RELEASE_PROCESS)\.md$',
+        ('^docs\\(' + ($publicDocs -join '|') + ')\.md$'),
+        '^docs\\(service-api\.json|glossary\.csv|images\\dashboard-offline\.png)$',
         '^tools\\Publish-Release\.ps1$',
+        '^tools\\Verify-SdkDelivery\.ps1$',
         '^tools\\Install-RaceBearSkill\.ps1$',
         '^tools\\DashboardDesigner\\(app\.js|index\.html|Start-DashboardDesigner\.cmd|styles\.css)$',
         '^tools\\skills\\racebear-frontend-panel\\SKILL\.md$',
@@ -210,6 +226,9 @@ function New-ReleaseStage {
             'examples\cpp\main.cpp', 'examples\cpp\CMakeLists.txt', 'examples\cpp\configuration_examples.cpp',
             'examples\cpp\configuration_examples.h', 'examples\cpp\custom_game_example.cpp', 'examples\cpp\custom_game_example.h',
             'examples\cpp\simhub_udp_bridge\main.cpp', 'examples\object_api\main.cpp', 'examples\object_api\CMakeLists.txt',
+            'examples\cpp\profile_packages\main.cpp', 'examples\cpp\profile_packages\README.md',
+            'examples\dashboard_render\CMakeLists.txt', 'examples\dashboard_render\main.cpp',
+            'examples\dashboard_render\README.md',
             'examples\RaceBearMotionStudio\RaceBearMotionStudio.sln',
             'examples\RaceBearMotionStudio\RaceBearMotionStudio.vcxproj',
             'examples\RaceBearMotionStudio\CMakeLists.txt',
@@ -225,6 +244,37 @@ function New-ReleaseStage {
             if (-not $stagedFiles.Contains($required)) {
                 throw "Release staging misses required file: $required"
             }
+        }
+        # 基于本次暂存的实际交付物生成身份和逐文件校验，避免沿用开发预览清单。
+        $dependencies = @()
+        foreach ($configuration in @('Debug', 'Release')) {
+            foreach ($name in @('RaceBearSDK.dll', 'RaceBearSDK.lib', 'libusb-1.0.dll')) {
+                $relative = "bin\x64\$configuration\$name"
+                $dependencies += [ordered]@{
+                    path = $relative.Replace('\', '/'); architecture = 'x64'; configuration = $configuration
+                    sha256 = (Get-FileHash -LiteralPath (Join-Path $stage $relative)).Hash
+                }
+            }
+        }
+        $dependencies += [ordered]@{
+            path = 'include/RaceBearSDK.h'; architecture = 'x64'; configuration = 'shared'
+            sha256 = (Get-FileHash -LiteralPath (Join-Path $stage 'include\RaceBearSDK.h')).Hash
+        }
+        $services = Get-Content -LiteralPath (Join-Path $stage 'docs\service-api.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+        $manifest = [ordered]@{
+            schemaVersion = 1; version = $Version; status = 'release'; architecture = 'x64'
+            sdkToolset = 'VS2019 v142'; protocolVersion = 1; abiExports = 10
+            publicOperations = $services.operations.Count; files = $dependencies
+        }
+        [IO.File]::WriteAllText((Join-Path $stage 'SDK_DEPENDENCIES.json'),
+            ($manifest | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
+        $sums = @(Get-ChildItem -LiteralPath $stage -Recurse -File | Sort-Object FullName | ForEach-Object {
+            (Get-FileHash -LiteralPath $_.FullName).Hash + '  ' + $_.FullName.Substring($stage.Length + 1).Replace('\', '/')
+        })
+        [IO.File]::WriteAllLines((Join-Path $stage 'SHA256SUMS.txt'), $sums, [Text.UTF8Encoding]::new($false))
+        & (Join-Path $stage 'tools\Verify-SdkDelivery.ps1') -Root $stage | Out-Host
+        foreach ($name in @('SDK_DEPENDENCIES.json', 'SHA256SUMS.txt')) {
+            Copy-Item -LiteralPath (Join-Path $stage $name) -Destination (Join-Path $publishRoot $name) -Force
         }
         return $stage
     }
@@ -406,7 +456,7 @@ try {
         $notes = $versionNotes.Groups[1].Value.Trim() + "`n`n" +
             "Windows x64 / VS2019 v142. Object protocol v1; exactly 10 DLL exports.`n`n" +
             "Validation: matching Debug/Release SDK builds, ABI/layout checks, frontend object tests, " +
-            "concurrent native-call marshalling, actual ZIP extraction, all four C++ example builds, " +
+            "actual ZIP extraction, six C++ example builds, " +
             "API lifecycle snippet compilation, runtime version/protocol/default reads, and file hashes.`n`n" +
             "Limits: automated package smokes run before runtime initialization. Initialization requires " +
             "writable product AppData/Documents folders and separate initialized-host acceptance. " +

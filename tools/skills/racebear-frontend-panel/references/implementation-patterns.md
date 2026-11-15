@@ -187,6 +187,22 @@ established; it does not implement the entire asynchronous host close coordinato
 Seatbelt CAN protection is an output-instance workflow. Single left/center uses only the left
 node; single right uses only the right node. Show startup homing wait, releasing, disabled lock,
 and fault lock separately. Never request homing or re-enable from a polling/reconnect callback.
+While the user keeps an output connection request active, the SDK waits for a missing USB
+controller and reconnects the original UID after unplug/replug. Initial logical-index binding
+is pinned to the first matching UID for that connection intent. Show Starting with Connected
+false while waiting, and distinguish reconnected USB from motor Ready. Do not repeatedly
+submit connect; explicit disconnect cancels retries. Old targets and RGB frames are discarded.
+Fast replug still requires fresh input and safety checks. Controller reset, EStop and prior
+severe locks remain protected even after the USB handle is reopened.
+The SDK can recover transient communication failures in an already-running session after
+fresh input, healthy transport, and active-node safety checks pass. Observe Ready; do not
+implement a frontend retry loop. Runtime drive alarms are also reset by the SDK only after
+confirmed disable, followed by fresh fault, homing and actual-position checks. Persistent alarms
+and runtime recovery initialization failures use bounded backoff and a ten-second cooldown
+after ten attempts, then retry another cycle. Only alarm-attributed release failure bits may
+participate; anchor actual position before enable and discard all old targets. EStop, lost
+homing, unrelated release failure, controller reset and historical locks still require operator
+action; see the CAN guide.
 After user confirmation, call `rb.seatbeltcan.request_reenable` and poll GetState until Ready;
 request acceptance is not physical success. A fault lock may still be releasing and reject
 the request. Keep diagnostics visible. Account for up to about 16.5 seconds of backend release

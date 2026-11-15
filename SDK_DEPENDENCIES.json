@@ -1,0 +1,54 @@
+{
+    "schemaVersion":  1,
+    "version":  "1.0.4",
+    "status":  "release",
+    "architecture":  "x64",
+    "sdkToolset":  "VS2019 v142",
+    "protocolVersion":  1,
+    "abiExports":  10,
+    "publicOperations":  281,
+    "files":  [
+                  {
+                      "path":  "bin/x64/Debug/RaceBearSDK.dll",
+                      "architecture":  "x64",
+                      "configuration":  "Debug",
+                      "sha256":  "8B46FA4BB2C257E0AFFF383BB279F26F962EFEA71863AF440DA02AB80200B9EB"
+                  },
+                  {
+                      "path":  "bin/x64/Debug/RaceBearSDK.lib",
+                      "architecture":  "x64",
+                      "configuration":  "Debug",
+                      "sha256":  "772DE0B5755916B2B4801D42C42B775E62EA9A845399E8B63D4C02BF6B95A02C"
+                  },
+                  {
+                      "path":  "bin/x64/Debug/libusb-1.0.dll",
+                      "architecture":  "x64",
+                      "configuration":  "Debug",
+                      "sha256":  "E0CB1D0E8C20AE55C4E2F944D3136A2766EDE61A16551CC7562EAEDAE4BC13BC"
+                  },
+                  {
+                      "path":  "bin/x64/Release/RaceBearSDK.dll",
+                      "architecture":  "x64",
+                      "configuration":  "Release",
+                      "sha256":  "B3AAD719B37DC009E212EDDB57E4E7334EFFF062A02C0DB0B8E0464561C46141"
+                  },
+                  {
+                      "path":  "bin/x64/Release/RaceBearSDK.lib",
+                      "architecture":  "x64",
+                      "configuration":  "Release",
+                      "sha256":  "09342BE1DFF7CF89A017BA2766D1106DD8FB8390DB8F660237EADB620467DA7E"
+                  },
+                  {
+                      "path":  "bin/x64/Release/libusb-1.0.dll",
+                      "architecture":  "x64",
+                      "configuration":  "Release",
+                      "sha256":  "E0CB1D0E8C20AE55C4E2F944D3136A2766EDE61A16551CC7562EAEDAE4BC13BC"
+                  },
+                  {
+                      "path":  "include/RaceBearSDK.h",
+                      "architecture":  "x64",
+                      "configuration":  "shared",
+                      "sha256":  "D27CD00F1C15111B6AAAE2320739AD6A43D8ED9EF49ECC484FDA6CECE864AEE6"
+                  }
+              ]
+}

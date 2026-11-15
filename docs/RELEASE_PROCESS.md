@@ -53,14 +53,11 @@ Before running the release script:
 - Build all C++ examples with VS2019/v142 x64 in Debug and Release, and verify
   their SDK imports belong to the 10 unified ABI exports. Example wrappers are
   host source code, not extra DLL exports or legacy ABI declarations.
-- Compare the public header and exported DLL symbols against the approved public
-  API list. Configuration package APIs and external `RB_CAN` realtime position
-  APIs are public in 0.6.0. From 0.6.1, the approved list also includes the
-  high-level motor maintenance, `.rbmotor` package, same-type synchronization,
-  RB servo firmware update, and CAN idle-disable timeout APIs. The documented
-  high-level `RB_SeatbeltCan_*` APIs, seatbelt instance configuration and binding
-  state are public; 0.6.2 adds explicit seatbelt protection recovery. Raw SDO/PDO,
-  firmware-internal commands and SimRacebear UI APIs remain private.
+- Compare public types and the DLL exports against the exact ten-entry ABI list.
+  All business operations use documented `rb.*` objects, commands and synchronous
+  services. The offline service catalog must match the runtime public operation
+  signatures. Do not publish or import legacy typed business functions. Raw
+  SDO/PDO, firmware-internal commands and SimRacebear UI APIs remain private.
 - Confirm the API manual, RB_CAN guide, frontend guide, README, runtime version,
   header, DLL/LIB and archive all identify the same release version.
 
@@ -82,7 +79,7 @@ The script performs these operations in order:
 5. Creates `RaceBearSDK-X.Y.Z-vs2019-x64.zip` and its SHA256 sidecar.
 6. Extracts the actual ZIP into an isolated SDK `obj` directory, verifies every
    delivered file against the public tree and SDK build, checks complete
-   documentation/Skill/resource inclusion, builds all four C++ programs plus the
+   documentation/Skill/resource inclusion, builds all six C++ programs plus the
    API lifecycle snippet and runtime probe in Debug/Release, checks exact DLL
    exports and client imports, and runs read-only version/protocol/defaults smokes.
    Any failure stops before a commit or network publication.
@@ -101,6 +98,18 @@ It permits the already reviewed preparation changes in the worktree; it does
 not clean or approve unknown changes. Review the complete resulting diff,
 commit the approved preparation, then run without `-PrepareOnly` from clean
 `main` for the full release.
+
+The formal package includes all twelve public SDK manuals, the offline service
+catalog and glossary, the dashboard reference image, the complete six-file
+frontend Skill, and six C++ example programs. The SDK source under `docs` owns
+this process document; the publish script copies its approved public version.
+Internal audit documents and diagnostic capture tools are excluded.
+
+The script generates `SDK_DEPENDENCIES.json` with `status=release` and a complete
+`SHA256SUMS.txt` from the actual staging contents. It copies both back into the
+public tree, includes them in the ZIP, and verifies the extracted package with
+`tools/Verify-SdkDelivery.ps1`. Local preview identities are rejected by the
+formal package gate.
 
 ## Post-Release Cleanup
 

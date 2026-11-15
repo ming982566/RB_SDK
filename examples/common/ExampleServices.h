@@ -3,6 +3,62 @@
 #include "ObjectClient.h"
 
 namespace rb_example {
+// 同步公开操作 rb.rgb.get_effect_profile_count；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Rgb_GetEffectProfileCount() {
+    return Native<int>("rb.service.rgb", "rb.rgb.get_effect_profile_count", 0xfa00318f42ab6671ULL);
+}
+// 同步公开操作 rb.rgb.get_effect_profile_name；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Rgb_GetEffectProfileName(int index, char* buffer, int bufferSize) {
+    return Native<int>("rb.service.rgb", "rb.rgb.get_effect_profile_name", 0x551455f08df06637ULL, index, buffer, bufferSize);
+}
+// 同步公开操作 rb.rgb.read_effect_profile_by_name；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Rgb_ReadEffectProfileByName(const char* name, RB_RgbEffectProfile* profile) {
+    return Native<int>("rb.service.rgb", "rb.rgb.read_effect_profile_by_name", 0x0810bf557997ab14ULL, name, profile);
+}
+// 同步公开操作 rb.rgb.save_effect_profile_as；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Rgb_SaveEffectProfileAs(const char* name, const RB_RgbEffectProfile* profile) {
+    return Native<int>("rb.service.rgb", "rb.rgb.save_effect_profile_as", 0x71c2e734572824dfULL, name, profile);
+}
+// 同步公开操作 rb.rgb.export_effect_package；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Rgb_ExportEffectPackage(const char* name, const char* packagePath) {
+    return Native<int>("rb.service.rgb", "rb.rgb.export_effect_package", 0x8b20cb572c544fadULL, name, packagePath);
+}
+// 同步公开操作 rb.rgb.import_effect_package；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Rgb_ImportEffectPackage(const char* packagePath, char* outName, int bufferSize) {
+    return Native<int>("rb.service.rgb", "rb.rgb.import_effect_package", 0xc4964fc5cc2dd187ULL, packagePath, outName, bufferSize);
+}
+// 同步公开操作 rb.rgb.read_current_effect_profile_name；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Rgb_ReadCurrentEffectProfileName(char* buffer, int bufferSize) {
+    return Native<int>("rb.service.rgb", "rb.rgb.read_current_effect_profile_name", 0x1edf04ab4bd979c0ULL, buffer, bufferSize);
+}
+// 同步公开操作 rb.rgb.save_current_effect_profile_name；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Rgb_SaveCurrentEffectProfileName(const char* name) {
+    return Native<int>("rb.service.rgb", "rb.rgb.save_current_effect_profile_name", 0x09206df780e497a6ULL, name);
+}
+// 同步公开操作 rb.motioneffect.export_package；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int MotionEffect_ExportPackage(const char* name, const char* packagePath) {
+    return Native<int>("rb.service.motioneffect", "rb.motioneffect.export_package", 0x8b20cb572c544fadULL, name, packagePath);
+}
+// 同步公开操作 rb.motioneffect.import_package；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int MotionEffect_ImportPackage(const char* packagePath, char* outName, int bufferSize) {
+    return Native<int>("rb.service.motioneffect", "rb.motioneffect.import_package", 0xc4964fc5cc2dd187ULL, packagePath, outName, bufferSize);
+}
+// 同步公开操作 rb.haptic.get_profile_count；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Haptic_GetProfileCount() {
+    return Native<int>("rb.service.haptic", "rb.haptic.get_profile_count", 0xfa00318f42ab6671ULL);
+}
+// 同步公开操作 rb.haptic.get_profile_name；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Haptic_GetProfileName(int index, char* buffer, int bufferSize) {
+    return Native<int>("rb.service.haptic", "rb.haptic.get_profile_name", 0x551455f08df06637ULL, index, buffer, bufferSize);
+}
+// 同步公开操作 rb.haptic.export_package；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Haptic_ExportPackage(const char* name, const char* packagePath) {
+    return Native<int>("rb.service.haptic", "rb.haptic.export_package", 0x8b20cb572c544fadULL, name, packagePath);
+}
+// 同步公开操作 rb.haptic.import_package；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Haptic_ImportPackage(const char* packagePath, char* outName, int bufferSize) {
+    return Native<int>("rb.service.haptic", "rb.haptic.import_package", 0xc4964fc5cc2dd187ULL, packagePath, outName, bufferSize);
+}
 // 同步公开操作 rb.runtime.set_app_data_name；参数有效期和业务结果见 SERVICE_API 对应条目。
 inline int Runtime_SetAppDataName(const char* name) {
     return Native<int>("rb.service.runtime", "rb.runtime.set_app_data_name", 0x09206df780e497a6ULL, name);
@@ -367,6 +423,10 @@ inline int MotionEffect_SaveProfileByIndex(int profileIndex, const RB_MotionEffe
 inline int MotionEffect_ApplyProfileToCurrentRig(const RB_MotionEffectProfile* profile) {
     return Native<int>("rb.service.motioneffect", "rb.motioneffect.apply_profile_to_current_rig", 0xcd831df07ae6b419ULL, profile);
 }
+// 同步公开操作 rb.motioneffect.get_default_config；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int MotionEffect_GetDefaultConfig(int effectIndex, RB_MotionEffectConfig* config) {
+    return Native<int>("rb.service.motioneffect", "rb.motioneffect.get_default_config", 0x4ae7f0f0b3de6b3aULL, effectIndex, config);
+}
 // 同步公开操作 rb.haptic.get_catalog；参数有效期和业务结果见 SERVICE_API 对应条目。
 inline int Haptic_GetCatalog(RB_EffectCatalog* catalog) {
     return Native<int>("rb.service.haptic", "rb.haptic.get_catalog", 0xf72a0eeed4caff7cULL, catalog);
@@ -390,6 +450,10 @@ inline int Haptic_SaveProfileByIndex(int profileIndex, const RB_HapticEffectProf
 // 同步公开操作 rb.haptic.apply_profile_to_current_function；参数有效期和业务结果见 SERVICE_API 对应条目。
 inline int Haptic_ApplyProfileToCurrentFunction(const RB_HapticEffectProfile* profile) {
     return Native<int>("rb.service.haptic", "rb.haptic.apply_profile_to_current_function", 0x51eb5d806955a652ULL, profile);
+}
+// 同步公开操作 rb.haptic.get_default_config；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Haptic_GetDefaultConfig(int effectIndex, RB_HapticEffectConfig* config) {
+    return Native<int>("rb.service.haptic", "rb.haptic.get_default_config", 0x1201390abac4df2bULL, effectIndex, config);
 }
 // 同步公开操作 rb.wind.get_default_config；参数有效期和业务结果见 SERVICE_API 对应条目。
 inline int Wind_GetDefaultConfig(RB_WindEffectConfig* config) {
@@ -451,6 +515,10 @@ inline int Rgb_ApplyDeviceConfig(const RB_RgbDeviceConfig* config) {
 inline int Rgb_GetDefaultEffectProfile(RB_RgbEffectProfile* profile) {
     return Native<int>("rb.service.rgb", "rb.rgb.get_default_effect_profile", 0x2d88c1c9206d2315ULL, profile);
 }
+// 同步公开操作 rb.rgb.read_effect_profile；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Rgb_ReadEffectProfile(RB_RgbEffectProfile* profile) {
+    return Native<int>("rb.service.rgb", "rb.rgb.read_effect_profile", 0x2d88c1c9206d2315ULL, profile);
+}
 // 同步公开操作 rb.rgb.save_effect_profile；参数有效期和业务结果见 SERVICE_API 对应条目。
 inline int Rgb_SaveEffectProfile(const RB_RgbEffectProfile* profile) {
     return Native<int>("rb.service.rgb", "rb.rgb.save_effect_profile", 0x1f330e459cee142aULL, profile);
@@ -466,6 +534,42 @@ inline int Command_Run(const char* command, const char* argsJson, char* resultBu
 // 同步公开操作 rb.log.read；参数有效期和业务结果见 SERVICE_API 对应条目。
 inline int Log_Read(char* buffer, int bufferSize) {
     return Native<int>("rb.service.log", "rb.log.read", 0x1edf04ab4bd979c0ULL, buffer, bufferSize);
+}
+// 同步公开操作 rb.dashboard.refresh_packages；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Dashboard_RefreshPackages() {
+    return Native<int>("rb.service.dashboard", "rb.dashboard.refresh_packages", 0xfa00318f42ab6671ULL);
+}
+// 同步公开操作 rb.dashboard.get_package_count；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Dashboard_GetPackageCount() {
+    return Native<int>("rb.service.dashboard", "rb.dashboard.get_package_count", 0xfa00318f42ab6671ULL);
+}
+// 同步公开操作 rb.dashboard.get_package_info；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Dashboard_GetPackageInfo(int index, RB_DashboardPackageInfo* info) {
+    return Native<int>("rb.service.dashboard", "rb.dashboard.get_package_info", 0x59ec21b307d007dfULL, index, info);
+}
+// 同步公开操作 rb.dashboard.open_package；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Dashboard_OpenPackage(const char* packageId, RB_DashboardPackageHandle* handle) {
+    return Native<int>("rb.service.dashboard", "rb.dashboard.open_package", 0x075b3bbefdf21afdULL, packageId, handle);
+}
+// 同步公开操作 rb.dashboard.close_package；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline void Dashboard_ClosePackage(RB_DashboardPackageHandle handle) {
+    return Native<void>("rb.service.dashboard", "rb.dashboard.close_package", 0x745299af411f38a3ULL, handle);
+}
+// 同步公开操作 rb.dashboard.set_package_page；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Dashboard_SetPackagePage(RB_DashboardPackageHandle handle, int pageIndex) {
+    return Native<int>("rb.service.dashboard", "rb.dashboard.set_package_page", 0x83a59d2a6c6e91ffULL, handle, pageIndex);
+}
+// 同步公开操作 rb.dashboard.render_package_frame；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Dashboard_RenderPackageFrame(RB_DashboardPackageHandle handle, const RB_RuntimeState* state, void* pixels, int width, int height, int stride) {
+    return Native<int>("rb.service.dashboard", "rb.dashboard.render_package_frame", 0xf9dbabb6326815e0ULL, handle, state, pixels, width, height, stride);
+}
+// 同步公开操作 rb.dashboard.get_package_state；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Dashboard_GetPackageState(RB_DashboardPackageHandle handle, RB_DashboardPackageState* state) {
+    return Native<int>("rb.service.dashboard", "rb.dashboard.get_package_state", 0x1bede66f8f624f84ULL, handle, state);
+}
+// 同步公开操作 rb.dashboard.import_package；参数有效期和业务结果见 SERVICE_API 对应条目。
+inline int Dashboard_ImportPackage(const char* sourcePath, char* packageIdBuffer, int packageIdBufferSize) {
+    return Native<int>("rb.service.dashboard", "rb.dashboard.import_package", 0xc4964fc5cc2dd187ULL, sourcePath, packageIdBuffer, packageIdBufferSize);
 }
 // 同步公开操作 rb.serial.get_available_port_count；参数有效期和业务结果见 SERVICE_API 对应条目。
 inline int Serial_GetAvailablePortCount() {

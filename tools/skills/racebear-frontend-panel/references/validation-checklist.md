@@ -51,7 +51,10 @@ tasks during close. Offline service tests do not establish real device timing or
 - Enter empty text, a minus sign, decimals, zero, overflow and invalid pasted text. Valid editing
   must remain possible; invalid drafts must not be written by debounce, blur or window close.
 - Exercise saved-but-readback-failed and saved-but-apply-failed results separately.
-- Verify Dynamic, Motion Effect, Haptic, Platform, and Output each retain their own catalog index domain.
+- Verify Motion Effect, named RGB, Platform, and Output retain their own catalog index domains.
+- Verify Haptic indexes resolve the Dynamic catalog and same-name Haptic nodes; missing nodes use documented defaults.
+- Verify standalone Haptic import requires a same-name Dynamic parent; deleting Haptic preserves that parent.
+- Verify RGB selection reloads the draft before apply, and exported effect packages persist stable telemetry keys.
 - Verify RGB effect telemetry bindings survive restart by stable Key and RGBAPP selection survives refresh by UID.
 - Verify separate RGB layers can map RPM to LED 1-20 and ABS blinking to LED 21-30, including frequency, duty cycle, fill direction, invert, and priority round trips.
 - Verify overlapping RGB layers render in list-derived priority order. Reject segments exceeding
@@ -59,10 +62,22 @@ tasks during close. Offline service tests do not establish real device timing or
 - Verify static effects have no input selector, fixed inputs cannot be rebound, and ordinary inputs
   come from `rb.rgb.get_effect_input_count/GetEffectInput`, including unsupported-source presentation.
 - Verify Seatbelt CAN selects the correct output instance and remains separate from global seatbelt effects.
+- Verify missing-at-start insertion, unplug/replug and fast same-path replug reconnect the original
+  UID after enumeration/logical-index changes. Another controller must not take over. Distinguish
+  Starting, Connected and Ready; no frontend connect loop, old position/RGB replay or implicit
+  homing. Verify fresh-input safety checks, preserved severe locks/controller-reset protection,
+  RGB after reconnect, stop while absent/opening, and maintenance only after all handles close.
 - Verify single left/right/center and dual active-node mapping, startup homing wait, old-firmware
   rejection, releasing/locked states, and user-initiated `RequestReenable`. Reconnect or ordinary
   homing must not unlock or replay old tightening targets. Test disconnect waiting and rejection
   while releasing/EStop remains active; report mechanical zero and release timing as hardware checks.
+- Verify SDK-owned runtime communication recovery after fresh input, healthy transport, and
+  confirmed safe active nodes. Verify SDK drive alarm reset only on currently faulted nodes,
+  0000-0080-0000 reset order, single-right compact mapping, failed writes, persistent alarms,
+  a complete ten-attempt cycle and ten-second cooldown, and automatic recovery after clearing.
+  Persistent failure, stale input, active Bus-Off, EStop, lost homing, incomplete disable,
+  unrelated release failure and controller reset must not auto-enable. Verify measured-position
+  anchoring, no old target replay, and that stop during a probe or reset prevents re-enable.
 - Verify current effective fields are editable, compatibility fields are preserved, and V2 protection
   is not presented alongside a misleading second V1 control set.
 

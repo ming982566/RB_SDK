@@ -2,7 +2,7 @@
 
 本文面向使用 RaceBear SDK 开发仪表、USB 屏幕、浏览器仪表或宿主窗口预览的应用开发者。文档说明从模板制作、数据绑定、渲染到输出部署的完整流程。
 
-本文以 SDK `1.0.2` 的公开 C ABI 为准。函数的精确签名、结构体布局、返回值和字段容量仍以同一版本的 `include/RaceBearSDK.h` 为最终依据；仪表接入使用对象协议和服务目录，不直接导入旧业务符号。
+本文以 SDK `1.0.4` 的公开 C ABI 为准。函数的精确签名、结构体布局、返回值和字段容量仍以同一版本的 `include/RaceBearSDK.h` 为最终依据；仪表接入使用对象协议和服务目录，不直接导入旧业务符号。
 采用对象 ABI 时，本文 Dashboard/VOCORE/Web 操作可用 [同步服务映射](RaceBearSDK_SERVICE_API.md)。
 像素指针和句柄通过 NATIVE_CALL 同步借用，不转 JSON、不进入对象任务队列；
 原业务对帧的复制、最新帧替换、授权和关闭规则不变。不能把本机指针封套发送到网页或网络。
@@ -70,12 +70,12 @@ RB_DASHBOARD_TEMPLATE_FORD_GT    // Ford GT 风格
 - 使用 Ford GT 或随附客户模板时，将 `DashboardAssets/RaceBear` 保持目录结构部署到 `RaceBearSDK.dll` 同级；
 - 目标电脑需要 Microsoft Visual C++ 2015-2022 Redistributable x64。
 
-初始化顺序：
+初始化顺序（以下为对象协议伪代码；可编译实现见 `examples/dashboard_render`）：
 
-```cpp
-rb.runtime.set_app_data_name("MyDashboardApp");
-RB_Runtime_Initialize();
-rb.runtime.start(2); // 单位为 ms；仪表刷新不跟随这个周期
+```text
+通过 rb.service.runtime 同步调用 rb.runtime.set_app_data_name("MyDashboardApp")
+RB_Runtime_Initialize()，检查返回值
+Invoke("rb.runtime.start", {"intervalMs":2})，Poll 至终态并检查 ResultCode
 ```
 
 仪表刷新建议由宿主自己的 16-33 ms 定时器驱动。SDK 后端循环可以按 1-2 ms 计算，但不应让每个后端 Tick 都生成一张仪表画面。
@@ -92,7 +92,10 @@ rb.runtime.start(2); // 单位为 ms；仪表刷新不跟随这个周期
 6. 导出单个 `.rbdash` 文件。
 7. 在 SDK 中重新导入并校验；设计器通过不代表运行时一定接受，SDK 校验才是最终结果。
 
-随 SDK 提供的 `assets/Dashboard/RaceBear/Custom/RaceBearStarter.rbdash` 是最小可编辑示例，设计尺寸为 `854x480`，包含车速、档位、转速表和转速条。
+随 SDK 提供的 `bin/x64/Release/DashboardAssets/RaceBear/Custom/RaceBearStarter.rbdash`
+是最小可编辑示例，设计尺寸为 `854x480`，包含车速、档位、转速表和转速条。
+`examples/dashboard_render` 提供可编译 Win32 实现：包目录、导入、Open、切页、
+Render、固定 BGRA stride、DIB 显示和句柄关闭；默认离线预览，显式 `--runtime` 才启动循环。
 
 ## 5. `.rbdash` V1 文件格式
 
@@ -419,9 +422,33 @@ rb.dashboardweb.submit_frame(
 
 同一 `RB_DashboardPackageHandle` 不应被多个线程同时设置页面和渲染。需要切页时在渲染线程或受互斥保护的 UI 命令队列中执行。
 
+### 12.1 CPU 与刷新验证
+
+2026-11-15 开发更新优化了内置仪表图片路径，特别是 Ford GT 的转速表：
+图片按最终像素尺寸缓存高质量缩放结果，动态转速只改变裁切宽度。缓存由各渲染
+线程独立持有，每线程以约 32 MiB 的像素估算预算淘汰旧项；保持固定渲染线程和
+目标尺寸可复用缓存，不应为每帧创建线程。字体缓存同时忽略字体名称结束符后的
+无效尾字节，避免相同字体重复创建 GDI 句柄。客户 `.rbdash` 渲染器未在本次修改。
+
+像素格式、stride、模板枚举、服务签名、刷新频率与 VOCORE 最新帧发送策略不变。
+高质量插值仍保留；非整数比例的图片位置和裁切落在目标像素上，边缘可能与旧版
+存在细微像素差异。首次加载或更换尺寸包含缓存建立开销，性能计量应区分首次和稳态。
+
+测试时分别记录纯渲染耗时、固定帧 USB 发送 CPU，以及相同模板/分辨率/提交频率下
+渲染加输出的 CPU；同时记录实际发送 FPS、替换/丢帧和错误计数。提交 30 或 60 FPS
+不代表屏幕或链路支持同等实际 FPS。整体宿主 CPU 还包含 UI、游戏、其它输出与编码，
+隔离渲染测试不能替代整机复测。CPU 型号、逻辑处理器数、配置和实际加载 DLL 的
+路径/哈希必须一致，详见[前端指南](RaceBearSDK_FRONTEND_GUIDE.md)的 CPU 验证。
+
 ## 13. 退出顺序
 
 退出前必须先停止宿主定时器和工作线程，确保不再提交新帧。然后按以下顺序释放：
+
+内置模板的离线渲染即使没有调用 `RB_Runtime_Initialize()`，卸载 DLL 前也须调用
+`RB_Runtime_Shutdown()`。现有 Shutdown 入口会在普通调用上下文释放内置图片、
+字体缓存和 GDI+ 会话，避免把图形后台线程的等待留到 DLL 卸载阶段。
+先停止所有 SDK 调用、关闭自有句柄，再 Shutdown，最后才能 `FreeLibrary`；
+同一进程下一轮渲染会重新建立缓存。不能用直接卸载 DLL 代替正常关闭流程。
 
 ```cpp
 if (web != nullptr) {

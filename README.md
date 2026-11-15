@@ -1,18 +1,44 @@
 # RaceBear SDK
 
-## 统一对象 ABI（1.0.2）
+## 统一对象 ABI（1.0.4）
 
 新增 7 个 `RB_Object_*` 入口，配合原版本/初始化/关闭入口组成主要 10 个接入函数。
 当前目录覆盖 9 个状态/草稿对象、29 个同步服务域、20 个异步动作。
-剩余 265 个公开业务操作均可走 NATIVE_CALL，参数映射见
+281 个公开业务操作均可走 NATIVE_CALL，参数映射见
 [同步服务目录](docs/RaceBearSDK_SERVICE_API.md)；第一方兼容操作不属于第三方合同。
 旧业务函数已从第三方公开 ABI 和 DLL 导出表移除；当前标准公开头和 DLL 仅保留上述 10 个入口。
 旧业务实现只作为 SDK 内部服务的实现细节保留，第三方不得定义内部迁移宏或直接导入旧符号。
 并发、版本冲突、缓冲区、生命周期和覆盖限制见
 [统一对象协议](docs/RaceBearSDK_OBJECT_API.md)。
 公开 SDK 仅保留 C++ 示例，全部使用 10 个统一 ABI；不再提供 Python 示例或旧业务函数绑定。
-协议版本为 1，运行时为 1.0.2；启动时应检查 10 个导出并读取 Describe 的协议版本。
+协议版本为 1，运行时为 1.0.4；启动时应检查 10 个导出并读取 Describe 的协议版本。
 本地开发和压缩包验证不等于真实设备、游戏或 USB 长稳验收。
+
+## 1.0.4
+
+- 优化内置仪表图片缩放与字体缓存，降低 Ford GT 等模板的 CPU 开销；修复内置
+  渲染后的 DLL 卸载等待。包括离线渲染在内，宿主须停止全部调用后执行 Shutdown。
+  本机 854×480 VOCORE 隔离渲染加发送测试中，Release/30FPS 提交的 Ford GT CPU
+  约 8.03% 降至 1.52%，实际发送仍约 23FPS；不是完整前端或其它机器的性能保证。
+- CAN 正常目标解析去除逐轴转换异常，重连退避改为阻塞等待，降低正常输出及
+  重连期间的 CPU 开销；功能插件每周期只取一次专用数值快照，保持原计算/输出频率。
+- 安全带支持保持连接意图时按原 UID 等待设备和 USB 重连，清理断线前旧目标；
+  连续异步接收避免空闲时反复取消 IN。运行中临时通信异常和可复位驱动报警在
+  新鲜输入、链路健康及节点安全确认后自动恢复；急停、原点丢失、非报警释放失败
+  和控制器复位仍需人工处理。USB Connected 不等于电机 Ready。
+- 增加能力门控的 CAN 故障快照接收和去重日志，辅助诊断错误计数、总线及同步
+  状态。配套 CAN APP 2026111401 单独维护和交付；本 x64 SDK 包不包含固件，
+  不要求重刷 BOOT/IAP，旧固件不会收到新诊断查询。
+- 合并第三方反馈修正：RGB 命名方案、独立 MotionEffect/Haptic 配置包、Dynamic
+  包携带同名效果；补齐业务合同、RGB 工作流、离线服务目录、术语、交付校验和
+  C++ 方案/仪表渲染示例。Haptic 索引继续复用 Dynamic，RGB 选定不隐式应用。
+- 运行时及 DLL 文件版本统一为 1.0.4；对象协议 v1、10 个 DLL 入口保持不变，
+  公开同步操作为 281 项。提供匹配的 VS2019/v142 x64 Debug/Release 产物、
+  完整前端 Skill、依赖清单与逐文件 SHA256；不包含 SDK 私有源码或 Python 示例。
+
+机械保护、真实游戏、USB 热插拔与长稳仍须按指南实机验收；本版不宣称已根治全部
+USB OUT 挂起或所有硬件 Bus-Off。SimRacebear 商场模式、固件和 SimHub x86 插件
+不属于本包交付范围。
 
 ## 1.0.2
 
@@ -178,6 +204,9 @@ Application developers should read:
 - `docs/RaceBearSDK_API.md`: integration guide, call order, field units, and common failure causes.
 - `docs/RaceBearSDK_DASHBOARD_DEVELOPMENT.md`: dashboard template, data binding, rendering, VOCORE, Web output, threading, and deployment guide.
 - `docs/RaceBearSDK_RB_CAN_GUIDE.md`: RB_CAN device discovery, logical-index assignment, stable UID binding, diagnostics, and recovery workflow.
+- `docs/RaceBearSDK_SERVICE_CONTRACTS.md` and `docs/RaceBearSDK_RGB_WORKFLOW.md`: configuration ownership, profile packages, error codes, and complete RGB workflows.
+- `docs/RaceBearSDK_BUILD_AND_DELIVERY.md` and `docs/RaceBearSDK_UI_REFERENCE.md`: delivery identity, toolsets, runnable references, and asset boundaries.
+- `docs/service-api.json` and `docs/glossary.csv`: offline public operation catalog and terminology.
 - `tools/skills/racebear-frontend-panel`: reusable, tool-neutral AI coding Skill for frontend implementation, review, and debugging.
 
 The public header, import library, DLL, documentation, and Skill provide the
@@ -225,7 +254,8 @@ cmake --build build-examples --config Release
 cmake --build build-examples --config Debug
 ```
 
-This builds the console, UDP bridge, object protocol and MotionStudio programs.
+This builds the console, UDP bridge, object protocol, MotionStudio, profile package
+and dashboard render programs.
 The build copies matching SDK and libusb DLLs beside each executable.
 MotionStudio also includes its own Visual Studio solution under
 `examples/RaceBearMotionStudio`. The SDK implementation project is private and
@@ -311,7 +341,8 @@ the C++ examples use host-side object service wrappers rather than legacy DLL im
 - `bin/x64/Debug` and `bin/x64/Release` matching DLL/LIB and dependencies.
 - `docs/` complete integration, object and service manuals.
 - `examples/` C++ sources using only the unified ABI.
-- `tools/` public release tools, Dashboard Designer and the frontend Skill.
+- `tools/` public release and verification tools, Dashboard Designer and the frontend Skill.
+- `SDK_DEPENDENCIES.json` and `SHA256SUMS.txt` release identity and complete package hashes.
 
 ## Notes
 

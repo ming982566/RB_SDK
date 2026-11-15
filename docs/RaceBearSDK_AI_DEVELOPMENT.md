@@ -45,7 +45,10 @@ SDK 根目录通过 `include/RaceBearSDK.h` 与 `docs` 同时存在确定，不�
 | 6 | `tools/skills/racebear-frontend-panel/SKILL.md` | 可选工具无关规则入口；未安装 Skill 时也能直接读文件 |
 | 按需 | [CAN 指南](RaceBearSDK_RB_CAN_GUIDE.md) | UID、绑定、健康、维护、恢复 |
 | 按需 | [仪表开发](RaceBearSDK_DASHBOARD_DEVELOPMENT.md) | 包格式、设计器、像素、VOCORE、Web、资源 |
-| 采用对象 ABI 时必读 | [统一对象 ABI](RaceBearSDK_OBJECT_API.md) / [同步服务目录](RaceBearSDK_SERVICE_API.md) | 协议第 0 节提供 key 分类、调用路线和公开服务域用途；第 2/5 节列对象/命令，服务目录列全部 265 项公开操作参数 |
+| 所有接入必读 | [统一对象 ABI](RaceBearSDK_OBJECT_API.md) / [同步服务目录](RaceBearSDK_SERVICE_API.md) | 协议第 0 节提供 key 分类、调用路线和公开服务域用途；第 2/5 节列对象/命令，服务目录列全部 281 项公开操作参数 |
+| 配置、错误与工具 | [服务业务合同](RaceBearSDK_SERVICE_CONTRACTS.md) / [离线目录](service-api.json) | 方案归属、配置包、错误层次、JSON key 和离线签名 |
+| RGB 页面 | [RGB 工作流](RaceBearSDK_RGB_WORKFLOW.md) | 设备、命名方案、草稿、应用、保存与 Flash 的区别 |
+| 构建与视觉 | [交付指南](RaceBearSDK_BUILD_AND_DELIVERY.md) / [界面参考](RaceBearSDK_UI_REFERENCE.md) / [术语](glossary.csv) | 工具集、完整性清单、素材边界与参考实现 |
 | 按需 | SDK 根目录的 `examples/README.md` | 仅 C++ 可构建示例，全部使用 10 个统一 ABI；其它语言按公开协议自行绑定 |
 
 Skill 的 feature-routing、integration-workflow、implementation-patterns、
@@ -177,7 +180,7 @@ Python 保留 ctypes callback，Qt 回调排队至主线程；Web 前端使用�
 | 游戏/遥测 | 无游戏、无数据、不支持输入、合法 0、断流 | 状态与值不混淆；Index 不当作行号或持久化键 |
 | 平台/效果 | 支持的 DOF、多输入/路由、保护开关、各配置域切换 | 全字段往返，范围与单位正确，不添加宿主二次运动算法 |
 | 输出/CAN | 多实例、多 UID、重复逻辑索引、断开/故障/恢复 | 所选与已绑定区分；前置条件、实际状态及错误可见 |
-| 安全带保护 | 单左/单右/居中/双路、旧固件、上电回零、失联、急停、显式恢复 | 仅有效节点参与；无自动重使能/旧目标重放；断开后台等待；离线验证与实机释放分别记录 |
+| 安全带保护 | 单左/单右/居中/双路、旧固件、上电回零、USB缺席/拔插、通信异常/驱动报警自动恢复、持续报警退避冷却、急停、显式恢复 | 仅有效节点参与；USB按原UID自动重连，Starting/Connected/Ready分开，不循环发起连接；SDK复位驱动报警并安全复核后恢复，持续报警停输出并按轮重试；急停/原点丢失/非报警释放失败及控制器复位保留人工恢复；实际位置锚定且不重放旧目标；主动断开终止重试并后台收尾；离线验证与实机释放分别记录 |
 | 维护 | 导入非法/合法、未保存编辑、同步部分失败、目标离线 | 草稿及勾选不丢；不宣称自动回滚；任务未结束不退出维护 |
 | RGB | 设备限制、逻辑段、RPM/ABS 双层、排序、Flash Save | 来源按效果目录、范围分层验证、主机/设备保存分开 |
 | 仪表 | 内置/客户包、横竖尺寸、资源缺失、切包、输出独立开关 | 返回码、stride、非空像素和截图、句柄计数/关闭 |

@@ -7,6 +7,8 @@
 | `object_api` | 直接演示目录、默认值、版本草稿、异步任务和整帧遥测 |
 | `cpp` | 控制台生命周期、外部遥测、配置片段和自定义 UDP 数据包 |
 | `cpp/simhub_udp_bridge` | 接收 SimHub Generic UDP 最终轴值，提交 SDK CAN 输出 |
+| `cpp/profile_packages` | RGB 命名库、MotionEffect/Haptic 独立包的配置往返 |
+| `dashboard_render` | Win32 `.rbdash` 包选择、导入、切页、BGRA/DIB 渲染与离线快照 |
 | `RaceBearMotionStudio` | Win32 控制面板，含平台、动态、效果、输出和串口页面 |
 | `common` | 示例共用的本机服务包装和按配置匹配的构建设置 |
 
